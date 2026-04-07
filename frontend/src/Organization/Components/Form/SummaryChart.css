@@ -1,0 +1,114 @@
+.submission-card {
+    padding: 20px;
+    border-radius: 8px;
+    width: 100%;
+}
+
+.bar-chart {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    height: 150px;
+    margin-top: 20px;
+}
+
+.bar {
+    background-color: #0d6efd;
+    width: 20px;
+    border-radius: 5px 5px 0 0;
+}
+
+.day {
+    text-align: center;
+    margin-top: 5px;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.legend {
+    margin-bottom: 10px;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 15px;
+    font-size: 0.9rem;
+}
+
+.legend-color {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background-color: #0d6efd;
+    margin-right: 5px;
+}
+
+.submission-info {
+    display: flex;
+    align-items: center;
+}
+
+.icon-container {
+    background-color: #e0e7ff; /* Light purple/blue */
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 15px;
+}
+
+.icon {
+    /* You might need to use an actual icon font or SVG here */
+    /* This example uses a placeholder text */
+    color: #3b82f6; /* Blue */
+    font-size: 1.5rem;
+}
+
+.text-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.date-range {
+    color: #6b7280; /* Gray */
+    font-size: 0.8rem;
+}
+
+.count {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #000; /* Black */
+}
+
+@media (min-width:1430px) {
+    .bar{
+        width: 20px;
+    }
+    
+}
+@media (max-width:768px) {
+    .bar{
+        width: 10px;
+    }
+    .submission {
+        display: flex;
+        align-items: left;
+        flex-direction: column;
+    }
+    .texts {
+        display: flex;
+        font-size: small;
+        align-items: left;
+        flex-direction: column;
+    }
+    .legend-item {
+    display:flex;
+    text-align: left;
+    align-items: left;
+    margin-right: 15px;
+    font-size: 0.9rem;
+}
+}

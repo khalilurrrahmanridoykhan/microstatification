@@ -1,0 +1,111 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-09-03T11:04:51.302+06:00</start>
+          <end>2025-09-03T11:14:37.449+06:00</end>
+          <diagnostic_information>
+            <patient_id_type>birth_id</patient_id_type>
+            <user_identification_11_9943_01976848561>sfsdf</user_identification_11_9943_01976848561>
+            <type_of_test_facility>facilities</type_of_test_facility>
+            
+            <type_of_test>bse</type_of_test>
+            
+            <types_of_diseases_for_bse>positive</types_of_diseases_for_bse>
+          </diagnostic_information>
+          <data_collector_s_information>
+            
+            
+            
+            <lab_name>lama_upazila_health_complex</lab_name>
+            
+            <name_of_the_organization>community_clinic</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>sfd</patient_name>
+            <guardians_name>sdf</guardians_name>
+            <_nationality>burmese__myanamar_</_nationality>
+            
+            <phone_number>01726848561</phone_number>
+            <age>5-14</age>
+            <weight>40</weight>
+            <gender>other</gender>
+            
+            <racegroup>marma</racegroup>
+            
+            <occupation>dependent</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>mymensingh</division>
+            <district>mymensingh</district>
+            <upazila>fulbaria</upazila>
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>other</patients_country_of_origin>
+            <other_7/>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_past_year>no</have_you_or_any_member_of_your_household_had_malaria_within_past_year>
+            
+            <date_of_onset_fever>2025-09-09</date_of_onset_fever>
+            <date_of_first_test>2025-09-24</date_of_first_test>
+            <type_of_species>plasmodium_ovale__po_</type_of_species>
+            
+            
+            <treatment_1>act___primaquine</treatment_1>
+            <treatment_2>act__24-tab_</treatment_2>
+            
+            <date_of_initiation_of_treatment>2025-09-03</date_of_initiation_of_treatment>
+            <the_patient_is_referred>no</the_patient_is_referred>
+            
+            
+            
+            
+            
+            
+            <case_classification>introduced</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>20</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.770212 90.421507 0 0</position_of_the_patient_coordinates_of_the_patient>
+            <lab_district>rangamati</lab_district>
+            <lab_upazila>sadar_2</lab_upazila>
+            <lab_organization>brac_9</lab_organization>
+            <lab_location_list_of_the_lab>kutukchari</lab_location_list_of_the_lab>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>outside_bangladesh</if_yes__type_of_travel>
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>mozambique_</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:f1238a1f-835c-4499-ae87-255db6e25fcc</instanceID>
+          </meta>
+        </data>

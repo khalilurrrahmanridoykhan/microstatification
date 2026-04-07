@@ -1,0 +1,123 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1867" version="20240601">
+          <start>2025-10-30T15:03:46.140+06:00</start>
+          <end>2025-10-30T15:05:42.053+06:00</end>
+          <malaria_case_record_form>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test_1>rdt</type_of_test_1>
+            <types_of_diseases_for_rdt>negative</types_of_diseases_for_rdt>
+            
+            
+          </malaria_case_record_form>
+          <data_collector_s_information>
+            <employee_name>qwert</employee_name>
+            <designation_of_data_collector>lab_technician__lt_</designation_of_data_collector>
+            
+            
+            
+            
+            
+            <name_of_the_organization>aclab_</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>qwert</patient_name>
+            <guardians_name>sdfg</guardians_name>
+            <nationality>bangladeshi</nationality>
+            
+            <phone_number>09876543212</phone_number>
+            <user_identification>vaccine_card_id</user_identification>
+            
+            
+            <vaccine_card_id>1234567890</vaccine_card_id>
+            
+            
+            <age>15_</age>
+            <weight>33</weight>
+            <gander>male</gander>
+            
+            <racegroup>garo</racegroup>
+            
+            <occupation>housewife</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>rangpur</division>
+            <district>gaibandha</district>
+            <upazila>gaibandha_sadar</upazila>
+            <union>badiakhali</union>
+            
+            
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            <division_1>sylhet</division_1>
+            <district_1>sunamganj</district_1>
+            <upazila_1>bishwambarpur</upazila_1>
+            <union_1>dhonpur</union_1>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>no</have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>
+            
+            <date_of_onset_fever>2025-10-08</date_of_onset_fever>
+            <date_of_first_test>2025-10-16</date_of_first_test>
+            <type_of_species>mixed__pf_pv_</type_of_species>
+            
+            
+            <treatment1>act___primaquine</treatment1>
+            
+            <treatment2>coartem_12_act</treatment2>
+            <date_of_initiation_of_treatment>2025-10-29</date_of_initiation_of_treatment>
+            <the_patient_is_referred>no</the_patient_is_referred>
+            
+            
+            
+            
+            
+            
+            <case_classification>imported_local</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>pacd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>3</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.812506 90.374144 0 95543.56236449636</position_of_the_patient_coordinates_of_the_patient>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>mozambique</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:7df916e7-f5ce-4da0-9b42-fdc920706a1d</instanceID>
+          </meta>
+        </data>

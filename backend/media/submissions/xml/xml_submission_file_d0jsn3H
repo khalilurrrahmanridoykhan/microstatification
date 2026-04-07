@@ -1,0 +1,46 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_2288" version="20240601">
+          <start>2025-12-08T14:31:06.921+06:00</start>
+          <end>2025-12-08T14:35:42.878+06:00</end>
+          <basic_information>
+            <name_of_the_assessee>Manju Khanam</name_of_the_assessee>
+            <national_id_no/>
+            <utin/>
+            <etin>197143289170</etin>
+            <circle>26</circle>
+            <taxes_zone>02, Chattogram</taxes_zone>
+            <assessment_year>2024_25</assessment_year>
+            <residential_status>non-resident</residential_status>
+            <status>individual</status>
+            <business_name/>
+            <wife_husband_name__tin>Md Abdur Rouf Mondol</wife_husband_name__tin>
+            <fathers_name>late Abdul kuddus Khan</fathers_name>
+            <mothers_name>Mosr Nurnahar betgum</mothers_name>
+            <date_of_birth/>
+            <address__present>Jubille Road Kotowali, Chattogram</address__present>
+            <address__permanent>Vill=: Sundorganj Bazar po: &amp; PS: Sundorganj. Gaibandha</address__permanent>
+            <telephone_office_residence/>
+            <vat_registration_number/>
+          </basic_information>
+          <income_statement_section>
+            <income_from_business/>
+            <income_from_salary/>
+            <income_from_house_property/>
+            <capital_gains/>
+            <agricultural_income/>
+            <interest_on_securities/>
+            <foreign_income/>
+          </income_statement_section>
+          <tax_payment_section>
+            <tax_deducted_at_source>1152000</tax_deducted_at_source>
+            <advance_tax/>
+            <tax_paid_us_173/>
+            <refund_adjustment/>
+          </tax_payment_section>
+          <verification>
+            <signature>1-14_35_19.jpg</signature>
+            <date/>
+          </verification>
+          <meta>
+            <instanceID>uuid:c4a331d3-6fe8-4573-a2be-b464f22f9518</instanceID>
+          </meta>
+        </data>

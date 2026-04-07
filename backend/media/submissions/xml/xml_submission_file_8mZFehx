@@ -1,0 +1,24 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_99" version="20240601">
+          <start>2025-07-22T12:37:28.203+06:00</start>
+          <end>2025-07-22T12:53:30.668+06:00</end>
+          <what_s_your_name_>huihogi</what_s_your_name_>
+          <how_old_are_you_>999</how_old_are_you_>
+          <what_s_time_now_>2025-07-30</what_s_time_now_>
+          <what_s_time_now__1>13:00:00.000+06:00</what_s_time_now__1>
+          <what_s_date_and_time_now_>2025-08-01T13:00:00.000+06:00</what_s_date_and_time_now_>
+          <your_current_location>23.754478 90.365366 0 12.562</your_current_location>
+          <draw_a_line>23.753961 90.357711 0 0;23.754864 90.365145 0 0</draw_a_line>
+          <draw_a_shape>23.749145 90.360202 0 0;23.753859 90.363984 0 0;23.748903 90.368784 0 0;23.749145 90.360202 0 0</draw_a_shape>
+          <write_a_fraction_value>88</write_a_fraction_value>
+          <scan_barcode>not working in web version</scan_barcode>
+          <company_rating>5</company_rating>
+          <select_alphabet>a</select_alphabet>
+          <select_multiple_alphabet>x z</select_multiple_alphabet>
+          <note_will_be_read_out_loud/>
+          <confirm_terms_and_conditions>OK</confirm_terms_and_conditions>
+          <take_picture>software-language-programmer-avatar_24877-764-12_53_23.avif</take_picture>
+          <pick_file>Css selector1-12_53_29.docx</pick_file>
+          <meta>
+            <instanceID>uuid:78998730-a8fe-4108-b839-284bf38e80af</instanceID>
+          </meta>
+        </data>

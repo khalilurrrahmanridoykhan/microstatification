@@ -1,0 +1,8 @@
+flutter clean
+flutter pub get
+flutter run
+
+flutter build ios --release
+
+Run the following command to update all packages:
+flutter pub upgrade --major-versions

@@ -1,0 +1,123 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1959" version="20240601">
+          <start>2025-11-06T12:42:16.668+06:00</start>
+          <end>2025-11-06T12:45:42.785+06:00</end>
+          <malaria_case_record_form>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test_1>rdt</type_of_test_1>
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            
+            
+          </malaria_case_record_form>
+          <data_collector_s_information>
+            <employee_name>qwer</employee_name>
+            <designation_of_data_collector>nursing__ss_</designation_of_data_collector>
+            
+            
+            
+            
+            
+            <name_of_the_organization>brac_</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>asdf</patient_name>
+            <guardians_name>sdfg</guardians_name>
+            <nationality>bangladeshi</nationality>
+            
+            <phone_number>01876543211</phone_number>
+            <user_identification>nid_id</user_identification>
+            <nid_id>1234567890</nid_id>
+            
+            
+            
+            
+            <age>15_</age>
+            <weight>45</weight>
+            <gender>male</gender>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>day_laborer</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division_2_2>chattogram_24_2</division_2_2>
+            <district_4_2>cox_s_bazar_2_2</district_4_2>
+            <upazila_2_2>cox_s_bazar_sadar_2_2</upazila_2_2>
+            <union_2_2>cox_s_bazar_paurashava_2_2</union_2_2>
+            <ward_2_2>ward_no._01_3_2_2</ward_2_2>
+            <brac_village_2_2>uttar_kutubdia_para_3_2</brac_village_2_2>
+            
+            <village_2_2>uttar_kutubdia_para__veron_para__2_2</village_2_2>
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            <division_2>chattogram_24</division_2>
+            <district_4>cox_s_bazar_2</district_4>
+            <upazila_2>cox_s_bazar_sadar_2</upazila_2>
+            <union_2>cox_s_bazar_paurashava_2</union_2>
+            <ward_2>ward_no._01_3_2</ward_2>
+            <brac_village_2>other_401_2</brac_village_2>
+            <other_15_3>qwerty</other_15_3>
+            
+            <village_3_2>madhyam_kutubdia_para__bara_masjid_elaka__3</village_3_2>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>yes</have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>
+            <how_many_times>2</how_many_times>
+            <date_of_onset_fever>2025-10-27</date_of_onset_fever>
+            <date_of_first_test>2025-10-31</date_of_first_test>
+            <type_of_species>plasmodium_falciparum__pf_</type_of_species>
+            
+            
+            <treatment1>act___primaquine</treatment1>
+            
+            <treatment2>coartem_6_act</treatment2>
+            <date_of_initiation_of_treatment>2025-11-05</date_of_initiation_of_treatment>
+            <the_patient_is_referred>no</the_patient_is_referred>
+            
+            
+            
+            
+            
+            
+            <case_classification>imported_non-local</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>4</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.809229 90.393805 0 95924.34578486734</position_of_the_patient_coordinates_of_the_patient>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>outside_bangladesh</if_yes__type_of_travel>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>india</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:3fe6afb2-ca60-4e21-80de-ddb27324a133</instanceID>
+          </meta>
+        </data>

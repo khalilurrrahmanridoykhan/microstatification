@@ -1,0 +1,46 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_2288" version="20240601">
+          <start>2025-12-08T15:47:52.521+06:00</start>
+          <end>2025-12-08T15:59:32.308+06:00</end>
+          <basic_information>
+            <name_of_the_assessee>Manju Khanam</name_of_the_assessee>
+            <national_id_no/>
+            <utin>197143289170</utin>
+            <etin>197143289170</etin>
+            <circle>26</circle>
+            <taxes_zone>02, Chattagram</taxes_zone>
+            <assessment_year>2024_25</assessment_year>
+            <residential_status>resident</residential_status>
+            <status>individual</status>
+            <business_name/>
+            <wife_husband_name__tin>Md. Abdur Rauf Mondal</wife_husband_name__tin>
+            <fathers_name>Late Abdul Kuddus Khan</fathers_name>
+            <mothers_name>Most. Nurnahar Begum</mothers_name>
+            <date_of_birth/>
+            <address__present>Jubilee Road, Kotowali, Chattagram</address__present>
+            <address__permanent>Vill: Sundorganj Bazar, PO: &amp; PS: Sundorganj, Dist. Gaibandha</address__permanent>
+            <telephone_office_residence/>
+            <vat_registration_number/>
+          </basic_information>
+          <income_statement_section>
+            <income_from_business/>
+            <income_from_salary/>
+            <income_from_house_property/>
+            <capital_gains/>
+            <agricultural_income/>
+            <interest_on_securities>1152000</interest_on_securities>
+            <foreign_income/>
+          </income_statement_section>
+          <tax_payment_section>
+            <tax_deducted_at_source>1152000</tax_deducted_at_source>
+            <advance_tax/>
+            <tax_paid_us_173/>
+            <refund_adjustment/>
+          </tax_payment_section>
+          <verification>
+            <signature/>
+            <date/>
+          </verification>
+          <meta>
+            <instanceID>uuid:01274aa5-9936-4cf3-9d13-538f631ccdc6</instanceID>
+          </meta>
+        </data>

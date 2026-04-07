@@ -1,0 +1,39 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_540" version="20240601">
+          <start>2025-08-17T16:41:49.883+06:00</start>
+          <end>2025-08-17T16:47:10.843+06:00</end>
+          <type_of_test>rdt</type_of_test>
+          <employee_name>Mridul</employee_name>
+          <data_collectors_position>health_worker__sk_hw_</data_collectors_position>
+          
+          
+          <name_of_the_institution>government_health_facility</name_of_the_institution>
+          <patient_name>Ayon</patient_name>
+          <guardians_name>Sabbir</guardians_name>
+          <phone_number>01722224567</phone_number>
+          <division>chattogram</division>
+          <district>bandarban</district>
+          <upazila>lama</upazila>
+          <union>lama_sadar</union>
+          <ward>ward_no_09_6</ward>
+          <village>gotiram_para</village>
+          <age>35</age>
+          <weight>70</weight>
+          <gender>male</gender>
+          <race_i_group>garo</race_i_group>
+          <occupation>agriculture</occupation>
+          <have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>yes</have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>
+          <date_of_onset_fever>2025-08-17</date_of_onset_fever>
+          <date_of_doing_test>2025-08-18</date_of_doing_test>
+          <type_of_disease>plasmodium_falciparum</type_of_disease>
+          <severe_malaria>yes</severe_malaria>
+          <treatment>act___primaquine</treatment>
+          <date_of_initiation_of_treatment>2025-08-17</date_of_initiation_of_treatment>
+          <the_patient_is_referred>yes</the_patient_is_referred>
+          <case_identification>acd</case_identification>
+          <the_total_number_of_llins_limited_insecticides_in_your_house>123</the_total_number_of_llins_limited_insecticides_in_your_house>
+          <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+          <lab_location>23.786291 90.400358 0 76631.99276551639</lab_location>
+          <meta>
+            <instanceID>uuid:b3e1c833-080e-4f10-bab6-3d687208a632</instanceID>
+          </meta>
+        </data>

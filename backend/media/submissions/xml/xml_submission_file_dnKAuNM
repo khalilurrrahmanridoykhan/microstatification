@@ -1,0 +1,61 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1079" version="20240601">
+          <start>2025-12-23T12:18:09.483+06:00</start>
+          <end>2025-12-23T12:23:58.736+06:00</end>
+          <health_worker_s_information>
+            <date>2025-12-23</date>
+            <name_of_staff>ADDITO ISLAM SHIAM</name_of_staff>
+            <organization>brac</organization>
+            <designation_1>cm</designation_1>
+            
+          </health_worker_s_information>
+          <suspected_patient-related_information>
+            <reporting_sites>city_corporation</reporting_sites>
+            
+            
+            
+            
+            
+            
+            <city_corporation>narayanganj</city_corporation>
+            <ward_1>ward_no_20_2</ward_1>
+            <location>23.780252 90.410126 10.428607699358075 9.97273016336542</location>
+            <hh_id>NCC20B401</hh_id>
+            <hh_head_name>ANWAR MIA</hh_head_name>
+            <suspected_in_the_disease>yes</suspected_in_the_disease>
+            <name_of_the_person_with_suspected_case>KHALEDA BEGUM</name_of_the_person_with_suspected_case>
+            <mobile_number>01843078599</mobile_number>
+            <patient_id_type/>
+            
+            <age>28</age>
+            <sex>female</sex>
+            <pregnent>no</pregnent>
+            <suspected_disease>dengue</suspected_disease>
+          </suspected_patient-related_information>
+          <referral-related_information>
+            <referred>yes</referred>
+            <referral_place>govt</referral_place>
+            <if_referred_to_govt>upazila_health_complex</if_referred_to_govt>
+          </referral-related_information>
+          <health_behaviour>
+            <bed_net_use_practice_during_sleep>yes</bed_net_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>yes</handwashing_practice_with_soap__water>
+            <type_latrine_use>pit_latrine</type_latrine_use>
+          </health_behaviour>
+          <information_of_already_identified_patient_s_>
+            
+            
+            
+          </information_of_already_identified_patient_s_>
+          <environmental_related_information_>
+            <presence_of_stagnant_water_mosquito_breeding_sites>no</presence_of_stagnant_water_mosquito_breeding_sites>
+            
+          </environmental_related_information_>
+          <disaster-related_information>
+            <did_any_disaster_occur_in_last_7_days_>no</did_any_disaster_occur_in_last_7_days_>
+            
+          </disaster-related_information>
+          <remarks/>
+          <meta>
+            <instanceID>uuid:c0dd491f-436d-4d78-8142-6266ca44c53e</instanceID>
+          </meta>
+        </data>

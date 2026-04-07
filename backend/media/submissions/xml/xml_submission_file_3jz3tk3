@@ -1,0 +1,91 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-08-27T10:01:11.221+06:00</start>
+          <end>2025-08-27T10:11:30.212+06:00</end>
+          <diagnostic_information>
+            <type_of_test_facility>community facilities</type_of_test_facility>
+            
+            
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            
+            
+            
+            
+            
+            <name_of_the_organization>ekata</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>sdfghjk</patient_name>
+            <guardians_name>asdfghjk</guardians_name>
+            <_nationality>indian</_nationality>
+            
+            <phone_number>85236974121</phone_number>
+            <nidbirth_id_number>2587417410</nidbirth_id_number>
+            <age>25___44</age>
+            <weight>-145</weight>
+            <gender>male</gender>
+            
+            <racegroup>other</racegroup>
+            <other_6>asdfghjkl</other_6>
+            <occupation>dependent</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>chattogram</division>
+            <district_1>bandarban</district_1>
+            <upazila_1>alikadam</upazila_1>
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            
+            <division_1>barishal</division_1>
+            <district>bandarban</district>
+            <upazila>alikadam</upazila>
+            <if_mmr__ind_and_others_/>
+            
+            
+            
+            <subdistrict/>
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_past_year/>
+            
+            <date_of_onset_fever/>
+            <date_of_1st_test/>
+            <species/>
+            <severe_malaria/>
+            
+            
+            
+            
+            <the_patient_is_referred/>
+            
+            
+            
+            
+            
+            
+            <case_identification/>
+            
+            <the_total_number_of_llins_limited_insecticides_in_your_house/>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days/>
+            <position_of_the_patient_coordinates_of_the_patient/>
+            <lab_district/>
+            <lab_upazila/>
+            <lab_organization/>
+            <lab_location_list_of_the_lab/>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history/>
+            
+            
+            <district_3/>
+            <upazila_2/>
+            <if_international__specify_the_last_country_visited./>
+            <other_3/>
+          </travel_history>
+          <meta>
+            <instanceID>uuid:b1ee9edb-eed7-4ebe-9d8d-178c12cb7542</instanceID>
+          </meta>
+        </data>

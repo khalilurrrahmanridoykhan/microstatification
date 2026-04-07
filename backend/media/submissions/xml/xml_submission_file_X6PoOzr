@@ -1,0 +1,123 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1959" version="20240601">
+          <start>2025-11-06T12:58:01.425+06:00</start>
+          <end>2025-11-06T14:34:04.448+06:00</end>
+          <malaria_case_record_form>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test_1>rdt</type_of_test_1>
+            <types_of_diseases_for_rdt>negative</types_of_diseases_for_rdt>
+            
+            
+          </malaria_case_record_form>
+          <data_collector_s_information>
+            <employee_name>ali</employee_name>
+            <designation_of_data_collector>health_worker__sk_hw___</designation_of_data_collector>
+            
+            
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>sabera</patient_name>
+            <guardians_name>ali</guardians_name>
+            <nationality>bangladeshi</nationality>
+            
+            <phone_number>01723456789</phone_number>
+            <user_identification>nid_id</user_identification>
+            <nid_id>1234567890</nid_id>
+            
+            
+            
+            
+            <age>5-14</age>
+            <weight>34</weight>
+            <gender>female</gender>
+            <pregnent>yes</pregnent>
+            <racegroup>garo</racegroup>
+            
+            <occupation>business</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division_2_2>chattogram_24_2</division_2_2>
+            <district_4_2>cox_s_bazar_2_2</district_4_2>
+            <upazila_2_2>cox_s_bazar_sadar_2_2</upazila_2_2>
+            <union_2_2>chaufaldandi_2_2</union_2_2>
+            <ward_2_2>ward_no._01_2_2_2</ward_2_2>
+            <brac_village_2_2>daskin_rakhyen_para_2_2</brac_village_2_2>
+            
+            <village_2_2>dakkhin_rakhain_para_2_2</village_2_2>
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>myanmar_</patients_country_of_origin>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <state_myanmar>bago_region__east_</state_myanmar>
+            
+            <district_3>bago_district</district_3>
+            
+            <township>bago</township>
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>no</have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>
+            
+            <date_of_onset_fever>2025-10-27</date_of_onset_fever>
+            <date_of_first_test>2025-10-30</date_of_first_test>
+            <type_of_species>plasmodium_falciparum__pf_</type_of_species>
+            
+            
+            <treatment1>primaquine___chloroquine</treatment1>
+            
+            <treatment2>coartem_6_act</treatment2>
+            <date_of_initiation_of_treatment>2025-11-05</date_of_initiation_of_treatment>
+            <the_patient_is_referred>no</the_patient_is_referred>
+            
+            
+            
+            
+            
+            
+            <case_classification>imported_non-local</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>pacd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>4</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.906032 90.396999 0 0</position_of_the_patient_coordinates_of_the_patient>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:60ba76bc-d7ed-4dce-997d-60e09e25ce67</instanceID>
+          </meta>
+        </data>

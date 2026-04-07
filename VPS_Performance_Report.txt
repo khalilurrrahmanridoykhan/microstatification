@@ -1,0 +1,379 @@
+================================================================================
+        VPS SERVER PERFORMANCE & CAPACITY ANALYSIS REPORT
+        Generated: January 31, 2026
+================================================================================
+
+================================================================================
+1. SERVER SPECIFICATIONS
+================================================================================
+
+Hardware:
+---------
+- CPU: Intel Xeon Silver 4310 @ 2.10GHz
+- Cores: 24 cores
+- RAM: 63 GB total
+- Storage: 3.5 TB total (105 GB used, 3.2 TB available)
+- Disk Usage: 4% (Excellent)
+
+Operating System:
+----------------
+- OS: Linux (Ubuntu)
+- Uptime: 24 days, 9 minutes
+
+================================================================================
+2. CRITICAL PERFORMANCE ISSUES
+================================================================================
+
+ISSUE #1: HIGH CPU LOAD (CRITICAL)
+-----------------------------------
+- Current Load Average: 3.84, 4.95, 5.20 (1min, 5min, 15min)
+- Problem: Load average consistently above 3.5 on a 24-core system indicates 
+           moderate-to-high load
+- Impact: System is working hard but not yet critically overloaded
+- Recommendation: Monitor closely; consider optimization
+
+ISSUE #2: HIGH MEMORY USAGE (WARNING)
+-------------------------------------
+- Total RAM: 63.7 GB
+- Used: 29.4 GB (46%)
+- Available: 32 GB (50%)
+- Buff/Cache: 25 GB
+- Swap Used: 0.8 KB (negligible)
+- Status: Acceptable but monitoring needed as usage is approaching 50%
+
+ISSUE #3: MULTIPLE GUNICORN WORKERS CONSUMING HIGH RESOURCES
+------------------------------------------------------------
+Top memory consumers:
+- ComMicPlanV2 Gunicorn workers: 3 workers using ~1.2-1.4 GB each
+- EWSM/LSTM API: 8 gunicorn workers using ~670 MB each (5.4 GB total)
+- Malaria Forecasting API: 682 MB
+- VSCode Servers: 2 processes using ~1.2-1.3 GB each
+
+Total Python/Node processes: 104 processes
+
+================================================================================
+3. APPLICATION STATUS - ComMicPlanV2
+================================================================================
+
+Service Status: RUNNING (Active)
+---------------------------------
+- Service: commicplanv2.service (active)
+- Gunicorn: 3 workers on port 8000 (127.0.0.1:8000)
+- Started: Jan 31, 15:33 (running for ~1.5 hours)
+- Workers consuming: 48-94% CPU each
+
+Database (PostgreSQL):
+----------------------
+- Status: Active (port 5432)
+- Database Size: 591 MB
+- Records:
+  * Users: 292
+  * Organizations: 36
+  * Projects: 16
+  * Forms: 2,223
+  * Submissions: 1,301
+  * Patients: 548
+  * TrashBin: 383
+  * Languages: 8,919
+
+Storage Breakdown:
+------------------
+- Total Project Size: ~2.1 GB
+- Media Files: 239 MB
+  * Downloads: 52 MB
+  * Submissions: 43 MB
+  * Updates: 144 MB
+  * Templates: 588 KB
+- Logs: 81 MB (79 MB in nohup.log - needs cleanup!)
+
+Technology Stack:
+-----------------
+- Python: 3.10.12
+- Django: 5.1.6
+- Gunicorn: 23.0.0
+- PostgreSQL: 16
+- Nginx: 1.18.0
+- Redis: Active
+
+================================================================================
+4. NETWORK & PORTS
+================================================================================
+
+Active Services:
+----------------
+- Port 80 (HTTP), 443 (HTTPS) - Nginx
+- Port 22 (SSH)
+- Port 5432 (PostgreSQL)
+- Port 6379 (Redis - localhost)
+- Port 8000 (ComMicPlanV2 - localhost)
+- Port 8010, 8090, 8120 (Other APIs)
+- Port 3306 (MySQL)
+- Port 4000, 8005 (Additional services)
+
+Network Connections:
+--------------------
+- TCP Established: 77 connections
+- TCP Total: 108 connections
+- Status: Normal activity
+
+================================================================================
+5. IDENTIFIED PROBLEMS & RECOMMENDATIONS
+================================================================================
+
+PROBLEM #1: Excessive Log File Size
+------------------------------------
+Issue: /opt/ComMicPlanV2/gunicorn-8000.nohup.log is 79 MB
+Impact: Wasting disk space and slowing down log processing
+Solution:
+  cd /opt/ComMicPlanV2
+  mv gunicorn-8000.nohup.log gunicorn-8000.nohup.log.old
+  gzip gunicorn-8000.nohup.log.old
+  touch gunicorn-8000.nohup.log
+
+PROBLEM #2: Too Many Concurrent Processes
+------------------------------------------
+Issue: 104 Python/Node processes running
+Impact: High memory consumption and CPU context switching
+Solutions:
+  - Review and optimize number of gunicorn workers
+  - Consider reducing EWSM LSTM API workers from 8 to 4-6
+  - Audit other background services
+
+PROBLEM #3: Gunicorn Workers Using High CPU
+--------------------------------------------
+Issue: Workers showing 48-94% CPU usage per process
+Impact: Potential performance bottleneck
+Solutions:
+  1. Check for slow database queries
+  2. Implement caching (Redis already available)
+  3. Consider async workers (gevent/eventlet) instead of sync
+  4. Review code for inefficient operations
+
+PROBLEM #4: User Capacity Planning
+-----------------------------------
+Current Users: 292
+Current Load: System handling 12,493 requests (based on access log)
+Estimated Capacity:
+  - Safe capacity: 500-800 concurrent users
+  - Maximum capacity: 1,000-1,500 users (with optimization)
+
+Recommendations:
+  - Current setup is adequate for <500 users
+  - For 1,000+ users, consider:
+    * Increase gunicorn workers to 6-8
+    * Implement load balancing
+    * Add connection pooling
+    * Enable query caching
+
+PROBLEM #5: No Monitoring/Alerting System
+------------------------------------------
+Issue: No automated monitoring detected
+Impact: Issues may go unnoticed until critical
+Solutions:
+  - Install Prometheus + Grafana
+  - Install New Relic / DataDog
+  - Or simple: netdata (lightweight)
+
+PROBLEM #6: Nginx Version Outdated
+-----------------------------------
+Current: nginx/1.18.0 (from 2020)
+Latest Stable: 1.26.x
+Security Risk: May have unpatched vulnerabilities
+Solution: Upgrade nginx when possible
+
+BANDWIDTH ANALYSIS:
+===================
+NO PROBLEMS - EXCELLENT CAPACITY
+
+Network Capacity:
+-----------------
+- Maximum Bandwidth: 1000 Mbps (1 Gbps)
+- Network Hardware: Intel 82599ES 10-Gigabit capable
+- Actual Usage: 8.84 Mbps (0.88% of capacity)
+- Available Headroom: 991 Mbps (99.12%)
+
+Current Traffic:
+----------------
+- Download Speed: 8.41 Mbps
+- Upload Speed: 0.43 Mbps
+- Data Transfer (24 days): 20.61 GB total
+- Average Daily: 858 MB/day
+- Projected Monthly: ~25 GB/month
+
+Network Quality:
+----------------
+- Packet Loss: 0%
+- Errors: 0
+- Dropped Packets: 0
+- Connection Status: Stable
+
+Capacity Assessment:
+--------------------
+- 292 users = 8.84 Mbps
+- Projected 500 users = ~15-20 Mbps (2% capacity)
+- Projected 1,000 users = ~30-50 Mbps (5% capacity)
+- Projected 5,000 users = ~150-250 Mbps (25% capacity)
+- Critical threshold at ~16,000+ users (800 Mbps)
+
+Verdict: Bandwidth is NOT a bottleneck. Can handle 10,000+ users.
+        Hardware supports upgrade to 10 Gbps if ever needed.
+
+================================================================================
+6. POSITIVE FINDINGS
+================================================================================
+
+1. Excellent disk space: Only 4% used (3.2 TB available)
+2. Adequate RAM: 50% available headroom
+3. Database size: 591 MB is very manageable
+4. Services stable: All critical services running properly
+5. Swap usage: Negligible (good memory management)
+6. Uptime: 24 days shows system stability
+7. EXCELLENT BANDWIDTH: 1 Gbps with 99% unused capacity - NO ISSUES
+8. Zero packet loss: Perfect network quality
+9. Network hardware: Capable of 10 Gbps upgrade path available
+
+================================================================================
+7. IMMEDIATE ACTION ITEMS
+================================================================================
+
+PRIORITY 1 (CRITICAL):
+----------------------
+1. Monitor CPU load - if it goes above 6.0, investigate immediately
+2. Clean up large log files (79 MB nohup.log)
+3. Optimize gunicorn worker count and type
+
+PRIORITY 2 (IMPORTANT):
+-----------------------
+1. Implement application monitoring
+2. Set up log rotation
+3. Review and optimize slow database queries
+4. Reduce number of concurrent processes
+
+PRIORITY 3 (RECOMMENDED):
+-------------------------
+1. Plan nginx upgrade
+2. Implement Redis caching for frequent queries
+3. Set up automated backup verification
+4. Create capacity scaling plan for 1,000+ users
+
+================================================================================
+8. SCALING RECOMMENDATIONS
+================================================================================
+
+For 500-1,000 Users:
+--------------------
+- Increase gunicorn workers to 6
+- Implement Redis caching
+- Optimize database queries
+- Current hardware is sufficient
+
+For 1,000-2,000 Users:
+----------------------
+- Increase gunicorn workers to 8-10
+- Add connection pooling (PgBouncer)
+- Consider horizontal scaling (load balancer + 2 app servers)
+- Consider upgrading to 128 GB RAM
+
+For 2,000+ Users:
+-----------------
+- Multi-server architecture required
+- Database replication (read replicas)
+- CDN for static assets
+- Message queue (Celery/RabbitMQ) for background tasks
+
+================================================================================
+9. SYSTEM PERFORMANCE METRICS SUMMARY
+================================================================================
+
+CPU:
+----
+- Load Average: 3.84 (1min), 4.95 (5min), 5.20 (15min)
+- CPU Cores: 24
+- Status: Moderate load
+
+Memory:
+-------
+- Total: 63.7 GB
+- Used: 29.4 GB (46%)
+- Free: 7.0 GB
+- Available: 32 GB (50%)
+- Buff/Cache: 25 GB
+- Swap: 2 GB (0.8 KB used)
+- Status: Acceptable
+
+Disk:
+-----
+- Total: 3.5 TB
+- Used: 105 GB (4%)
+- Available: 3.2 TB
+- Status: Excellent
+
+Network:
+--------
+- TCP Connections: 108 total
+- Established: 77
+- Status: Normal
+
+Bandwidth:
+----------
+- Network Interface: enp81s0f1 (Intel 82599ES 10-Gigabit)
+- Maximum Speed: 1000 Mbps (1 Gbps)
+- Current RX: 8.41 Mbps (0.84% usage)
+- Current TX: 0.43 Mbps (0.04% usage)
+- Total Downloaded: 4.58 GB (since boot)
+- Total Uploaded: 16.03 GB (since boot)
+- Packet Loss: 0 (Excellent)
+- Status: Excellent - 99% unused capacity
+
+Processes:
+----------
+- Total Tasks: 544
+- Running: 4
+- Sleeping: 540
+- Python/Node: 104 processes
+- Status: High process count
+
+Database:
+---------
+- Size: 591 MB
+- Users: 292
+- Total Records: ~15,000+
+- Status: Healthy
+
+================================================================================
+10. OVERALL ASSESSMENT
+================================================================================
+
+Status: GOOD CONDITION with MODERATE LOAD
+
+Summary:
+--------
+Your VPS is in good condition but showing signs of moderate load. With 292 
+users, the system is performing adequately but will need optimization before 
+scaling to 500+ users.
+
+Key Points:
+-----------
+- Current capacity is sufficient for 292 users
+- System can handle up to 500-800 users with current setup
+- Optimization needed before reaching 1,000+ users
+- No critical failures detected
+- Memory and disk resources are adequate
+- CPU load requires monitoring
+
+Risk Level: MEDIUM
+- Immediate risk is low
+- Medium-term capacity planning needed
+- Performance optimization recommended
+
+Next Review: 
+------------
+Recommended within 30 days or when:
+- User count exceeds 400
+- CPU load average exceeds 6.0
+- Memory usage exceeds 70%
+- Response times degrade
+
+================================================================================
+                            END OF REPORT
+================================================================================

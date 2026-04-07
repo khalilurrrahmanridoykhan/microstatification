@@ -1,0 +1,73 @@
+.container {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+table {
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+}
+
+th {
+    background-color: #3599db; /* Light AliceBlue background for header */
+    font-weight: bold;
+    color: #ffffff;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+tfoot {
+    background-color: #3599db; /* Light blue background for footer */
+    font-weight: bold;
+    color: #ffffff;
+}
+
+tfoot td {
+    text-align: center;
+}
+
+.action-buttons button {
+    padding: 8px 12px;
+    margin-right: 5px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.action-buttons button:first-child {
+    background-color: #bbdefb; /* Light blue for edit */
+    color: #1976d2; /* Blue text for edit */
+}
+
+.action-buttons button:last-child {
+    background-color: #ff00195b; /* Light red for delete */
+    color: #d32f2f; /* Red text for delete */
+}
+
+.species-icons {
+    font-size: 1.2em;
+}
+
+.chart-container {
+    width: 80%;
+    max-width: 900px;
+    margin-top: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    border: 2px solid #e0f7fa; /* Light blue border */
+}

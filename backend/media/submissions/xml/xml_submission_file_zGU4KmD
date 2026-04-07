@@ -1,0 +1,58 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1079" version="20240601">
+          <start>2025-09-15T22:08:38.294+06:00</start>
+          <end>2025-09-15T22:09:19.165+06:00</end>
+          <health_worker_s_information>
+            <date>2025-09-24</date>
+            <name_of_staff>dfdf</name_of_staff>
+            <organization>brac</organization>
+            <designation_1>chw</designation_1>
+            
+          </health_worker_s_information>
+          <suspected_patient-related_information>
+            <division>rajshahi</division>
+            <district>naogaon</district>
+            <upazila>porsha</upazila>
+            <union>mushidpur</union>
+            <ward>ward_no_4_4</ward>
+            <area>dffd</area>
+            <location>23.710149 90.446036 0 0</location>
+            <hh_id>dfdf</hh_id>
+            <hh_head_name>dfdf</hh_head_name>
+            <suspected_in_the_disease>yes</suspected_in_the_disease>
+            <name_of_the_person_with_suspected_case>dfdf</name_of_the_person_with_suspected_case>
+            <mobile_number>01726848561</mobile_number>
+            <patient_id_type/>
+            
+            <age>20</age>
+            <sex>male</sex>
+            
+            <suspected_disease>dengue awd</suspected_disease>
+          </suspected_patient-related_information>
+          <referral-related_information>
+            <referred>no</referred>
+            
+            
+          </referral-related_information>
+          <health_behaviour>
+            <bed_net_use_practice_during_sleep>yes</bed_net_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>no</handwashing_practice_with_soap__water>
+            <type_latrine_use>flush_latrine</type_latrine_use>
+          </health_behaviour>
+          <information_of_already_identified_patient_s_>
+            
+            
+            
+          </information_of_already_identified_patient_s_>
+          <environmental_related_information_>
+            <presence_of_stagnant_water_mosquito_breeding_sites>no</presence_of_stagnant_water_mosquito_breeding_sites>
+            
+          </environmental_related_information_>
+          <disaster-related_information>
+            <did_any_disaster_occur_in_last_7_days_>no</did_any_disaster_occur_in_last_7_days_>
+            
+          </disaster-related_information>
+          <remarks/>
+          <meta>
+            <instanceID>uuid:fc18bb72-7620-410a-8a85-118986d35985</instanceID>
+          </meta>
+        </data>

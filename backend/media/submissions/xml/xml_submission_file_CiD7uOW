@@ -1,0 +1,113 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_936" version="20240601">
+          <start>2025-09-08T10:01:15.849+06:00</start>
+          <end>2025-09-08T10:04:32.830+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <patient_identification_numbers>1010101010</patient_identification_numbers>
+          <diagnostic_information>
+            <type_of_test_facility>community</type_of_test_facility>
+            <type_of_test>rdt</type_of_test>
+            
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>asdfghjkl;</employee_name>
+            <designation_of_data_collector>health_worker__sk_hw___</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>asdfghjkl;</patient_name>
+            <guardians_name>asdfghjkl.;</guardians_name>
+            <_nationality>bangladeshi</_nationality>
+            
+            <phone_number_1>bangladesh</phone_number_1>
+            <phone_number>01989492958</phone_number>
+            <age>5-14</age>
+            <weight>22</weight>
+            <gender>male</gender>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>dependent</occupation>
+          </patient_information>
+          <reporting_site_details>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>lama</upazila>
+            <union>aziznagar</union>
+            <ward>ward_no_01</ward>
+            <village>azizuddin_colony_para</village>
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            
+            <division_1>chattogram_2</division_1>
+            <district_1>bandarban</district_1>
+            <upazila_1>lama</upazila_1>
+            <union_1>aziznagar</union_1>
+            <ward_1>ward_no_02</ward_1>
+            <village_1>bosonto_chanda_para</village_1>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>
+            <how_many_times>1</how_many_times>
+            <date_of_onset_fever>2025-09-23</date_of_onset_fever>
+            <date_of_first_test>2025-09-23</date_of_first_test>
+            <type_of_species>plasmodium_falciparum__pf_</type_of_species>
+            
+            
+            
+            
+            <medicines_type>primaquine___chloroquine</medicines_type>
+            <medicines_name>act__6-tab_ act__12-tab_ act__18-tab_</medicines_name>
+            
+            <date_of_initiation_of_treatment>2025-09-30</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>medical_college</where_is_it_referred_to>
+            
+            <medical_collage>cox_s_bazar_medical_college</medical_collage>
+            
+            
+            
+            <case_classification>indigenous</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_active_llin_or_itn_available_in_your_house>1</the_total_number_of_active_llin_or_itn_available_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.754496 90.365321 0 10</position_of_the_patient_coordinates_of_the_patient>
+            
+            
+            
+            
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>within_bangladesh</if_yes__type_of_travel>
+            <if_within_bangladesh__specify_the_last_travel_location.>chattogram</if_within_bangladesh__specify_the_last_travel_location.>
+            <district_3>bandarban</district_3>
+            <upazila_2>lama</upazila_2>
+            <union_2>aziznagar</union_2>
+            <ward_2>ward_no_02</ward_2>
+            <village_2>bosonto_chanda_para</village_2>
+            
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:eced529c-933c-4435-87bd-def29bff374d</instanceID>
+          </meta>
+        </data>

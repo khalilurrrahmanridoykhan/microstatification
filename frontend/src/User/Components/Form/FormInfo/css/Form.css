@@ -1,0 +1,9 @@
+.icon-spacing {
+  margin-right: 1rem;
+}
+
+.dropdown-custom .dropdown-menu {
+  right: 0;
+  left: auto !important;
+  top: auto !important;
+}

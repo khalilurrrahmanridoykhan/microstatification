@@ -1,0 +1,58 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1079" version="20240601">
+          <start>2025-10-12T09:25:32.492+06:00</start>
+          <end>2025-10-12T09:27:18.131+06:00</end>
+          <health_worker_s_information>
+            <date>2025-10-12</date>
+            <name_of_staff>Ayon Pal</name_of_staff>
+            <organization>brac</organization>
+            <designation_1>chw</designation_1>
+            
+          </health_worker_s_information>
+          <suspected_patient-related_information>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>lama</upazila>
+            <union>gojalia</union>
+            <ward>ward_no_1</ward>
+            <area>Lama Bazar</area>
+            <location>23.756742 90.364754 0 8</location>
+            <hh_id>8899</hh_id>
+            <hh_head_name>Rashid</hh_head_name>
+            <suspected_in_the_disease>yes</suspected_in_the_disease>
+            <name_of_the_person_with_suspected_case>kamrul</name_of_the_person_with_suspected_case>
+            <mobile_number>01799552232</mobile_number>
+            <patient_id_type>nid</patient_id_type>
+            <user_identification_11_9943_01976848561>1234567892</user_identification_11_9943_01976848561>
+            <age>22</age>
+            <sex>male</sex>
+            
+            <suspected_disease>dengue malaria</suspected_disease>
+          </suspected_patient-related_information>
+          <referral-related_information>
+            <referred>yes</referred>
+            <referral_place>brac</referral_place>
+            
+          </referral-related_information>
+          <health_behaviour>
+            <bed_net_use_practice_during_sleep>yes</bed_net_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>yes</handwashing_practice_with_soap__water>
+            <type_latrine_use>flush_latrine</type_latrine_use>
+          </health_behaviour>
+          <information_of_already_identified_patient_s_>
+            
+            
+            
+          </information_of_already_identified_patient_s_>
+          <environmental_related_information_>
+            <presence_of_stagnant_water_mosquito_breeding_sites>yes</presence_of_stagnant_water_mosquito_breeding_sites>
+            <presence_of_mosquito_larvae>aedes</presence_of_mosquito_larvae>
+          </environmental_related_information_>
+          <disaster-related_information>
+            <did_any_disaster_occur_in_last_7_days_>yes</did_any_disaster_occur_in_last_7_days_>
+            <what_types>heavy_rainfall</what_types>
+          </disaster-related_information>
+          <remarks>N/A</remarks>
+          <meta>
+            <instanceID>uuid:f5adac58-0254-44a7-986e-3dd59907cb9c</instanceID>
+          </meta>
+        </data>

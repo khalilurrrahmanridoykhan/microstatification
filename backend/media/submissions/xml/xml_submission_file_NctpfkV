@@ -1,0 +1,63 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1079" version="20240601">
+          <start>2026-02-18T13:50:24.196+06:00</start>
+          <end>2026-02-18T13:51:13.279+06:00</end>
+          <health_worker_s_information>
+            <date>2026-02-18</date>
+            <name_of_staff>fdg</name_of_staff>
+            <organization>brac</organization>
+            <designation_1>chw</designation_1>
+            
+          </health_worker_s_information>
+          <suspected_patient-related_information>
+            <reporting_sites>district</reporting_sites>
+            <division>barishal</division>
+            <district>barguna</district>
+            <upazila>taltali</upazila>
+            <union>barobogi</union>
+            <ward>ward_no_1_4</ward>
+            
+            
+            <area>dddf</area>
+            <location>7.117245 -34.908683 0 0</location>
+            <hh_id>dfdf</hh_id>
+            <hh_head_name>ddg</hh_head_name>
+            <suspected_in_the_disease>no</suspected_in_the_disease>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </suspected_patient-related_information>
+          <referral-related_information>
+            
+            
+            
+            
+          </referral-related_information>
+          <health_behaviour>
+            
+            
+            
+          </health_behaviour>
+          <information_of_already_identified_patient_s_>
+            <no._of_already_diagnosed_cases_of_dengue_in_the_hh_1>4</no._of_already_diagnosed_cases_of_dengue_in_the_hh_1>
+            <no._of_already_diagnosed_cases_of_malaria_in_the_hh>4545</no._of_already_diagnosed_cases_of_malaria_in_the_hh>
+            <no._of_already_diagnosed_cases_of_awd_in_the_hh>4545</no._of_already_diagnosed_cases_of_awd_in_the_hh>
+          </information_of_already_identified_patient_s_>
+          <environmental_related_information_>
+            <presence_of_stagnant_water_mosquito_breeding_sites>no</presence_of_stagnant_water_mosquito_breeding_sites>
+            
+          </environmental_related_information_>
+          <disaster-related_information>
+            <did_any_disaster_occur_in_last_7_days_>no</did_any_disaster_occur_in_last_7_days_>
+            
+          </disaster-related_information>
+          <remarks>334</remarks>
+          <meta>
+            <instanceID>uuid:24566697-7604-4481-901d-c59714dd8983</instanceID>
+          </meta>
+        </data>

@@ -1,0 +1,804 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,shapes,calc}
+
+\definecolor{codebg}{RGB}{248,248,248}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  framerule=0.2pt,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=black
+}
+
+\begin{document}
+
+\begin{titlepage}
+  \thispagestyle{empty}
+  \centering
+  {\Huge \textbf{ComMicPlan System}}\\[0.4cm]
+  {\Large \textbf{Technical Documentation}}\\[0.6cm]
+  {\large Version 1.0}\\[0.2cm]
+  {\large \today}\\[0.8cm]
+  {\large Prepared by the ComMicPlan Engineering Team}\\[0.3cm]
+  {\large Affiliated with: GroupMappers}\\[0.8cm]
+  {\large Repository Links}\\[0.2cm]
+  \href{https://github.com/groupmappers/ComMicPlanMain}{ComMicPlanMain (Web)} \textbar{}
+  \href{https://github.com/groupmappers/ComMicPlanMain-App}{ComMicPlanMain-App (Mobile)}
+  \vfill
+  {\large Contact: \href{mailto:ridoy@groupmappers.com}{ridoy@groupmappers.com}}\\[0.8cm]
+  \includegraphics[width=0.5\textwidth]{GRPMbd (1).jpg}
+  \vspace*{0.6cm}
+\end{titlepage}
+
+\clearpage
+\thispagestyle{empty}
+\begin{center}
+  {\Large \textbf{Abstract}}\\[0.5cm]
+\end{center}
+ComMicPlan is a sophisticated, integrated platform engineered for community-based monitoring and strategic planning, facilitating real-time data acquisition, advanced analytics, and comprehensive reporting for critical sectors such as public health surveillance, disaster response, and humanitarian operations. This technical documentation constitutes the authoritative reference for the ComMicPlan ecosystem, encompassing the responsive web frontend, scalable Django backend, Enketo-integrated form rendering, cross-platform mobile application, and resilient operational infrastructure.
+
+The platform's architecture leverages cutting-edge technologies to ensure high availability, security, and performance. The web frontend, constructed with React.js and Vite, delivers an intuitive user interface for data visualization and management. The Django REST API backend, powered by PostgreSQL, handles complex data processing, authentication, and API integrations. Enketo provides ODK-compatible form rendering for standardized survey deployments. The Flutter-based mobile application enables offline data collection in resource-constrained environments. Infrastructure components include Docker containerization, Nginx load balancing, Redis caching, Celery task queuing, and cloud-based deployment strategies.
+
+This comprehensive guide details system prerequisites, installation methodologies, API endpoint specifications, database schemas, deployment protocols, security measures, and maintenance procedures. It serves as an indispensable resource for software developers engaged in feature implementation, DevOps engineers responsible for system deployment and scaling, system administrators overseeing operational integrity, and project stakeholders requiring technical insights for strategic decision-making. The documentation promotes efficient collaboration, rapid troubleshooting, and sustainable evolution of the ComMicPlan platform, ensuring its continued effectiveness in supporting mission-critical data collection and analysis initiatives.
+
+\clearpage
+\pagestyle{plain}
+\tableofcontents
+\clearpage
+
+This living document mirrors how the engineering, field operations, and data teams actually run ComMicPlan day to day. We refresh it whenever a rollout, infrastructure tweak, or operating procedure changes so that a new teammate can ramp up quickly without wading through tribal knowledge.
+
+\section{System Overview}
+\noindent The overview that follows is written for practitioners who already know their way around data platforms but need a refresher on what makes ComMicPlan unique. It condenses the conversations we typically have during onboarding sessions into a single narrative.
+\subsection{Purpose and Scope}
+ComMicPlan is a comprehensive health planning and monitoring platform. Field workers capture data through guided forms, administrators review and manage submissions, and stakeholders generate analytical outputs in real time. The platform supports both online and offline data entry, seamless synchronization, and integrates with the Enketo form renderer for advanced form capabilities.
+
+\subsection{High-Level Architecture}
+The ecosystem is composed of three major pillars:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Frontend}: React-based dashboard hosted at \href{https://dev.commicplan.com}{dev.commicplan.com}.
+  \item \textbf{Backend}: Django REST API hosted at \href{https://admin2.commicplan.com}{admin2.commicplan.com} and exposed through Gunicorn + Nginx.
+  \item \textbf{Enketo}: Dedicated form rendering stack at \href{https://enketo2.commicplan.com}{enketo2.commicplan.com}.
+\end{itemize}
+Data flows from mobile or web clients through the backend, which persists to PostgreSQL and orchestrates background jobs via Celery and Redis.
+
+\subsection{Technologies Used}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Frontend}: React.js, Vite, Tailwind CSS, Axios, React Router.
+  \item \textbf{Backend}: Django 4.x, Python 3.12, PostgreSQL, Celery, Redis.
+  \item \textbf{Enketo}: Custom ODK-compatible renderer.
+  \item \textbf{Mobile}: Flutter (Dart) for Android and iOS delivery.
+  \item \textbf{Infrastructure}: Nginx, Gunicorn, Docker, GitHub Actions, TLS via Let's Encrypt.
+\end{itemize}
+
+\subsection{Key Features}
+\begin{itemize}[leftmargin=*]
+  \item Secure authentication with role-based access control.
+  \item Form creation, management, and submission pipelines (Enketo and native clients).
+  \item Offline-first mobile data collection with background synchronization.
+  \item Real-time dashboards, reporting, and analytics.
+  \item Background jobs for heavy processing (exports, notifications, aggregations).
+\end{itemize}
+
+\section{Architecture and Design}
+\noindent We describe the platform in layers so that troubleshooting starts with user channels and works its way down to infrastructure. The intent is to give engineers enough context to know where to look first when something feels off.
+\subsection{Component Breakdown}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Frontend (dev.commicplan.com)}: Dashboards, reports, and administration UI built with React.
+  \item \textbf{Backend (admin2.commicplan.com)}: Django REST API responsible for authentication, business logic, and persistence.
+  \item \textbf{Enketo (enketo2.commicplan.com)}: OpenRosa-compatible renderer for complex forms and offline submissions.
+  \item \textbf{Mobile App}: Flutter-based client enabling offline capture and synchronization.
+  \item \textbf{Database}: PostgreSQL as the system of record.
+  \item \textbf{Ancillary Services}: Redis (cache and Celery broker) plus Celery workers for asynchronous workloads.
+\end{itemize}
+
+\subsection{Data Flow}
+\begin{enumerate}[leftmargin=*]
+  \item Users access dashboards or administer forms via the web frontend.
+  \item The mobile app synchronizes projects, templates, and submissions over REST.
+  \item Enketo fetches form definitions and posts submissions directly to backend endpoints using OpenRosa contracts.
+  \item The backend validates, processes, and stores requests, interfacing with PostgreSQL and Redis.
+  \item Long-running or scheduled tasks (exports, notifications) execute through Celery.
+\end{enumerate}
+
+\subsection{System Architecture Diagram}
+Figure~\ref{fig:architecture} illustrates the layered view of the platform.
+
+\begin{figure}[H]
+  \centering
+  \tikzset{
+    user/.style={rectangle, rounded corners, draw=blue!70, thick, fill=blue!7, minimum width=3cm, minimum height=1cm, align=center},
+    edge/.style={rectangle, rounded corners, draw=teal!70, thick, fill=teal!8, minimum width=3cm, minimum height=1cm, align=center},
+    service/.style={rectangle, rounded corners, draw=orange!80, thick, fill=orange!10, minimum width=3.2cm, minimum height=1cm, align=center},
+    data/.style={rectangle, rounded corners, draw=purple!70, thick, fill=purple!9, minimum width=3.2cm, minimum height=1cm, align=center},
+    ops/.style={rectangle, rounded corners, draw=green!70, thick, fill=green!10, minimum width=3cm, minimum height=1cm, align=center},
+    arrow/.style={-Latex, thick}
+  }
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[>=Latex]
+    % Coordinates for columns
+    \coordinate (colA) at (-6,0);
+    \coordinate (colB) at (-2,0);
+    \coordinate (colC) at (2,0);
+    \coordinate (colD) at (6,0);
+
+    % --- User layer ---
+    \node[user] (browser) at (colA) {Dashboards\\(dev.commicplan.com)};
+    \node[user] (mobile) at (colB) {Flutter Field App};
+    \node[user] (enketoUser) at (colC) {Enketo\\Respondent};
+    \node[user] (apiClient) at (colD) {3rd-party\\Integrations};
+
+    % --- Edge layer ---
+    \node[edge] (cdn) at (-6,-2) {CDN + WAF};
+    \node[edge] (nginx) at (-2,-2) {Nginx Reverse Proxy};
+    \node[edge] (enketoEdge) at (2,-2) {Enketo Router};
+    \node[edge] (apiGateway) at (6,-2) {API Gateway};
+
+    % --- Application services ---
+    \node[service] (frontend) at (-7,-4) {React SPA Hosting};
+    \node[service] (gunicorn) at (-2,-4) {Gunicorn + Django\\admin2/api1/api2/backend3};
+    \node[service] (enketo) at (2.5,-4) {Enketo Service};
+    \node[service] (celery) at (7,-4) {Celery Worker Pool\\Async Jobs/Reports};
+
+    % --- Data layer ---
+    \node[data] (redis) at (-6,-6.3) {Redis Cache\\\& Celery Broker};
+    \node[data] (postgres) at (0,-6.3) {PostgreSQL Cluster};
+    \node[data] (media) at (6,-6.3) {Media Storage\\/backend/media + S3};
+    \node[data] (backups) at (0,-8.3) {Automated Backups\\DB + Media};
+
+    % --- Operations layer ---
+    \node[ops] (infra) at (-6,-10.3) {Systemd / Docker Hosts};
+    \node[ops] (observability) at (0,-10.3) {Monitoring \& Logging\\Prometheus / Sentry};
+    \node[ops] (cicd) at (6,-10.3) {CI/CD (GitHub Actions)};
+
+    % Connections: users -> edge
+    \draw[arrow] (browser.south) -- (cdn.north);
+    \draw[arrow] (mobile.south) -- (nginx.north);
+    \draw[arrow] (enketoUser.south) -- (enketoEdge.north);
+    \draw[arrow] (apiClient.south) -- (apiGateway.north);
+
+    % Edge -> services
+    \draw[arrow] (cdn.south) -- (frontend.north);
+    \draw[arrow] (nginx.south) -- (gunicorn.north);
+    \draw[arrow] (enketoEdge.south) -- (enketo.north);
+    \draw[arrow] (apiGateway.south) to[out=270, in=30] (gunicorn.north east);
+
+    % Service interactions
+    \draw[arrow] (frontend.east) to[out=0, in=180] (gunicorn.west);
+    \draw[arrow] (enketo.west) -- (gunicorn.east);
+    \draw[arrow] (gunicorn.east) to[out=0, in=150] (celery.north west);
+
+    % Data access
+    \draw[arrow] (gunicorn.south) to[out=250, in=90] (redis.north);
+    \draw[arrow] (gunicorn.south) -- (postgres.north);
+    \draw[arrow] (gunicorn.south) to[out=290, in=120] (media.north west);
+    \draw[arrow] (celery.south) to[out=230, in=45] (postgres.north east);
+    \draw[arrow] (celery.south) to[out=200, in=60] (redis.north east);
+    \draw[arrow] (celery.south) to[out=270, in=90] (media.north);
+
+    % Backups - single consolidated connection
+    \draw[arrow] (postgres.south) -- (backups.north);
+    \draw[arrow] (media.south) to[out=250, in=15] (backups.east);
+    \draw[arrow] (redis.south) to[out=290, in=165] (backups.west);
+
+    % Operations connections - simplified and cleaner
+    \draw[arrow] (infra.north) to[out=75, in=240] (gunicorn.south west);
+    \draw[arrow] (observability.north) -- (postgres.south);
+    \draw[arrow] (observability.north) to[out=110, in=270] (gunicorn.south);
+    \draw[arrow] (cicd.north) to[out=110, in=280] (gunicorn.south east);
+    \draw[arrow] (cicd.north) to[out=90, in=270] (celery.south);
+  \end{tikzpicture}%
+  }
+  \caption{Clean separation of user channels, ingress, application services, data stores, and operations for ComMicPlan.}
+  \label{fig:architecture}
+\end{figure}
+
+\subsection{Detailed Component Interactions}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Frontend \textrightarrow{} Backend}: RESTful API calls secured via JWTs for dashboards, admin workflows, and configuration.
+  \item \textbf{Mobile App \textrightarrow{} Backend}: Synchronizes forms and submissions, with local persistence for offline usage and conflict resolution upon reconnect.
+  \item \textbf{Enketo \textrightarrow{} Backend}: Implements OpenRosa endpoints for XML form retrieval and submission callbacks with CSRF/CORS protections.
+  \item \textbf{Backend \textrightarrow{} Database}: Django ORM manages CRUD operations, migrations, and referential integrity validations.
+  \item \textbf{Background Tasks}: Celery handles heavy workloads such as bulk exports, notifications, and scheduled reports.
+  \item \textbf{Caching}: Redis stores session keys, rate limiting metadata, and reusable API payloads.
+  \item \textbf{Security}: TLS termination at Nginx, strict headers, and RBAC enforcement at the API level.
+\end{itemize}
+
+\subsection{Scalability and Reliability}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Horizontal Scaling}: Run multiple Gunicorn workers or nodes behind Nginx.
+  \item \textbf{Database Replication}: PostgreSQL replicas support read scaling and failover.
+  \item \textbf{Monitoring}: Integrate Prometheus/Grafana and Sentry for metrics and error tracking.
+  \item \textbf{Resilience}: Health checks on /health endpoints, auto-restart policies, and alerting on queue depth.
+\end{itemize}
+
+\subsection{Database Schema}
+The Django models inside `/opt/ComMicPlanV2/backend/api/models.py` define the production schema. Figure~\ref{fig:erdiagram} highlights the key tables (users, organizations, projects, templates, forms, submissions, patients) together with supporting models (language, settings, form access, download logs, Trash Bin) and their relationships.
+
+\begin{figure}[H]
+  \centering
+  \tikzset{
+    entity/.style={rectangle, rounded corners, draw=purple!60, thick, fill=purple!6, minimum width=3.4cm, align=left, inner sep=6pt},
+    rel/.style={-Latex, thick}
+  }
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[node distance=1.8cm and 2.2cm]
+    \node[entity] (user) {\textbf{User (auth\_user)}\\id, username, role};
+    \node[entity, below=1.5cm of user] (profile) {\textbf{UserProfile}\\user\_id (OneToOne)\\M2M: orgs/projects/forms/templates};
+    \node[entity, right=2.6cm of user] (org) {\textbf{Organization}\\id, name, metadata\\created\_by, updated\_by};
+    \node[entity, right=2.6cm of org] (project) {\textbf{Project}\\id, name, species(JSON)\\organization\_id, created\_by};
+    \node[entity, right=2.6cm of project] (template) {\textbf{Template}\\id, name\\project\_id\\data\_collection\_form (FK Form)};
+    \node[entity, below=1.6cm of template] (form) {\textbf{Form}\\id, name\\project\_id, template\_id\\questions(JSON), translations};
+    \node[entity, right=2.4cm of form] (language) {\textbf{Language}\\subtag, type\\default + M2M other languages};
+    \node[entity, below=1.6cm of form] (submission) {\textbf{Submission}\\id, xml\_file\\user\_id};
+    \node[entity, below=1.6cm of submission] (patient) {\textbf{Patient}\\patient\_id, demographics\\M2M submissions};
+    \node[entity, below=1.6cm of project] (setting) {\textbf{Setting}\\project\_id\\key/value};
+    \node[entity, below=1.6cm of org] (formaccess) {\textbf{FormAccess}\\project\_id\\user\_id\\access\_level};
+    \node[entity, right=2.6cm of submission] (download) {\textbf{DownloadLog}\\form\_id\\user\_id\\type, file\_path};
+    \node[entity, below=1.5cm of patient] (trash) {\textbf{TrashBin}\\item\_type, item\_id\\item\_data(JSON)\\deleted\_by};
+
+    \draw[rel] (user) -- node[right]{1..1} (profile);
+    \draw[rel] (profile) -- node[above]{M..N} (org);
+    \draw[rel] (org) -- node[above]{1..*} (project);
+    \draw[rel] (project) -- node[above]{1..*} (template);
+    \draw[rel] (project) -- node[left]{1..*} (form);
+    \draw[rel] (template) -- node[right]{1..*} (form);
+    \draw[rel] (form) -- node[right]{1..*} (submission);
+    \draw[rel] (submission) -- node[right]{M..N} (patient);
+    \draw[rel] (form) -- node[above]{*..*} (language);
+    \draw[rel] (project) -- node[right]{1..*} (setting);
+    \draw[rel] (formaccess) -- node[left]{*..1} (user);
+    \draw[rel] (formaccess) -- node[above]{*..1} (project);
+    \draw[rel] (form) -- node[above]{1..*} (download);
+    \draw[rel] (patient) -- node[left]{*..1} (trash);
+    \draw[rel] (trash) -- node[left]{*..1} (user);
+    \draw[rel] (profile) -- node[right]{M..N} (form);
+    \draw[rel] (profile) -- node[above]{M..N} (template);
+  \end{tikzpicture}%
+  }
+  \caption{Entity relationship overview extracted from `/opt/ComMicPlanV2/backend/api/models.py`.}
+  \label{fig:erdiagram}
+\end{figure}
+
+\noindent\textbf{Additional Notes}
+\begin{itemize}[leftmargin=*]
+  \item Templates also maintain \texttt{lookup\_forms} and \texttt{generated\_lookup\_forms} ManyToMany relations to \texttt{Form} to store dynamically generated follow-up workflows.
+  \item `SoftDeleteMixin` powers logical deletes for `Patient` (and any other inheriting model), with serialized payloads persisted in `TrashBin` for 30 days before permanent removal.
+  \item `Submission` stores uploaded XML payloads while `DownloadLog` tracks XLS/CSV exports for compliance auditing.
+\end{itemize}
+
+\subsection{APIs and Integrations}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Internal APIs}: REST endpoints for CRUD operations, reporting, and utility workflows.
+  \item \textbf{External Services}: Enketo for form rendering plus optional third-party analytics and notification services.
+  \item \textbf{Authentication}: JWT access tokens and CSRF protection for browser clients.
+\end{itemize}
+
+\subsection{Security Model}
+\noindent The platform relies on layered controls implemented across Django (`backend/backend/settings.py`) and the SPA (`frontend/src/App.jsx`):
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Authentication}: Login issues JWTs stored in \texttt{sessionStorage}, mirrored to the \texttt{commicplan\_auth} cookie for Enketo clients. \texttt{EnketoAuthMiddleware} then accepts JWT, DRF token, or Basic Auth headers for \texttt{/api/openrosa/*} endpoints while honoring anonymous submissions only when \texttt{Form.allow\_anonymous\_submissions} permits it (\texttt{backend/api/middleware.py}).
+  \item \textbf{Session + CSRF Controls}: \texttt{CustomCSRFMiddleware} validates a dedicated \texttt{\_\_csrf} cookie for Enketo POST flows, \texttt{SESSION\_COOKIE\_SECURE}, \texttt{CSRF\_COOKIE\_SECURE}, \texttt{SameSite} and domain scoping harden cookies across subdomains, and allowed origins are limited via \texttt{corsheaders} plus explicit \texttt{CSRF\_TRUSTED\_ORIGINS}.
+  \item \textbf{Authorization}: Default DRF permissions require authenticated callers, and business rules enforce ownership (organization/project/form binding) before mutating resources. Frontend routing uses discrete layouts per numeric role, preventing UI exposure of unauthorized workflows.
+  \item \textbf{Transport + Perimeter}: All ingress terminates at TLS 1.3 behind CDN/WAF and Nginx reverse proxies; Strict \texttt{ALLOWED\_HOSTS} and locked-down CORS prevent rogue origins from exercising the APIs.
+  \item \textbf{Credential Hygiene}: Django password validators (length, numeric, dictionary checks) plus GitHub Actions secrets management enforce strong admin credentials.
+  \item \textbf{Data Protection}: PostgreSQL, Redis, and `/backend/media` volumes snapshot daily, with encrypted backups exported to S3; sensitive exports stay in protected storage buckets and in-flight payloads remain TLS encrypted.
+  \item \textbf{Monitoring \& Compliance}: Prometheus/Sentry alert on auth failures, queue anomalies, and request spikes, while GDPR/HIPAA-leaning audit trails (download logs, TrashBin retention) support periodic reviews.
+\end{itemize}
+
+\paragraph{Role-based Access}
+Routes in \verb|frontend/src/App.jsx| map numeric roles to layouts, and backend serializers still verify ownership before writes. Table~\ref{tab:rbac} summarizes the experience exposed for each persona.
+
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabular}{p{1.2cm}p{3.5cm}p{8cm}}
+    \toprule
+    \textbf{Role} & \textbf{Portal/Layout} & \textbf{Primary Capabilities} \\
+    \midrule
+    1 & AdminLayout (global administrators) & Full CRUD over organizations, projects, forms, users, templates, Trash Bin, patient registry, submissions, and follow-up analytics. \\
+    2 & OrganizationLayout (org managers) & Scoped management of their organization: onboard/edit orgs, spin up projects, manage org members, assign forms, and view Trash Bin/submission telemetry. \\
+    3 & ProjectLayout (project owners) & Maintain assigned projects, manage project-level memberships, configure forms, edit project metadata, and audit submissions for those projects. \\
+    4 & UserLayout (authenticated staff/partners) & Dashboard/follow-up view plus conditional access (organizations/projects/forms) calculated from \verb|userDetails.profile|; can review assigned forms, inspect submissions, and edit their own profile. \\
+    5 & UserLayout (data collectors) & Streamlined Data Collector page to capture submissions, inspect their own Trash Bin, and download the mobile client; no administrative routes rendered. \\
+    \bottomrule
+  \end{tabular}
+  \caption{Role-based access matrix enforced jointly by the SPA router and backend policies.}
+  \label{tab:rbac}
+\end{table}
+
+\section{Frontend Documentation}
+\noindent This section captures the practical steps frontend engineers follow when implementing features or debugging production: from cloning the repo, to running Vite locally, to pushing new builds through our CI/CD workflow.
+\subsection{Tech Stack}
+React.js application scaffolded with Vite, styled via Tailwind CSS, and orchestrated with Axios for API calls and React Router for navigation.
+
+\subsection{Setup and Installation}
+\begin{enumerate}[leftmargin=*]
+  \item Install Node.js 18+ and npm.
+  \item Clone the repository: \verb|git clone https://github.com/groupmappers/ComMicPlanMain.git|.
+  \item Install dependencies: \verb|npm install|.
+  \item Configure environment variables in \verb|.env| (e.g., \verb|VITE_BACKEND_URL=https://admin2.commicplan.com|, \verb|VITE_ENKETO_URL=https://enketo2.commicplan.com|).
+\end{enumerate}
+
+\subsection{Development Guide}
+\noindent Developers generally follow this rhythm: open a feature branch, run the dev server with mock credentials, and keep the structure below in mind when wiring new modules.
+\begin{itemize}[leftmargin=*]
+  \item Start dev server: \verb|npm run dev|.
+  \item Build production assets: \verb|npm run build|.
+  \item Folder structure:
+\end{itemize}
+
+\begin{lstlisting}
+src/
+  assets/             # static images, fonts, translations
+  components/
+    layout/
+    widgets/
+  hooks/              # reusable React hooks
+  lib/                # domain helpers and constants
+  pages/
+    Dashboard/
+    Forms/
+  routes/             # router configuration
+  services/
+    api/              # axios clients + DTOs
+  store/              # Zustand/Redux slices
+  styles/             # Tailwind config + global CSS
+  utils/              # formatters, validators
+  App.tsx
+  main.tsx
+  env.d.ts
+\end{lstlisting}
+
+\subsection{Deployment}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Artifact generation}: `npm run build` compiles the Vite SPA into `/frontend/dist`, producing hashed bundles (`assets/*.js`, `assets/*.css`) alongside `index.html`.
+  \item \textbf{Web serving}: The GitHub Actions workflow (`.github/workflows/deploy.yml`) copies the repository to the VPS, clears `/var/www/html`, and syncs `frontend/dist` there. Nginx hosts these static files at \href{https://dev.commicplan.com}{dev.commicplan.com} while proxying `/api/` and `/ws/` traffic to the Django stack.
+  \item \textbf{Environment + caching}: \texttt{import.meta.env} variables such as \texttt{VITE\_BACKEND\_URL}, \texttt{VITE\_ENKETO\_URL}, and \texttt{VITE\_OPENROSA\_SERVER\_URL} (see \texttt{frontend/src/config.js}) are compiled in during \texttt{vite build}. Long-lived assets are cacheable because filenames are content-hashed; \texttt{index.html} remains un-cached to ensure new deployments load the latest bundles.
+  \item \textbf{CI/CD}: The `deploy.yml` pipeline installs Node 18, runs `npm install \&\& npm run build`, uploads artifacts via `appleboy/scp-action`, and restarts Nginx after swapping the static root, providing unattended promotion from `main`.
+\end{itemize}
+
+\subsection{Key Components}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Role-aware layouts}: `AdminLayout`, `OrganizationLayout`, `ProjectLayout`, and `UserLayout` (see `frontend/src/App.jsx`) gate dashboard navigation based on `userRole` sourced from `sessionStorage`.
+  \item \textbf{Administrative suites}: Modules under `frontend/src/Admin` expose organization/project/form CRUD, follow-up analytics, trash management, and patient explorer flows for superusers.
+  \item \textbf{Org/Project consoles}: `frontend/src/Organization` and `frontend/src/Project` provide scoped management (assign members, configure forms, inspect submissions) tied to the user’s organization/project assignments.
+  \item \textbf{Collector + follow-up tools}: `DataCollectorPage`, `UserDashboard`, `UserFollowUp`, and `UserTemplateData` power the practitioner experience for roles 4–5 with simplified submission queues and offline guidance.
+  \item \textbf{Shared services}: \texttt{src/api.js} and \texttt{src/config.js} centralize Axios clients plus CSRF helpers, \texttt{components/layout} houses nav shells, and Leaflet-powered visualizations (imports from \texttt{react-leaflet}, \texttt{leaflet.heat}, etc.) support geospatial dashboards.
+\end{itemize}
+
+\subsection{Testing}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Local smoke tests}: Run \verb|npm run build && npm run preview| to exercise the production bundle against a staging backend before promotion.
+  \item \textbf{Component tests}: The project currently omits a built-in \texttt{npm test} script; add Vitest or Jest suites under \texttt{src/\_\_tests\_\_/} and execute them via \verb|npx vitest run| (or \verb|npm run test| once scripted) to guard critical components like dashboards and form builders.
+  \item \textbf{End-to-end}: Use Cypress/Playwright pointing at the preview server to validate role routing (Admin/Org/Project/User/Data Collector) and key submission workflows prior to release.
+\end{itemize}
+
+\section{Backend Documentation}
+\noindent These notes reflect the habits of the backend team—what they install first on a clean workstation, how they think about the Django service topology, and the commands they run most often during incidents.
+\subsection{Tech Stack}
+Django 4.x (Python 3.12) with PostgreSQL, Celery for asynchronous tasks, and Redis for caching/broker responsibilities.
+
+\subsection{Backend Service Topology}
+The `/opt/ComMicPlanV2/backend` tree contains the Django project, Celery configuration, static/media assets, and systemd-managed start scripts. Figure~\ref{fig:backend-topology} summarizes how these elements interact at runtime alongside supporting infrastructure managed under `/opt/ComMicPlanV2/frontend`.
+
+\begin{figure}[H]
+  \centering
+  \tikzset{
+    component/.style={rectangle, rounded corners, draw=orange!70, thick, fill=orange!10, minimum width=3.1cm, minimum height=1cm, align=center},
+    gateway/.style={rectangle, rounded corners, draw=teal!70, thick, fill=teal!10, minimum width=3.1cm, minimum height=1cm, align=center},
+    data/.style={rectangle, rounded corners, draw=purple!70, thick, fill=purple!8, minimum width=3.1cm, minimum height=1cm, align=center},
+    ext/.style={rectangle, rounded corners, draw=blue!60, thick, fill=blue!8, minimum width=3.1cm, minimum height=1cm, align=center},
+    arrow/.style={-Latex, thick}
+  }
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[node distance=1.5cm and 2cm]
+    \node[ext] (users) {Browsers \& Mobile\\Clients};
+    \node[gateway, right=2.3cm of users] (nginx) {Nginx Reverse Proxy\\`/etc/nginx`};
+    \node[component, right=2.6cm of nginx] (gunicorn) {Gunicorn Service\\`systemctl commicplan-gunicorn`};
+    \node[component, right=2.6cm of gunicorn] (django) {Django Apps\\`backend/api`, `backend/backend`};
+    \node[component, above=1.6cm of django] (frontend) {React Build\\`/opt/ComMicPlanV2/frontend`};
+    \node[component, below=1.6cm of django] (celery) {Celery Workers\\`backend/celery.py`};
+    \node[ext, right=2.4cm of django] (enketo) {Enketo Service\\`enketo2.commicplan.com`};
+    \node[data, below=1.4cm of gunicorn] (redis) {Redis Broker\\Caching};
+    \node[data, below=1.4cm of django] (postgres) {PostgreSQL\\Primary + replicas};
+    \node[data, below=1.4cm of celery] (media) {Media Files\\`backend/media`};
+    \node[data, below=1.8cm of redis] (storage) {Backups \& Snapshots\\DB + Media};
+
+    \draw[arrow] (users) -- (nginx);
+    \draw[arrow] (nginx) -- (gunicorn);
+    \draw[arrow] (gunicorn) -- (django);
+    \draw[arrow] (django) -- (frontend);
+    \draw[arrow] (django) -- (enketo);
+    \draw[arrow] (django) -- (celery);
+    \draw[arrow] (celery) -- (django);
+    \draw[arrow] (gunicorn) -- (redis);
+    \draw[arrow] (django) -- (postgres);
+    \draw[arrow] (celery) -- (postgres);
+    \draw[arrow] (django) -- (media);
+    \draw[arrow] (celery) -- (media);
+    \draw[arrow] (redis) -- (storage);
+    \draw[arrow] (postgres) -- (storage);
+    \draw[arrow] (media) -- (storage);
+  \end{tikzpicture}%
+  }
+  \caption{Backend runtime topology linking Nginx, Gunicorn, Django apps, Celery workers, and data stores.}
+  \label{fig:backend-topology}
+\end{figure}
+
+\subsection{Setup and Installation}
+\begin{enumerate}[leftmargin=*]
+  \item Install Python 3.12 and PostgreSQL.
+  \item Clone repository: \verb|git clone https://github.com/groupmappers/ComMicPlanMain.git|.
+  \item Create a virtual environment: \verb|python -m venv venv && source venv/bin/activate|.
+  \item Install dependencies: \verb|pip install -r requirements.txt|.
+  \item Apply migrations: \verb|python manage.py migrate|.
+  \item Configure environment variables (database credentials, \verb|SECRET_KEY|, email backends, etc.).
+\end{enumerate}
+
+\subsection{API Endpoints}
+Base URL: \verb|https://admin2.commicplan.com/api/|. Below is a comprehensive list of all available API endpoints, grouped by category.
+
+\subsubsection{Authentication}
+\begin{itemize}[leftmargin=*]
+  \item \verb|POST /auth/login/|: Authenticate user and return JWT token.
+  \item \verb|POST /auth/register/|: Register a new user.
+  \item \verb|GET /csrf-token/|: Retrieve CSRF token for form submissions.
+\end{itemize}
+
+\subsubsection{Forms (CRUD via Router)}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /forms/|: List all forms.
+  \item \verb|POST /forms/|: Create a new form.
+  \item \verb|GET /forms/<id>/|: Retrieve a specific form.
+  \item \verb|PUT /forms/<id>/|: Update a form.
+  \item \verb|DELETE /forms/<id>/|: Delete a form.
+  \item \verb|POST /projects/<pk>/create_form/|: Create a form within a project.
+  \item \verb|POST /forms/<form_id>/submit/|: Submit data to a form.
+  \item \verb|POST /forms/<form_id>/submit-media/|: Submit media files to a form.
+  \item \verb|PUT /forms/<form_id>/translations/|: Update translations for a form.
+  \item \verb|PUT /forms/<form_id>/anonymous-setting/|: Update anonymous submission setting.
+  \item \verb|GET /forms/<form_id>/csv/|: Download form submissions as CSV.
+  \item \verb|GET /forms/<form_id>/media/|: List media files for a form.
+  \item \verb|GET /forms/<form_id>/zip/|: Download form media as ZIP.
+  \item \verb|POST /forms/<form_id>/download_xls/|: Generate XLS download for form.
+  \item \verb|GET /forms/<form_id>/download_csv/|: Download form CSV (alternative).
+  \item \verb|GET /forms/<form_id>/download_zip/|: Download form ZIP (alternative).
+  \item \verb|GET /forms/<form_id>/download_logs/|: List download logs for form.
+\end{itemize}
+
+\subsubsection{Submissions (CRUD via Router)}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /submissions/|: List all submissions.
+  \item \verb|POST /submissions/|: Create a new submission.
+  \item \verb|GET /submissions/<id>/|: Retrieve a specific submission.
+  \item \verb|PUT /submissions/<id>/|: Update a submission.
+  \item \verb|DELETE /submissions/<id>/|: Delete a submission.
+  \item \verb|GET /submissions/<submission_id>/xml/|: Get submission XML.
+  \item \verb|GET /submissions/instance/<instance_id>/|: Get submission by instance ID.
+  \item \verb|PUT /submissions/<instance_id>/validation/|: Update submission validation status.
+  \item \verb|DELETE /forms/<form_id>/submissions/<instance_id>/|: Delete a submission.
+\end{itemize}
+
+\subsubsection{Projects (CRUD via Router)}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /projects/|: List all projects.
+  \item \verb|POST /projects/|: Create a new project.
+  \item \verb|GET /projects/<id>/|: Retrieve a specific project.
+  \item \verb|PUT /projects/<id>/|: Update a project.
+  \item \verb|DELETE /projects/<id>/|: Delete a project.
+  \item \verb|GET /get-project-templates/<project_id>/|: Get templates for a project.
+  \item \verb|GET /get-project-templates-paginated/<project_id>/|: Get paginated templates.
+  \item \verb|GET /get-project-templates-full/<project_id>/|: Get full templates.
+  \item \verb|GET /get-all-projects/|: Get all projects (alternative).
+\end{itemize}
+
+\subsubsection{Languages (CRUD via Router)}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /languages/|: List all languages.
+  \item \verb|POST /languages/|: Create a new language.
+  \item \verb|GET /languages/<id>/|: Retrieve a specific language.
+  \item \verb|PUT /languages/<id>/|: Update a language.
+  \item \verb|DELETE /languages/<id>/|: Delete a language.
+\end{itemize}
+
+\subsubsection{Users (CRUD via Router)}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /users/|: List all users.
+  \item \verb|POST /users/|: Create a new user.
+  \item \verb|GET /users/<id>/|: Retrieve a specific user.
+  \item \verb|PUT /users/<id>/|: Update a user.
+  \item \verb|DELETE /users/<id>/|: Delete a user.
+  \item \verb|GET /get-current-user-profile/|: Get current user profile.
+\end{itemize}
+
+\subsubsection{Organizations (CRUD via Router)}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /organizations/|: List all organizations.
+  \item \verb|POST /organizations/|: Create a new organization.
+  \item \verb|GET /organizations/<id>/|: Retrieve a specific organization.
+  \item \verb|PUT /organizations/<id>/|: Update an organization.
+  \item \verb|DELETE /organizations/<id>/|: Delete an organization.
+\end{itemize}
+
+\subsubsection{Patients (CRUD via Router)}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /patients/|: List all patients.
+  \item \verb|POST /patients/|: Create a new patient.
+  \item \verb|GET /patients/<id>/|: Retrieve a specific patient.
+  \item \verb|PUT /patients/<id>/|: Update a patient.
+  \item \verb|DELETE /patients/<id>/|: Delete a patient.
+  \item \verb|GET /patients/csv/|: Download patients as CSV.
+\end{itemize}
+
+\subsubsection{Trash Bin (CRUD via Router)}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /trash/|: List trash bin items.
+  \item \verb|POST /trash/|: Create a trash bin item.
+  \item \verb|GET /trash/<id>/|: Retrieve a specific trash item.
+  \item \verb|PUT /trash/<id>/|: Update a trash item.
+  \item \verb|DELETE /trash/<id>/|: Delete a trash item.
+\end{itemize}
+
+\subsubsection{Templates}
+\begin{itemize}[leftmargin=*]
+  \item \verb|POST /create-template/|: Create a new template.
+  \item \verb|POST /create-lookup-form/|: Create a lookup form.
+  \item \verb|GET /get-template/<template_id>/|: Get a specific template.
+  \item \verb|DELETE /delete-template/<template_id>/|: Delete a template.
+  \item \verb|PUT /update-template/<template_id>/|: Update a template.
+  \item \verb|POST /clone-template/<template_id>/|: Clone a template.
+  \item \verb|GET /get-templates-bulk/|: Get templates in bulk.
+\end{itemize}
+
+\subsubsection{Downloads and Logs}
+\begin{itemize}[leftmargin=*]
+  \item \verb|DELETE /download_logs/<log_id>/|: Delete a download log.
+\end{itemize}
+
+\subsubsection{OpenRosa and Enketo}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /openrosa/forms/<form_id>/form.xml|: Get form XML for OpenRosa.
+  \item \verb|POST /openrosa/submission/|: Submit data via OpenRosa.
+  \item \verb|GET /openrosa/formList|: List forms for OpenRosa.
+  \item \verb|GET /openrosa/formList/|: List forms (with trailing slash).
+  \item \verb|GET /forms/<form_id>/data/<instance_id>/enketo/edit/|: Get Enketo edit URL.
+  \item \verb|POST /auth/set-enketo-cookie/|: Set Enketo cookie.
+\end{itemize}
+
+\subsubsection{Enketo Authentication}
+\begin{itemize}[leftmargin=*]
+  \item \verb|POST /auth/enketo-login/|: Login to Enketo.
+  \item \verb|POST /auth/enketo-logout/|: Logout from Enketo.
+\end{itemize}
+
+\subsubsection{Dashboards and Utilities}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /dashboard/summary/|: Get dashboard summary.
+  \item \verb|GET /get-user-forms/|: Get forms for current user.
+  \item \verb|GET /forms-without-submission/|: Get forms without submissions.
+  \item \verb|POST /lookup-form-set-criteria/|: Set lookup form criteria.
+  \item \verb|POST /convert/xlsform/|: Convert XLS form.
+\end{itemize}
+
+\subsubsection{Debugging}
+\begin{itemize}[leftmargin=*]
+  \item \verb|GET /debug-auth/|: Debug authentication.
+  \item \verb|GET /debug-enketo-auth/|: Debug Enketo authentication.
+  \item \verb|GET /test-cookie/|: Test cookie.
+\end{itemize}
+
+\paragraph{Example Payload}
+\begin{lstlisting}[language=json]
+{
+  "method": "POST",
+  "endpoint": "/submissions/",
+  "body": {
+    "form_id": 1,
+    "data": {"field": "value"}
+  }
+}
+\end{lstlisting}
+
+\subsection{Models and Serializers}
+User, Project, Form, Submission, and Organization models expose serializer layers to ensure consistent JSON payloads and validation.
+
+\subsection{Deployment}
+Gunicorn processes managed by systemd behind Nginx reverse proxy on \href{https://admin2.commicplan.com}{admin2.commicplan.com}. Certificates issued via Let's Encrypt.
+
+\subsection{Background Tasks}
+Celery workers execute asynchronous jobs (report generation, nightly exports, notifications) with Redis acting as broker and cache.
+
+\subsection{Testing}
+Execute \verb|python manage.py test| for the backend test suite; fixtures provide deterministic datasets.
+
+\section{Enketo Integration Documentation}
+\subsection{Purpose}
+Enketo supplies an ODK-compliant, offline-ready form runner that mirrors the templates hosted inside Django. It allows enumerators to capture data from any browser (including low-connectivity tablets) while honoring the same validation logic as the native clients.
+
+\subsection{Architecture}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Endpoints}: All Enketo traffic targets \texttt{/api/openrosa/formList}, \texttt{/api/openrosa/forms/<id>/form.xml}, and \texttt{/api/openrosa/submission/} on the backend. Responses are generated by Django views under \texttt{backend/api/views/openrosa.py}.
+  \item \textbf{Ingress}: \href{https://enketo2.commicplan.com}{enketo2.commicplan.com} terminates TLS at Nginx and proxies to the Enketo Docker stack (port 8005). Outbound calls from Enketo to the API traverse the same CDN/WAF perimeter as other clients.
+  \item \textbf{Payload flow}: Forms are fetched as XML, rendered client-side by Enketo, and submissions are posted back as multipart XML payloads. Media attachments piggyback on the same OpenRosa submission.
+  \item \textbf{State synchronization}: When a submission completes, Enketo receives an HTTP 201 from Django and the form instance is persisted under \texttt{backend/media/submissions}.
+\end{itemize}
+
+\subsection{Authentication and Security}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Login handshake}: Field staff authenticate via \texttt{frontend/src/Authentication/EnketoLogin.jsx}, which exchanges credentials for a JWT, stores it in \texttt{sessionStorage}, and sets the \texttt{commicplan\_auth} cookie through \verb|POST /api/auth/set-enketo-cookie/|.
+  \item \textbf{Middleware enforcement}: \texttt{EnketoAuthMiddleware} in \texttt{backend/api/middleware.py} validates the JWT cookie, DRF tokens, or HTTP Basic credentials. Anonymous submissions are only accepted when \texttt{Form.allow\_anonymous\_submissions} is enabled.
+  \item \textbf{CSRF}: \texttt{CustomCSRFMiddleware} inspects the \texttt{\_\_csrf} cookie for POSTs originating from Enketo. If absent, it fetches a token from \verb|/api/csrf-token/| before replaying the request.
+  \item \textbf{CORS}: \texttt{backend/backend/settings.py} restricts cross-origin calls to \href{https://enketo2.commicplan.com}{enketo2.commicplan.com}, ensuring only the sanctioned host can load OpenRosa resources.
+\end{itemize}
+
+\subsection{Configuration Checklist}
+\begin{enumerate}[leftmargin=*]
+  \item Install Enketo using the upstream Docker compose bundle or Helm chart. Set \texttt{ENKETO\_API\_KEY} to match \texttt{backend/backend/settings.py}.
+  \item In Enketo's \texttt{config.json}, point \texttt{linked\_server} to \texttt{https://admin2.commicplan.com/api/openrosa} and supply the API key.
+  \item Ensure DNS for \texttt{enketo2.commicplan.com} resolves to the reverse proxy and that TLS certificates exist under \texttt{/etc/letsencrypt/live/enketo2.commicplan.com/}.
+  \item Populate the SPA \texttt{.env} with \texttt{VITE\_ENKETO\_URL} and \texttt{VITE\_OPENROSA\_SERVER\_URL} so deep links/buttons in the dashboards reference the correct renderer.
+\end{enumerate}
+
+\subsection{Deployment and Operations}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Code \& assets}: The Enketo repository lives alongside the main stack (see \texttt{/opt/ComMicPlanV2/Enketo} if cloned). Deployment is typically handled via Docker Compose with systemd ensuring restart policies.
+  \item \textbf{Reverse proxy}: Nginx hosts two blocks for Enketo—port 80 redirect to HTTPS and a port 443 proxy forwarding all traffic to \texttt{http://127.0.0.1:8005/}. Update \texttt{/etc/nginx/sites-available/mycommicplan} when ports or upstream hosts change.
+  \item \textbf{Monitoring}: Add Enketo health probes to Prometheus (HTTP 200 on \texttt{/service/worker/status}). Sentry can wrap the Enketo frontend if custom themes inject JavaScript.
+  \item \textbf{Scaling}: Increase Enketo worker replicas or CPU/memory reservations in Docker Compose when concurrent edits spike. CDN caching of form XML reduces backend load.
+\end{itemize}
+
+\subsection{Customization and UX}
+\begin{itemize}[leftmargin=*]
+  \item Brand alignment achieved through Enketo's \texttt{/public/css/custom.css}. Synchronize styles with the React design system to avoid abrupt context shifts for users passing between channels.
+  \item Advanced widgets (geo traces, media prompts, repeating groups) are configured within Django templates and automatically reflected in Enketo upon next fetch.
+  \item \texttt{frontend/src/DataCollector/DataCollectorPage.jsx} exposes “Open in Enketo” links for each assignment, ensuring the correct query params (\texttt{formId}, \texttt{returnUrl}) are included.
+\end{itemize}
+
+\subsection{Troubleshooting}
+\begin{itemize}[leftmargin=*]
+  \item Use \verb|GET /api/debug-enketo-auth/| and \verb|GET /api/test-cookie/| to verify cookies and tokens issued to Enketo.
+  \item Inspect \texttt{/var/log/nginx/enketo.log} for proxy errors and \texttt{docker logs <enketo\_container>} for renderer issues.
+  \item Common failures include mismatched API keys, missing CSRF cookies, or Enketo hitting HTTP 401—walk through the login flow and confirm \texttt{commicplan\_auth} exists before reattempting submissions.
+\end{itemize}
+
+\section{Mobile App Documentation}
+\subsection{Tech Stack}
+Flutter (Dart) multi-platform application for Android and iOS.
+
+\subsection{Setup}
+\begin{enumerate}[leftmargin=*]
+  \item Install the Flutter SDK and platform toolchains.
+  \item Clone \href{https://github.com/groupmappers/ComMicPlanMain-App}{ComMicPlanMain-App}.
+  \item Run \verb|flutter pub get|.
+\end{enumerate}
+
+\subsection{Features}
+Offline data capture, local queueing, synchronization, attachment handling, and project/form management.
+
+\subsection{Build and Deployment}
+\begin{itemize}[leftmargin=*]
+  \item Android: \verb|flutter build apk|.
+  \item iOS: \verb|flutter build ipa| (requires macOS toolchain).
+  \item Continuous delivery through GitHub Actions and respective app stores.
+\end{itemize}
+
+\section{Deployment and Infrastructure}
+\noindent Everything in this chapter originates from the ops runbook we keep beside the on-call phone. It highlights what we actually do during maintenance windows rather than presenting an idealized architecture diagram.
+\subsection{Environment Setup}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Local + QA}: Developers spin up Django, Vite, PostgreSQL, and Redis via Docker Compose or dedicated containers; `.env` mirrors production secrets (without credentials) so feature flags and integrations can be exercised using \texttt{VITE\_*} variables.
+  \item \textbf{Production footprint}: A hardened Ubuntu VPS at \texttt{/opt/ComMicPlanV2} runs Nginx, Gunicorn, Celery, Redis, and PostgreSQL. Static assets live in \texttt{/var/www/html}, media uploads in \texttt{/opt/ComMicPlanV2/backend/media}, and TLS certificates in \texttt{/etc/letsencrypt/live/*}.
+  \item \textbf{Network topology}: Cloudflare (or equivalent CDN/WAF) fronts \href{https://dev.commicplan.com}{dev.commicplan.com}, \href{https://admin2.commicplan.com}{admin2.commicplan.com}, and \href{https://enketo2.commicplan.com}{enketo2.commicplan.com}; Nginx reverse-proxies API/websocket traffic to Gunicorn (port 8000/8001) while serving the built SPA directly.
+\end{itemize}
+
+\subsection{CI/CD Pipeline}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Trigger}: Pushes to \texttt{main} activate \texttt{.github/workflows/deploy.yml}.
+  \item \textbf{Build}: Actions runners install Node 18 + Python 3.10, execute \texttt{npm install \&\& npm run build} in \texttt{frontend/}, and \texttt{pip install -r requirements.txt} for Django before running migrations.
+  \item \textbf{Artifact delivery}: \texttt{appleboy/scp-action} syncs the repository to \texttt{/root/mycommicplan-main} on the VPS, then \texttt{appleboy/ssh-action} provisions system packages, copies \texttt{frontend/dist} to \texttt{/var/www/html}, and restarts Gunicorn/Nginx to pick up the new release.
+  \item \textbf{Post-deploy}: The workflow validates Nginx configuration (\texttt{nginx -t}) and relaunches background services; health checks run manually afterwards using the runbook below.
+\end{itemize}
+
+\subsection{Monitoring and Logging}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Application telemetry}: Sentry (JavaScript + Python SDKs) captures uncaught exceptions, release tags, and user context.
+  \item \textbf{Infrastructure metrics}: Prometheus scrapes systemd exporters for CPU, memory, disk, and Celery queue depth; Grafana dashboards surface SLIs.
+  \item \textbf{Log aggregation}: Access/error logs reside in \verb|/var/log/nginx/|, Gunicorn output streams to \verb|/var/log/django.log|, and Celery workers log under \verb|/var/log/celery/*.log|. Shipping to CloudWatch/OpenSearch is recommended for long-term retention.
+\end{itemize}
+
+\subsection{Backup and Recovery}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Database}: Nightly \texttt{pg\_dump} exports (retained for 30 days) plus AWS RDS-style snapshots for multi-day retention; restores are tested quarterly in a staging VPC.
+  \item \textbf{Media}: \texttt{backend/media} syncs to S3/Wasabi using \texttt{rclone} with server-side encryption enabled; checksum audits run weekly.
+  \item \textbf{Configuration}: Infrastructure-as-code snippets (Nginx configs, systemd units, deployment scripts) live in Git to guarantee reproducible recovery.
+\end{itemize}
+
+\subsection{Scaling}
+\begin{itemize}[leftmargin=*]
+  \item Horizontal scale by adding Gunicorn workers (via \texttt{commicplan-gunicorn.service}) or deploying additional EC2/VPS instances behind an AWS Application Load Balancer.
+  \item Vertical scale by tuning PostgreSQL instance classes, Redis memory allocations, and CDN cache rules to offload read-heavy traffic.
+  \item Celery autoscaling adjusts worker pool size in response to queue depth alarms raised by Prometheus.
+\end{itemize}
+
+\subsection{Operational Runbook}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Service recovery}: Execute \verb|bash run_all_sites.sh| inside \verb|/opt/ComMicPlanV2| (script shown in repository). It restarts \texttt{commicplan-gunicorn.service}, \texttt{commicplanv2.service}, and \texttt{nginx}, displays status summaries, captures listening ports, and tails recent Gunicorn logs for verification.
+  \item \textbf{EWARS LMIS toggle}: When DNS for the LMIS backend is restored, enable the \texttt{/lmis/} proxy block in \texttt{/etc/nginx/sites-available/ewars.commicplan.com}, run \verb|sudo nginx -t|, then \verb|sudo systemctl reload nginx|.
+  \item \textbf{Verification steps}: After any deployment or recovery, load both public endpoints, inspect \verb|sudo journalctl -u commicplan-gunicorn.service|, and confirm Prometheus targets plus Sentry heartbeats are healthy.
+  \item \textbf{Incident escalation}: If repeated failures occur, disable CI/CD by pausing the GitHub workflow, revert to the previous Git tag, and notify the on-call engineer via the incident bridge.
+\end{itemize}
+
+\section{Security and Compliance}
+\noindent Security controls evolve alongside deployments. The bullets below summarize what we actively monitor and enforce today rather than a distant roadmap.
+\subsection{Authentication and Authorization}
+JWT-based sessions with strict role mapping (Admin, User, Viewer). Short-lived tokens plus refresh workflow recommended.
+
+\subsection{Data Protection}
+TLS 1.3 for transport security and AES-256 encryption for backups and sensitive payloads.
+
+\subsection{Vulnerability Management}
+Regular dependency scans, OS patching, and penetration testing cycles.
+
+\subsection{Compliance}
+Aligns with GDPR principles for data minimization and subject rights; tailor for HIPAA or local regulations as required.
+
+\section{Maintenance and Troubleshooting}
+\noindent No matter how polished the system becomes, these are the issues that crop up most frequently in Slack. Use this section as a quick diagnostic checklist before escalating to the broader team.
+\subsection{Common Issues}
+\begin{itemize}[leftmargin=*]
+  \item API timeouts due to heavy queries or network latency.
+  \item Synchronization failures (usually credential or connectivity issues).
+\end{itemize}
+
+\subsection{Logs and Debugging}
+Inspect \verb|/var/log/nginx/|, Gunicorn logs, Celery worker logs, and monitoring dashboards.
+
+\subsection{Updates}
+Semantic versioning with documented release notes; rollback via Git revert and deployment automation.
+
+\subsection{Performance}
+Track CPU, memory, DB query times, cache hit rates, and Celery queue depth.
+
+\section{Contributing and Development}
+\subsection{Code Style}
+\begin{itemize}[leftmargin=*]
+  \item Frontend: ESLint + Prettier enforcement.
+  \item Backend: Black and Flake8.
+\end{itemize}
+
+\subsection{Branching Strategy}
+Feature branches merge through pull requests into \texttt{main}; releases tagged accordingly.
+
+\subsection{Testing Strategy}
+\begin{itemize}[leftmargin=*]
+  \item Unit tests: Jest (frontend) and Django test suite.
+  \item End-to-end: Cypress or Flutter integration tests.
+\end{itemize}
+
+\subsection{Contact}
+Primary team alias: \href{mailto:ridoy@groupmappers.com}{ridoy@groupmappers.com}. For urgent issues, contact the on-call DevOps engineer through the incident channel.
+
+\vfill
+\noindent\textit{For updates, refer to the repository README or contact the ComMicPlan engineering team.}
+
+\end{document}

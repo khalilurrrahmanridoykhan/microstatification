@@ -1,0 +1,45 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_540" version="20240601">
+          <start>2025-08-21T01:52:12.671+06:00</start>
+          <end>2025-08-21T01:53:14.408+06:00</end>
+          <employee_info>
+            <type_of_test>rdt</type_of_test>
+            <employee_name>sdf</employee_name>
+            <data_collectors_position>shastho_shebika_</data_collectors_position>
+            
+            
+            <name_of_the_institution>community_clinic</name_of_the_institution>
+            <patient_name>dsa</patient_name>
+            <guardians_name>dfggdf</guardians_name>
+            <phone_number>01726848561</phone_number>
+          </employee_info>
+          <administrative>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>bandarban_sadar</upazila>
+            <union>jamchhari</union>
+            <ward>ward_no_02_18</ward>
+            <village>mengko_para</village>
+          </administrative>
+          <group_gltbz1d8w>
+            <age>0__10</age>
+            <weight>60</weight>
+            <gender>male</gender>
+            <race_i_group>bangali</race_i_group>
+            <occupation>housewife</occupation>
+            <have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>yes</have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>
+            <date_of_onset_fever>2025-08-20</date_of_onset_fever>
+            <date_of_doing_test>2025-08-13</date_of_doing_test>
+            <type_of_disease>plasmodium_vivax</type_of_disease>
+            <severe_malaria>no</severe_malaria>
+            <treatment>primaquine___chloroquine</treatment>
+            <date_of_initiation_of_treatment>2025-08-20</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <case_identification>acd</case_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>30</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <lab_location>23.706427 90.4456 0 35</lab_location>
+          </group_gltbz1d8w>
+          <meta>
+            <instanceID>uuid:378cc25b-1ff3-411d-847b-5ba2671ebf53</instanceID>
+          </meta>
+        </data>

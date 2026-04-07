@@ -1,0 +1,24 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_99" version="20240601">
+          <start>2025-07-22T12:58:58.249+06:00</start>
+          <end>2025-07-22T13:00:23.296+06:00</end>
+          <what_s_your_name_>dfghjkl;</what_s_your_name_>
+          <how_old_are_you_>852</how_old_are_you_>
+          <what_s_time_now_>2025-07-29</what_s_time_now_>
+          <what_s_time_now__1>13:00:00.000+06:00</what_s_time_now__1>
+          <what_s_date_and_time_now_>2025-08-06T13:00:00.000+06:00</what_s_date_and_time_now_>
+          <your_current_location>23.754482 90.365362 0 13.232</your_current_location>
+          <draw_a_line>23.750269 90.359858 0 0;23.753411 90.367334 0 0</draw_a_line>
+          <draw_a_shape>23.749263 90.357325 0 0;23.759397 90.372961 0 0;23.749656 90.38863 0 0;23.749263 90.357325 0 0</draw_a_shape>
+          <write_a_fraction_value>7</write_a_fraction_value>
+          <scan_barcode>not working in web version</scan_barcode>
+          <company_rating>5</company_rating>
+          <select_alphabet>c</select_alphabet>
+          <select_multiple_alphabet>x z</select_multiple_alphabet>
+          <note_will_be_read_out_loud/>
+          <confirm_terms_and_conditions>OK</confirm_terms_and_conditions>
+          
+          <pick_file>Css selector1-13_0_19.docx</pick_file>
+          <meta>
+            <instanceID>uuid:40218086-cdaa-41d5-ba0d-be656ed0c16b</instanceID>
+          </meta>
+        </data>

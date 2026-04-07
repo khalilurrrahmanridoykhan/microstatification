@@ -1,0 +1,46 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_540" version="20240601">
+          <start>2025-08-21T11:53:49.539+06:00</start>
+          <end>2025-08-21T11:56:08.951+06:00</end>
+          <employee_info>
+            <type_of_test>rdt</type_of_test>
+            <employee_name>Ayon Pal</employee_name>
+            <data_collectors_position>special_health_worker__shw_</data_collectors_position>
+            
+            
+            <name_of_the_institution>brac</name_of_the_institution>
+            <other_1/>
+            <patient_name>Zahidul Islam</patient_name>
+            <guardians_name>Akmol hossain</guardians_name>
+            <phone_number>01989492958</phone_number>
+          </employee_info>
+          <administrative>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>alikadam</upazila>
+            <union>alikadam</union>
+            <ward>ward_no_01_9</ward>
+            <village>lama_bazar_para__dakshin_ongsho_</village>
+          </administrative>
+          <group_gltbz1d8w>
+            <age>11__25</age>
+            <weight>30 Kg</weight>
+            <gender>male</gender>
+            <race_i_group>bangali</race_i_group>
+            <occupation>job</occupation>
+            <have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>yes</have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>
+            <date_of_onset_fever>2025-08-21</date_of_onset_fever>
+            <date_of_doing_test>2025-08-21</date_of_doing_test>
+            <type_of_disease>plasmodium_falciparum</type_of_disease>
+            <severe_malaria>yes</severe_malaria>
+            <treatment>other</treatment>
+            <date_of_initiation_of_treatment>2025-08-21</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <case_identification>acd</case_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>1</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <lab_location>23.753523 90.36759 0 1353.096247752317</lab_location>
+          </group_gltbz1d8w>
+          <meta>
+            <instanceID>uuid:484f4f65-d06f-4d93-ac68-9682e084040f</instanceID>
+          </meta>
+        </data>

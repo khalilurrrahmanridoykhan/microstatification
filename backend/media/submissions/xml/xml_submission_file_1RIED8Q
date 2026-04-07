@@ -1,0 +1,46 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_592" version="20240601">
+          <start>2025-08-22T22:51:45.048+06:00</start>
+          <end>2025-08-22T22:53:26.382+06:00</end>
+          <type_of_test>rdt</type_of_test>
+          
+          
+          <employee_name>asdfasdf</employee_name>
+          <data_collectors_position>health_worker__sk_hw_</data_collectors_position>
+          
+          <name_of_the_institution>government_health_facility</name_of_the_institution>
+          
+          <patient_name>asdfsadf</patient_name>
+          <guardians_name>asdfasdfsadf</guardians_name>
+          <phone_number>11111111111</phone_number>
+          <division>chattogram</division>
+          <district>bandarban</district>
+          <upazila>lama</upazila>
+          <union>aziznagar</union>
+          <ward>ward_no_01_12</ward>
+          <village>kalamboxu_para</village>
+          <group_-_2>
+            <age>_1_years_</age>
+            <weight>33</weight>
+            <gender>male</gender>
+            <racegroup>garo</racegroup>
+            
+            <occupation>agriculture</occupation>
+            
+            <have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>yes</have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>
+            <date_of_onset_fever>2025-08-30</date_of_onset_fever>
+            <date_of_doing_test>2025-09-05</date_of_doing_test>
+            <type_of_disease>plasmodium_falciparum</type_of_disease>
+            <treatment>primaquine___chloroquine</treatment>
+            
+            <date_of_initiation_of_treatment>2025-08-29</date_of_initiation_of_treatment>
+            <the_patient_is_referred>no</the_patient_is_referred>
+            <case_identification>pcd</case_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>3</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient>45.836454 77.661673 0 0</position_of_the_patient>
+            <whether_the_patient_comes_from_other_district_upazila>yes</whether_the_patient_comes_from_other_district_upazila>
+          </group_-_2>
+          <meta>
+            <instanceID>uuid:5eaac9b2-4a3d-4c25-87f1-bc0a2fa6f5f5</instanceID>
+          </meta>
+        </data>

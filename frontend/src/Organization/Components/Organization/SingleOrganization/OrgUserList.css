@@ -1,0 +1,252 @@
+
+.container {
+    max-width: 100%;
+    margin: auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+  }
+
+  .tabs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .tab-buttons {
+    display: flex;
+    gap: 10px;
+  }
+
+  .tab-button {
+    position: relative;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: none;
+    font-weight: 500;
+    color: #333;
+  }
+  
+  .tab-button::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0%;
+    height: 3px;
+    background-color: #0614d6;
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+    border-radius: 2px;
+  }
+  
+  .tab-button.active::after {
+    width: 100%;
+  }
+
+  .mt-btn.active{
+    border-bottom: 3px solid  #0614d6;
+
+  }
+
+  .create-btn:active {
+    transform: scale(0.97);
+    box-shadow: 0 2px 6px rgba(53, 153, 219, 0.2);
+    background-color: #3599db;
+  }
+  
+  .create-btn:focus {
+    outline: 2px solid #a3d8f4;
+    outline-offset: 2px;
+  }
+  
+  .content-section {
+    margin-top: 20px;
+    display: none;
+  }
+
+  .content-section.active {
+    display: block;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+  }
+
+  th {
+    background-color: #3599db;
+  }
+
+  .action-buttons button {
+    border: none;
+    background: none;
+    cursor: pointer;
+    margin: 0 5px;
+  }
+
+  .form-group {
+    margin-bottom: 15px;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  select, input[type="date"] {
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 24px;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+  }
+
+  .switch input:checked + .slider {
+    background-color: #2196F3;
+  }
+
+  .switch input:checked + .slider:before {
+    transform: translateX(26px);
+  }
+
+  .notification-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+
+  .save-btn {
+    background-color: #1f3fff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+
+
+
+.notif-label {
+display: flex;
+align-items: center;
+gap: 10px;
+position: relative;
+}
+
+.notif-input {
+opacity: 0;
+width: 0;
+height: 0;
+}
+
+.notif-label .slider {
+position: relative;
+display: inline-block;
+width: 45px;
+height: 22px;
+background-color: #ccc;
+border-radius: 22px;
+transition: 0.4s;
+}
+
+.notif-label .slider::before {
+content: "";
+position: absolute;
+height: 16px;
+width: 16px;
+left: 3px;
+bottom: 3px;
+background-color: white;
+transition: 0.4s;
+border-radius: 50%;
+}
+
+.notif-input:checked + .slider {
+background-color: #2196F3;
+}
+
+.notif-input:checked + .slider::before {
+transform: translateX(22px);
+}
+
+.notif-text {
+font-size: 16px;
+} 
+
+
+@media (max-width: 768px) {
+  .tabs {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+   .tab-buttons {
+    flex-wrap: wrap;
+    align-items: center;
+    text-align: center;
+  }
+
+
+
+  .create-btn {
+    width: 100%;
+    margin-top: 10px;
+  }
+  .create-btn_res {
+    width: 100%;
+    margin-top: 10px;
+  }
+
+}
+
+
+

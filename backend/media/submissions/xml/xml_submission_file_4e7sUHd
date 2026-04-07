@@ -1,0 +1,14 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_131" version="20240601">
+          <start>2025-07-24T11:02:29.916+06:00</start>
+          <end>2025-07-24T11:02:53.100+06:00</end>
+          <name_of_para_mahalla_camp>alikadam</name_of_para_mahalla_camp>
+          <ward_number>ward_no_03</ward_number>
+          
+          <geolocation__latitude_and_longitude__of_the_para_mahalla_camp>21.635729 91.975643 0 0</geolocation__latitude_and_longitude__of_the_para_mahalla_camp>
+          <picture>Radiant_icon-11_2_50.png</picture>
+          <waypoint>center_of_the_village</waypoint>
+          
+          <meta>
+            <instanceID>uuid:d3fe5000-174c-4d25-b52e-964d2ca36f81</instanceID>
+          </meta>
+        </data>

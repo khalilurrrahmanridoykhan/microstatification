@@ -1,0 +1,17 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_725" version="20240601">
+          <start>2025-09-01T10:39:06.105+06:00</start>
+          <end>2025-09-01T10:39:13.125+06:00</end>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>other</patients_country_of_origin>
+            <other_3/>
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <meta>
+            <instanceID>uuid:7acfb449-0286-4a46-b8a0-5e3ad0bab2b1</instanceID>
+          </meta>
+        </data>

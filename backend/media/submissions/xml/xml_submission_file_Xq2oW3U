@@ -1,0 +1,63 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1079" version="20240601">
+          <start>2026-02-19T12:36:26.948+06:00</start>
+          <end>2026-02-19T12:49:50.791+06:00</end>
+          <health_worker_s_information>
+            <date>2026-02-19</date>
+            <name_of_staff>Ayon Pal</name_of_staff>
+            <organization>brac</organization>
+            <designation_1>chw</designation_1>
+            
+          </health_worker_s_information>
+          <suspected_patient-related_information>
+            <reporting_sites>district</reporting_sites>
+            <division>barishal</division>
+            <district>barguna</district>
+            <upazila>taltali</upazila>
+            <union>barobogi</union>
+            <ward>ward_no_1_4</ward>
+            
+            
+            <area>hatimara</area>
+            <location>23.730669 90.184273 0 0</location>
+            <hh_id>8888</hh_id>
+            <hh_head_name>javed</hh_head_name>
+            <suspected_in_the_disease>yes</suspected_in_the_disease>
+            <name_of_the_person_with_suspected_case>Karim</name_of_the_person_with_suspected_case>
+            <mobile_number>01989492958</mobile_number>
+            <patient_id_type>nid</patient_id_type>
+            <user_identification_11_9943_01976848561>1470147014</user_identification_11_9943_01976848561>
+            <age_month>20</age_month>
+            <age_year>0</age_year>
+            <sex>male</sex>
+            
+            <suspected_disease>dengue awd malaria</suspected_disease>
+          </suspected_patient-related_information>
+          <referral-related_information>
+            <referred>yes</referred>
+            <referral_place>govt</referral_place>
+            <if_referred_to_govt>community_clinic</if_referred_to_govt>
+            
+          </referral-related_information>
+          <health_behaviour>
+            <bed_net_use_practice_during_sleep>yes</bed_net_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>yes</handwashing_practice_with_soap__water>
+            <type_latrine_use>flush_latrine</type_latrine_use>
+          </health_behaviour>
+          <information_of_already_identified_patient_s_>
+            
+            
+            
+          </information_of_already_identified_patient_s_>
+          <environmental_related_information_>
+            <presence_of_stagnant_water_mosquito_breeding_sites>yes</presence_of_stagnant_water_mosquito_breeding_sites>
+            <presence_of_mosquito_larvae>aedes</presence_of_mosquito_larvae>
+          </environmental_related_information_>
+          <disaster-related_information>
+            <did_any_disaster_occur_in_last_7_days_>yes</did_any_disaster_occur_in_last_7_days_>
+            <what_types>flood</what_types>
+          </disaster-related_information>
+          <remarks>Yes</remarks>
+          <meta>
+            <instanceID>uuid:066a85cb-3ba8-440b-ba83-e104adcc0cd4</instanceID>
+          </meta>
+        </data>

@@ -1,0 +1,122 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-09-08T13:14:47.459+06:00</start>
+          <end>2025-09-08T13:16:08.785+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <user_identification_11_9943_01976848561>1234567891</user_identification_11_9943_01976848561>
+          <diagnostic_information>
+            <type_of_test_facility>community</type_of_test_facility>
+            <type_of_test>rdt</type_of_test>
+            
+            <types_of_diseases_for_rdt>nagative</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>gd</employee_name>
+            <designation_of_data_collector>health_worker__sk_hw___</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>df</patient_name>
+            <guardians_name>dffd</guardians_name>
+            <_nationality>burmese__myanamar_</_nationality>
+            
+            <phone_number_1>bangladesh</phone_number_1>
+            <phone_number>01975849541</phone_number>
+            <age>_1</age>
+            <weight>10</weight>
+            <gender>male</gender>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>dependent</occupation>
+          </patient_information>
+          <reporting_site_details>
+            <division>barishal</division>
+            <district>barguna</district>
+            <upazila>amtali</upazila>
+            
+            
+            
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>other</patients_country_of_origin>
+            <other_7>ghj</other_7>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>no</have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>
+            
+            <date_of_onset_fever>2025-09-08</date_of_onset_fever>
+            <date_of_first_test>2025-09-07</date_of_first_test>
+            <type_of_species>mixed__pf_pv_</type_of_species>
+            <_is_this_case_identify_as_a_sevear_malaria_case>no</_is_this_case_identify_as_a_sevear_malaria_case>
+            
+            
+            
+            <medicines_type>act___primaquine</medicines_type>
+            <medicines_name>injection_artesunate__gf_</medicines_name>
+            
+            <date_of_initiation_of_treatment>2025-09-07</date_of_initiation_of_treatment>
+            <are_you_refered_this_patient_1>no</are_you_refered_this_patient_1>
+            
+            
+            
+            
+            
+            
+            <case_classification>imported_local</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification/>
+            <the_total_number_of_active_llin_or_itn_available_in_your_house>10</the_total_number_of_active_llin_or_itn_available_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.758174 90.364496 0 0</position_of_the_patient_coordinates_of_the_patient>
+            
+            
+            
+            
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:0c095694-ae7b-422f-a244-85c556d375af</instanceID>
+          </meta>
+        </data>

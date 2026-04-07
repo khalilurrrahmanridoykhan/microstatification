@@ -1,0 +1,111 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-09-03T10:54:43.927+06:00</start>
+          <end>2025-09-03T11:00:33.632+06:00</end>
+          <diagnostic_information>
+            <patient_id_type>birth_certificate</patient_id_type>
+            <user_identification_11_9943_01976848561>20</user_identification_11_9943_01976848561>
+            <type_of_test_facility>facilities</type_of_test_facility>
+            
+            <type_of_test>rdt_2</type_of_test>
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>fed</employee_name>
+            <designation_of_data_collector>special_health_worker__shw__2</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>community_clinic</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>sr</patient_name>
+            <guardians_name>fsdfsd</guardians_name>
+            <_nationality>other</_nationality>
+            <other_5>sdf</other_5>
+            <phone_number>01976848561</phone_number>
+            <age>5-14</age>
+            <weight>4</weight>
+            <gender>female</gender>
+            <pregnent>no</pregnent>
+            <racegroup>chakma</racegroup>
+            
+            <occupation>businessman</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>dhaka</division>
+            <district>faridpur</district>
+            <upazila>bhanga</upazila>
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>other</patients_country_of_origin>
+            <other_7>sdf</other_7>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_past_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_past_year>
+            <how_many_times>432</how_many_times>
+            <date_of_onset_fever>2025-09-29</date_of_onset_fever>
+            <date_of_first_test>2025-09-23</date_of_first_test>
+            <type_of_species>mixed__pf_pv_</type_of_species>
+            
+            
+            <treatment_1>act___primaquine</treatment_1>
+            <treatment_2>act__18-tab_</treatment_2>
+            
+            <date_of_initiation_of_treatment>2025-09-17</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>medical_college</where_is_it_referred_to>
+            
+            <medical_collage>rangamati_medical_college</medical_collage>
+            
+            
+            
+            <case_classification>imported_local</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>pacd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>343</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.772776 90.426532 0 0</position_of_the_patient_coordinates_of_the_patient>
+            
+            
+            
+            
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>outside_bangladesh</if_yes__type_of_travel>
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>other</if_international__specify_the_last_country_visited.>
+            <other_3>cvsx</other_3>
+          </travel_history>
+          <meta>
+            <instanceID>uuid:cb60aaf3-e7a1-4f3d-8206-fe46aa0bd2b9</instanceID>
+          </meta>
+        </data>

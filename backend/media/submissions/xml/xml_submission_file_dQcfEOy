@@ -1,0 +1,19 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_955" version="20240601">
+          <start>2025-09-08T10:12:01.629+06:00</start>
+          <end>2025-09-08T10:12:23.513+06:00</end>
+          <number_of_follow_up>1st__4th_day_from_treatment_</number_of_follow_up>
+          <is_fever_subsiding>yes</is_fever_subsiding>
+          
+          <bse_did_>yes</bse_did_>
+          <_what_is_then_result>positive_</_what_is_then_result>
+          <did_he_or_she_take_proper_medication_according_to_prescription>yes</did_he_or_she_take_proper_medication_according_to_prescription>
+          <any_unusable_bleeding_history_present_>yes</any_unusable_bleeding_history_present_>
+          <any_sign__symptom_of_anemia_and_jaundice_present>yes</any_sign__symptom_of_anemia_and_jaundice_present>
+          <any_severe_malaria_symptom_present_>yes</any_severe_malaria_symptom_present_>
+          <patient_referred_>yes</patient_referred_>
+          <where_referred_>chattogram</where_referred_>
+          <data_collection_form_uuid>uuid:58ce500d-c16c-4afb-ac26-fac4a859a6c8</data_collection_form_uuid>
+          <meta>
+            <instanceID>uuid:c5371330-6858-426d-9d72-f5595b69dc71</instanceID>
+          </meta>
+        </data>

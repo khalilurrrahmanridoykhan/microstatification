@@ -1,0 +1,28 @@
+# Ignore sensitive config files
+backend/backend/settings.py
+frontend/src/config.js
+.venv
+venv/
+frontend/node_modules/
+old_frontend/node_modules/
+node_modules/
+*.pack
+.cache/
+frontend/src/config.js
+
+node_modules/
+/mobileapp/
+frontend/public/mobileapp/
+frontend/dist/mobileapp/
+.env
+backend/api/__pycache__
+backend/backend/__pycache__backend/media/downloads/mydatabase_backup_*.sql.gz
+backend/gunicorn.log
+**/__pycache__/
+backend/gunicorn.log
+
+# GitHub hard limit: exclude oversized DB dump from normal git push.
+migration_bundle_20260328/db/commicplan_clone_2_Mar_20260328.dump
+
+# Generated data exports (very large, should not be versioned).
+backend/media/downloads/

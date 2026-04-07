@@ -1,0 +1,111 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-09-03T10:53:18.895+06:00</start>
+          <end>2025-09-03T10:54:43.544+06:00</end>
+          <diagnostic_information>
+            <patient_id_type>nid</patient_id_type>
+            <user_identification_11_9943_01976848561>19</user_identification_11_9943_01976848561>
+            <type_of_test_facility>facilities</type_of_test_facility>
+            
+            <type_of_test>bse</type_of_test>
+            
+            <types_of_diseases_for_bse>positive</types_of_diseases_for_bse>
+          </diagnostic_information>
+          <data_collector_s_information>
+            
+            
+            
+            <lab_name>gajalia_lab_</lab_name>
+            
+            <name_of_the_organization>community_clinic</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>wer</patient_name>
+            <guardians_name>sfdfsd</guardians_name>
+            <_nationality>indian</_nationality>
+            
+            <phone_number>01926848561</phone_number>
+            <age>5-14</age>
+            <weight>3</weight>
+            <gender>male</gender>
+            
+            <racegroup>chakma</racegroup>
+            
+            <occupation>businessman</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>khulna</division>
+            <district>jhenaidah</district>
+            <upazila>kaliganj_2</upazila>
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>other</patients_country_of_origin>
+            <other_7>rf</other_7>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_past_year>no</have_you_or_any_member_of_your_household_had_malaria_within_past_year>
+            
+            <date_of_onset_fever>2025-09-23</date_of_onset_fever>
+            <date_of_first_test>2025-09-23</date_of_first_test>
+            <type_of_species>plasmodium_falciparum__pf_</type_of_species>
+            
+            
+            <treatment_1>act___primaquine</treatment_1>
+            <treatment_2>act__18-tab_</treatment_2>
+            
+            <date_of_initiation_of_treatment>2025-09-18</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>general_hospital</where_is_it_referred_to>
+            
+            
+            
+            <general_hospital>rangamati_general_hospital</general_hospital>
+            
+            <case_classification>imported_local</case_classification>
+            <case_identification>pcd__passive_case_detection_</case_identification>
+            
+            <the_total_number_of_llins_limited_insecticides_in_your_house>43</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.769577 90.41785 0 0</position_of_the_patient_coordinates_of_the_patient>
+            <lab_district>bandarban</lab_district>
+            <lab_upazila>lama_2</lab_upazila>
+            <lab_organization>ekata</lab_organization>
+            <lab_location_list_of_the_lab>lama_mukh_lab</lab_location_list_of_the_lab>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>mozambique_</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:ce16bb8e-61ac-4e63-9249-fa49db2c42a7</instanceID>
+          </meta>
+        </data>

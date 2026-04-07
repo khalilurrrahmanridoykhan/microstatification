@@ -1,0 +1,213 @@
+source .venv/bin/activate
+source venv/bin/activate
+sudo python manage.py runserver 8001
+sudo lsof -i :8000
+sudo kill -9 <PID>
+pkill -f gunicorn
+pip freeze > requirements.txt
+
+ssh root@153.92.209.218
+
+cd /root/mycommicplan-main/backend
+source ../venv/bin/activate
+
+sudo pkill -f gunicorn
+nohup gunicorn backend.wsgi:application --bind 127.0.0.1:8000 --workers 8 --timeout 600 > gunicorn.log 2>&1 &
+
+gunicorn backend.wsgi:application --bind 127.0.0.1:8000 --workers 8 --timeout 600
+
+
+
+sudo rsync -a --delete /opt/ComMicPlanV2/frontend/dist/ /var/www/collect.nmcp.gov.bd/
+
+
+
+
+sudo nginx -t
+sudo systemctl reload nginx
+
+
+python manage.py runserver 0.0.0.0:8000
+
+sudo python manage.py makemigrations
+sudo python manage.py migrate
+
+python manage.py makemigrations
+python manage.py migrate
+
+nohup gunicorn backend.wsgi:application --bind 127.0.0.1:8000 > gunicorn.log 2>&1 &
+ps aux | grep gunicorn
+sudo pkill -f gunicorn
+
+
+
+
+
+sudo pkill -f gunicorn
+nohup gunicorn backend.wsgi:application --bind 0.0.0.0:8000 > gunicorn.log 2>&1 &
+tail -n 50 gunicorn.log
+
+
+python manage.py runserver 0.0.0.0:8000
+
+
+
+
+
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+User.objects.create_superuser(
+    username='ridoy',
+    email='ridoy@gmail.com',
+    password='yourpassword',
+    role='1'
+)
+
+
+
+
+IEDCR Frontend:
+npm install
+npm run build
+sudo cp -r /opt/ComMicPlanV2/frontend/dist/* /var/www/html/
+sudo nginx -t
+sudo systemctl reload nginx
+
+
+
+sudo -i -u postgres
+psql
+<<<<<<< HEAD
+\c bfs_socile
+=======
+\c mydatabase
+>>>>>>> f433c0d7f8f1005ae94bee9c4b8fd66984fa7161
+\dt
+
+
+
+GITHUB Comments:
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+
+git init
+
+git branch                  # List all branches
+git branch new-branch       # Create new branch
+git checkout new-branch     # Switch to a branch
+git switch new-branch       # (Alternative to checkout)
+git checkout -b new-branch  # Create and switch to new branch
+git merge branch-name       # Merge branch into current
+git branch -d branch-name   # Delete branch
+
+commit:
+git branch --show-current
+git add .
+git commit -m "Test deploy"
+git push origin main
+
+
+git push origin branch-name         # Push specific branch
+git push                            # Push current branch
+git push -u origin branch-name      # Push and set upstream
+
+
+git pull origin branch-name         # Pull specific branch
+git pull                            # Pull current branch
+
+
+git status                 # Check changes
+git add .                  # Stage all changes
+git add file.txt           # Stage specific file
+git commit -m "message"    # Commit staged changes
+
+
+git stash                  # Save uncommitted changes
+git stash apply            # Reapply latest stash
+git stash pop              # Apply and remove stash
+
+
+git reset file.txt         # Unstage file
+git checkout -- file.txt   # Discard file changes
+git reset --hard HEAD      # Reset everything to last commit
+
+
+git remote -v                     # View remote URLs
+git remote add origin <url>       # Add remote
+git remote remove origin          # Remove remote
+
+
+
+
+
+server {
+    listen 443 ssl;
+    server_name admin2.commicplan.com;
+
+    ssl_certificate /etc/letsencrypt/live/admin2.commicplan.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/admin2.commicplan.com/privkey.pem;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8001/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location / {
+        return 404;
+    }
+}
+server {
+    listen 443 ssl;
+    server_name dev.commicplan.com mycommicplan.com;
+
+    ssl_certificate /etc/letsencrypt/live/dev.commicplan.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/dev.commicplan.com/privkey.pem;
+
+    root /var/www/html;
+    index index.html index.htm;
+
+    # Serve frontend files
+    location / {
+        try_files $uri /index.html;
+    }
+
+    # Proxy API requests to Django backend
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # WebSocket support (if needed)
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8001/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # No Enketo proxy here; Enketo is served on its own domain
+}
+
+
+cd /opt/ComMicPlanV2
+bash run_all_sites.sh

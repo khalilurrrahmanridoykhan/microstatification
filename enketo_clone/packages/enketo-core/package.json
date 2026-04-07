@@ -1,0 +1,76 @@
+{
+    "name": "enketo-core",
+    "description": "Extensible Enketo form engine",
+    "homepage": "https://enketo.org",
+    "version": "9.0.1",
+    "license": "Apache-2.0",
+    "os": [
+        "darwin",
+        "linux",
+        "win32"
+    ],
+    "keywords": [
+        "enketo",
+        "OpenRosa",
+        "ODK",
+        "XForms",
+        "form"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/enketo/enketo"
+    },
+    "files": [
+        "src/",
+        "config.js"
+    ],
+    "bugs": "https://github.com/enketo/enketo/issues",
+    "main": "src/js/form.js",
+    "scripts": {
+        "build": "grunt css && grunt compile && grunt transforms && echo 'enketo-core build complete'",
+        "start": "grunt develop",
+        "test": "cross-env NODE_OPTIONS='--max-old-space-size=8192' grunt test",
+        "test-browsers": "cross-env NODE_OPTIONS='--max-old-space-size=8192' grunt karma:browsers",
+        "test-watch": "cross-env NODE_OPTIONS='--max-old-space-size=8192' grunt test:watch"
+    },
+    "devDependencies": {
+        "enketo-transformer": "4.2.0",
+        "libxslt": "0.10.2"
+    },
+    "resolutions": {
+        "nan": "^2.17.0",
+        "libxslt/nan": "^2.17.0",
+        "node1-libxmljsmt-myh/nan": "^2.17.0"
+    },
+    "browser": {
+        "enketo/config": "./config.js",
+        "enketo/widgets": "./src/js/widgets.js",
+        "enketo/translator": "./src/js/fake-translator",
+        "enketo/dialog": "./src/js/fake-dialog",
+        "enketo/file-manager": "./src/js/file-manager",
+        "enketo/xpath-evaluator-binding": "./src/js/xpath-evaluator-binding"
+    },
+    "dependencies": {
+        "bootstrap-datepicker": "^1.10.0",
+        "drag-drop-touch": "^1.3.1",
+        "html5sortable": "^0.13.3",
+        "jquery": "^3.7.1",
+        "jquery-touchswipe": "^1.6.19",
+        "leaflet": "^1.9.4",
+        "leaflet-draw": "github:enketo/Leaflet.draw#ff73078",
+        "leaflet.gridlayer.googlemutant": "^0.13.5",
+        "mergexml": "1.2.3",
+        "node-forge": "^1.3.1",
+        "openrosa-xpath-evaluator": "3.2.0",
+        "signature_pad": "^5.0.2"
+    },
+    "engines": {
+        "node": ">=20 <23",
+        "npm": "please-use-yarn",
+        "yarn": ">= 1.22.22 <2"
+    },
+    "volta": {
+        "node": "22.12.0",
+        "yarn": "1.22.22"
+    }
+}

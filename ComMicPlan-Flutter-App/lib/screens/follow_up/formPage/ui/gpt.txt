@@ -1,0 +1,1502 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:gmgi_project/bloc/backend/algorithms/skip_logic_check.dart';
+import 'package:gmgi_project/bloc/form_only/formPage/bloc/form_page_bloc.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/acknowledge.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/audio.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/barcode.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/date.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/date_time.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/decimal.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/file.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/geopoint.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/geoshape.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/geotrace.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/image.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/integer.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/note.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/range.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/select_multiple.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/select_one.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/text.dart' as text_question;
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/time.dart';
+import 'package:gmgi_project/screens/form_only/formPage/ui/questionaries/video.dart';
+import 'package:gmgi_project/screens/form_only/userHome/ui/userHome.dart';
+
+// Debugging extension
+extension FormPageDebugging on _FormPageState {
+  void debugFormState() {
+    debugPrint('=== Form Debug Info ===');
+    debugPrint('Current Index: $currentIndex');
+    debugPrint('Form Length: ${widget.form.length}');
+    debugPrint('Is Form Complete: $isFormComplete');
+    debugPrint('Answers Count: ${answers.length}');
+    if (currentIndex < widget.form.length) {
+      final current = widget.form[currentIndex];
+      debugPrint('Current Item Type: ${current?['type'] ?? 'null'}');
+      debugPrint('Current Item Label: ${current?['label'] ?? 'null'}');
+      debugPrint('Is Group Section: ${_isGroupSection(currentIndex)}');
+      if (current?['filterEnabled'] == true) {
+        debugPrint('Filter Enabled: true');
+        debugPrint('Filter Question ID: ${current?['filterQuestionId']}');
+        final filterAnswer = answers[uuidToName[current?['filterQuestionId']]];
+        debugPrint('Filter Answer: $filterAnswer');
+        debugPrint('Filtered Options: ${current?['optionFilterMap']?[filterAnswer]}');
+      }
+    }
+    debugPrint('Visibility Cache Size: ${_visibilityCache.length}');
+    debugPrint('Answers: $answers');
+    debugPrint('uuidToName: $uuidToName');
+    debugPrint('====================');
+  }
+}
+
+class FormPage extends StatefulWidget {
+  final int currentIndex;
+  final Map<String, dynamic> answers;
+  final String formUid;
+  final List<dynamic> form;
+  final dynamic name;
+  final bool fromSingleAnswer;
+
+  const FormPage({
+    super.key,
+    this.currentIndex = 0,
+    this.answers = const {},
+    required this.formUid,
+    required this.form,
+    required this.name,
+    this.fromSingleAnswer = false,
+  });
+
+  @override
+  State<FormPage> createState() => _FormPageState();
+}
+
+class _FormPageState extends State<FormPage> {
+  late Map<String, dynamic> answers;
+  late int currentIndex;
+  bool isFormComplete = false;
+  final _formKey = GlobalKey<FormState>();
+  final _formPageBloc = FormPageBloc();
+  final Map<String, bool> _visibilityCache = {};
+  bool _isNavigating = false;
+  bool _isDialogShowing = false;
+  final Map<String, String> uuidToName = {}; // Map from UUID to question name
+
+  @override
+  void initState() {
+    super.initState();
+    answers = Map<String, dynamic>.from(widget.answers);
+    currentIndex = widget.currentIndex;
+    _initializeUuidToName();
+
+    // Ensure 'start' timestamp
+    if (answers['start'] == null || answers['start'].toString().isEmpty) {
+      final now = DateTime.now();
+      final offset = now.timeZoneOffset;
+      final offsetHours = offset.inHours;
+      final offsetMinutes = offset.inMinutes.remainder(60);
+      final offsetString =
+          '${offsetHours >= 0 ? '+' : '-'}${offsetHours.abs().toString().padLeft(2, '0')}:${offsetMinutes.abs().toString().padLeft(2, '0')}';
+      answers['start'] = '${now.toIso8601String().substring(0, 23)}$offsetString';
+      debugPrint('Start timestamp: ${answers['start']}');
+    }
+
+    // Jump to first visible section
+    if (widget.form.isNotEmpty) {
+      currentIndex = _findNextSectionStart(currentIndex);
+    } else {
+      currentIndex = 0;
+    }
+    debugFormState(); // Debug initial state
+  }
+
+  @override
+  void didUpdateWidget(covariant FormPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.form != widget.form) {
+      _initializeUuidToName();
+    }
+  }
+
+  void _initializeUuidToName() {
+    uuidToName.clear();
+    for (var question in widget.form) {
+      if (question != null && question['_uuid'] != null && question['name'] != null) {
+        uuidToName[question['_uuid'].toString()] = question['name'].toString();
+      }
+    }
+    debugPrint('Initialized uuidToName: $uuidToName');
+  }
+
+  @override
+  void dispose() {
+    _formPageBloc.close();
+    super.dispose();
+  }
+
+  // ---------- Helpers: types & cache ----------
+
+  bool _isUnsupportedType(String? type) {
+    if (type == null) return true;
+    const supportedTypes = {
+      'text',
+      'datetime',
+      'acknowledge',
+      'select_one',
+      'select_multiple',
+      'video',
+      'image',
+      'time',
+      'integer',
+      'date',
+      'audio',
+      'geopoint',
+      'range',
+      'decimal',
+      'file',
+      'barcode',
+      'geotrace',
+      'geoshape',
+      'note',
+      'begin_group',
+      'end_group',
+    };
+    final baseType = type.split(' ')[0];
+    return !supportedTypes.contains(baseType);
+  }
+
+  bool _isGroupSection(int index) {
+    if (index < 0 || index >= widget.form.length) return false;
+    final q = widget.form[index];
+    if (q == null || q['type'] == null) return false;
+    return q['type'] == 'begin_group' && q['appearance'] == 'field-list';
+  }
+
+  String _cacheKeyForQuestion(dynamic q) {
+    final name = q?['name']?.toString();
+    return 'q:${name ?? q.hashCode.toString()}';
+  }
+
+  String _cacheKeyForGroup(dynamic q) {
+    final groupId = q?['groupId']?.toString();
+    return 'g:${groupId ?? q.hashCode.toString()}';
+  }
+
+  bool _evaluateConditions(dynamic q) {
+    try {
+      if (q == null || q['conditions'] == null || q['conditions'].isEmpty) {
+        return true;
+      }
+      final db = SkipLogicCheck(conditions: q['conditions'], answers: answers);
+      return db.skipLogicCheck();
+    } catch (e, stack) {
+      debugPrint('Error evaluating conditions for ${q?['name'] ?? q?['groupId'] ?? 'unknown'}: $e\n$stack');
+      return false; // Default to hiding on error
+    }
+  }
+
+  bool _shouldShowQuestion(dynamic q) {
+    if (q == null) return false;
+    final key = _cacheKeyForQuestion(q);
+    if (_visibilityCache.containsKey(key)) return _visibilityCache[key]!;
+    final show = _evaluateConditions(q);
+    _visibilityCache[key] = show;
+    return show;
+  }
+
+  bool _shouldShowGroup(dynamic beginGroupQ) {
+    if (beginGroupQ == null) return false;
+    final key = _cacheKeyForGroup(beginGroupQ);
+    if (_visibilityCache.containsKey(key)) return _visibilityCache[key]!;
+    final show = _evaluateConditions(beginGroupQ);
+    _visibilityCache[key] = show;
+    return show;
+  }
+
+  void _invalidateVisibilityCache() {
+    _visibilityCache.clear();
+    debugPrint('Visibility cache invalidated');
+  }
+
+  int _findMatchingEnd(int beginIndex) {
+    if (beginIndex < 0 || beginIndex >= widget.form.length) {
+      debugPrint('Invalid beginIndex: $beginIndex');
+      return widget.form.length;
+    }
+
+    final beginItem = widget.form[beginIndex];
+    if (beginItem == null) {
+      debugPrint('Null item at beginIndex: $beginIndex');
+      return beginIndex + 1;
+    }
+
+    final String? groupId = beginItem['groupId']?.toString();
+    if (groupId == null) {
+      debugPrint('Missing groupId for begin_group at index $beginIndex');
+      return beginIndex + 1;
+    }
+
+    for (int j = beginIndex + 1; j < widget.form.length; j++) {
+      final it = widget.form[j];
+      if (it != null && it['type'] == 'end_group' && it['groupId']?.toString() == groupId) {
+        return j;
+      }
+    }
+
+    debugPrint('No matching end_group for groupId $groupId at index $beginIndex');
+    return widget.form.length;
+  }
+
+  int _findMatchingBegin(int endIndex) {
+    if (endIndex < 0 || endIndex >= widget.form.length) return -1;
+
+    final endItem = widget.form[endIndex];
+    if (endItem == null) return -1;
+
+    final String? groupId = endItem['groupId']?.toString();
+    if (groupId == null) return -1;
+
+    for (int j = endIndex - 1; j >= 0; j--) {
+      final it = widget.form[j];
+      if (it != null && it['type'] == 'begin_group' && it['groupId']?.toString() == groupId) {
+        return j;
+      }
+    }
+    return -1;
+  }
+
+  // ---------- Navigation index finders (skip-logic aware) ----------
+
+  int _findNextSectionStart(int from) {
+    int i = from;
+    while (i < widget.form.length) {
+      final q = widget.form[i];
+      if (q == null) {
+        debugPrint('Null item at index $i');
+        i++;
+        continue;
+      }
+
+      final String? typeStr = q['type']?.toString();
+      if (typeStr == null) {
+        debugPrint('Null type at index $i');
+        i++;
+        continue;
+      }
+
+      final String baseType = typeStr.split(' ')[0];
+      debugPrint('Checking index $i, type: $baseType, name: ${q['name'] ?? q['groupId']}');
+
+      if (baseType == 'begin_group') {
+        if (q['appearance'] != 'field-list') {
+          i++;
+          continue;
+        }
+        final visible = _shouldShowGroup(q);
+        debugPrint('Group at $i visible: $visible');
+        if (!visible) {
+          i = _findMatchingEnd(i) + 1;
+          continue;
+        }
+        return i;
+      }
+
+      if (baseType == 'end_group' || _isUnsupportedType(baseType)) {
+        i++;
+        continue;
+      }
+
+      final visible = _shouldShowQuestion(q);
+      debugPrint('Question at $i visible: $visible');
+      if (!visible) {
+        i++;
+        continue;
+      }
+      return i;
+    }
+    debugPrint('Reached end of form at index $i');
+    return widget.form.length;
+  }
+
+  int _findPreviousSectionStart(int from) {
+    int i = from - 1;
+    while (i >= 0) {
+      final q = widget.form[i];
+      if (q == null) {
+        debugPrint('Null item at index $i');
+        i--;
+        continue;
+      }
+
+      final String? typeStr = q['type']?.toString();
+      if (typeStr == null) {
+        debugPrint('Null type at index $i');
+        i--;
+        continue;
+      }
+
+      final String baseType = typeStr.split(' ')[0];
+      debugPrint('Checking previous index $i, type: $baseType');
+
+      if (baseType == 'end_group') {
+        final begin = _findMatchingBegin(i);
+        if (begin >= 0) {
+          final beginQ = widget.form[begin];
+          final isFieldList = beginQ?['appearance'] == 'field-list';
+          final visible = isFieldList ? _shouldShowGroup(beginQ) : false;
+          debugPrint('Group at $begin visible: $visible');
+          if (isFieldList && visible) return begin;
+          i = begin - 1;
+          continue;
+        }
+        i--;
+        continue;
+      }
+
+      if (baseType == 'begin_group' || _isUnsupportedType(baseType)) {
+        i--;
+        continue;
+      }
+
+      final visible = _shouldShowQuestion(q);
+      debugPrint('Question at $i visible: $visible');
+      if (visible) return i;
+      i--;
+    }
+    return 0;
+  }
+
+  // ---------- Validation ----------
+
+  String? _validateQuestion(dynamic question) {
+    if (question == null) return null;
+
+    final String? typeStr = question['type']?.toString();
+    if (typeStr == null) return null;
+
+    final baseType = typeStr.split(' ')[0];
+    final label = question['label']?.toString() ?? 'Unknown Question';
+    final questionName = question['name']?.toString() ?? 'unknown_name';
+    final isRequired = question['required'] == true;
+
+    if (_isUnsupportedType(baseType)) return null;
+    if (!isRequired) return null;
+
+    final answer = answers[questionName];
+
+    // For filtered questions, validate against filtered options
+    if (question['filterEnabled'] == true && question['filterQuestionId'] != null) {
+      final filterQuestionName = uuidToName[question['filterQuestionId']];
+      final filterAnswer = filterQuestionName != null ? answers[filterQuestionName] : null;
+      if (filterAnswer != null) {
+        final allowedOptions = question['optionFilterMap']?[filterAnswer] ?? [];
+        if (answer != null && !allowedOptions.contains(answer)) {
+          return 'Selected option for "$label" is not valid for the current filter.';
+        }
+      }
+    }
+
+    switch (baseType) {
+      case 'text':
+        if (answer == null || answer.toString().trim().isEmpty) {
+          return 'Please enter text for "$label".';
+        }
+        break;
+      case 'integer':
+        if (answer == null || answer.toString().trim().isEmpty) {
+          return 'Please enter a number for "$label".';
+        }
+        if (int.tryParse(answer.toString()) == null) {
+          return 'Please enter a valid integer for "$label".';
+        }
+        break;
+      case 'decimal':
+        if (answer == null || answer.toString().trim().isEmpty) {
+          return 'Please enter a decimal number for "$label".';
+        }
+        if (double.tryParse(answer.toString()) == null) {
+          return 'Please enter a valid decimal number for "$label".';
+        }
+        break;
+      case 'date':
+        if (answer == null || answer.toString().trim().isEmpty) {
+          return 'Please select a date for "$label".';
+        }
+        break;
+      case 'time':
+        if (answer == null || answer.toString().trim().isEmpty) {
+          return 'Please select a time for "$label".';
+        }
+        break;
+      case 'datetime':
+        if (answer == null || answer.toString().trim().isEmpty) {
+          return 'Please select a date and time for "$label".';
+        }
+        break;
+      case 'select_one':
+        if (answer == null || answer.toString().trim().isEmpty) {
+          return 'Please select an option for "$label".';
+        }
+        break;
+      case 'select_multiple':
+        if (answer == null ||
+            (answer is List && answer.isEmpty) ||
+            (answer is String && answer.trim().isEmpty)) {
+          return 'Please select at least one option for "$label".';
+        }
+        break;
+      case 'acknowledge':
+        if (answer != true && answer != 'OK') {
+          return 'Please acknowledge "$label".';
+        }
+        break;
+      case 'image':
+        if (answer == null || answer.toString().isEmpty) {
+          return 'Please upload an image for "$label".';
+        }
+        break;
+      case 'video':
+        if (answer == null || answer.toString().isEmpty) {
+          return 'Please upload a video for "$label".';
+        }
+        break;
+      case 'audio':
+        if (answer == null || answer.toString().isEmpty) {
+          return 'Please upload an audio file for "$label".';
+        }
+        break;
+      case 'geopoint':
+        if (answer == null || answer.toString().trim().isEmpty) {
+          return 'Please record a location for "$label".';
+        }
+        break;
+      case 'range':
+        if (answer == null) {
+          return 'Please select a value for "$label".';
+        }
+        break;
+      case 'file':
+        if (answer == null || answer.toString().isEmpty) {
+          return 'Please upload a file for "$label".';
+        }
+        break;
+      case 'barcode':
+        if (answer == null || answer.toString().isEmpty) {
+          return 'Please scan a barcode for "$label".';
+        }
+        break;
+      default:
+        return 'Please provide an answer for "$label".';
+    }
+    return null;
+  }
+
+  List<String> _validateSection(int sectionStart) {
+    final List<String> errors = [];
+    if (sectionStart >= widget.form.length) return errors;
+
+    if (_isGroupSection(sectionStart)) {
+      final end = _findMatchingEnd(sectionStart);
+      for (int k = sectionStart + 1; k < end && k < widget.form.length; k++) {
+        final q = widget.form[k];
+        if (q == null) continue;
+
+        final String? typeStr = q['type']?.toString();
+        if (typeStr == null) continue;
+
+        final baseType = typeStr.split(' ')[0];
+        if (_isUnsupportedType(baseType)) continue;
+        if (!_shouldShowQuestion(q)) continue;
+        final err = _validateQuestion(q);
+        if (err != null) errors.add(err);
+      }
+    } else {
+      final q = widget.form[sectionStart];
+      if (q == null) return errors;
+
+      final String? typeStr = q['type']?.toString();
+      if (typeStr == null || _isUnsupportedType(typeStr.split(' ')[0])) {
+        return errors;
+      }
+
+      if (_shouldShowQuestion(q)) {
+        final err = _validateQuestion(q);
+        if (err != null) errors.add(err);
+      }
+    }
+    return errors;
+  }
+
+  // ---------- Navigation actions ----------
+
+  void previous() {
+    if (currentIndex <= 0 || !mounted || _isNavigating) return;
+    _isNavigating = true;
+
+    if (mounted && FocusScope.of(context).hasFocus) {
+      FocusScope.of(context).unfocus();
+    }
+
+    setState(() {
+      isFormComplete = false;
+      currentIndex = _findPreviousSectionStart(currentIndex);
+      currentIndex = currentIndex.clamp(0, widget.form.length - 1);
+    });
+    debugFormState();
+    _isNavigating = false;
+  }
+
+  void next() async {
+    if (_isNavigating || !mounted) return;
+    _isNavigating = true;
+
+    try {
+      // Dismiss keyboard
+      if (mounted && FocusScope.of(context).hasFocus) {
+        FocusScope.of(context).unfocus();
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      // Validate inline widgets
+      if (_formKey.currentState != null && !_formKey.currentState!.validate()) {
+        _isNavigating = false;
+        return;
+      }
+
+      // Validate current section
+      final errors = _validateSection(currentIndex);
+      if (errors.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errors.join('\n')),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        _isNavigating = false;
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          isFormComplete = false;
+          final sectionEnd = _isGroupSection(currentIndex) ? _findMatchingEnd(currentIndex) : currentIndex;
+          currentIndex = _findNextSectionStart(sectionEnd + 1);
+          if (currentIndex >= widget.form.length) {
+            isFormComplete = true;
+            currentIndex = (widget.form.length - 1).clamp(0, widget.form.length - 1);
+          }
+        });
+        debugFormState();
+      }
+    } finally {
+      _isNavigating = false;
+    }
+  }
+
+  void _onAnswerChanged(String key, dynamic value) {
+    if (!mounted) return;
+
+    setState(() {
+      answers[key] = value;
+      _invalidateVisibilityCache();
+
+      // Recursively clear dependent answers if they are no longer valid
+      void clearDependents(String changedKey) {
+        for (var question in widget.form) {
+          if (question == null || question['filterEnabled'] != true) continue;
+          final parentUuid = question['filterQuestionId']?.toString();
+          final parentName = uuidToName[parentUuid];
+          if (parentName == null || parentName != changedKey) continue;
+
+          final dependentName = question['name']?.toString();
+          if (dependentName == null) continue;
+          final currentAnswer = answers[dependentName];
+          if (currentAnswer == null) {
+            // If no answer exists, still check dependents of this question
+            clearDependents(dependentName);
+            continue;
+            }
+
+          final allowedOptions = question['optionFilterMap']?[answers[parentName]] ?? [];
+          if (question['type'].toString().startsWith('select_one')) {
+            if (!allowedOptions.contains(currentAnswer)) {
+              answers.remove(dependentName);
+              debugPrint(
+                'Cleared dependent answer for $dependentName due to filter change (parent: $parentName, value: ${answers[parentName]})',
+              );
+              // Recursively clear dependents of this dependent question
+              clearDependents(dependentName);
+            }
+          } else if (question['type'].toString().startsWith('select_multiple')) {
+            final currentAnswers =
+                currentAnswer is String
+                    ? currentAnswer.split(' ').where((v) => v.isNotEmpty).toList()
+                    : (currentAnswer as List?)?.cast<String>() ?? [];
+            final validAnswers = currentAnswers.where((a) => allowedOptions.contains(a)).toList();
+            if (validAnswers.length != currentAnswers.length) {
+              answers[dependentName] = validAnswers.isEmpty ? null : validAnswers.join(' ');
+              debugPrint(
+                'Filtered dependent answers for $dependentName: $validAnswers (parent: $parentName, value: ${answers[parentName]})',
+              );
+              // Recursively clear dependents of this dependent question
+              clearDependents(dependentName);
+            }
+          }
+        }
+      }
+
+      // Start the recursive clearing process
+      clearDependents(key);
+
+      // Auto-jump if current section becomes invisible
+      if (_isGroupSection(currentIndex)) {
+        final currentGroup = widget.form[currentIndex];
+        final groupVisible = _shouldShowGroup(currentGroup);
+        if (!groupVisible) {
+          final end = _findMatchingEnd(currentIndex);
+          final nextStart = _findNextSectionStart(end + 1);
+          currentIndex =
+              nextStart >= widget.form.length
+                  ? (widget.form.length - 1).clamp(0, widget.form.length - 1)
+                  : nextStart;
+          isFormComplete = currentIndex >= widget.form.length - 1;
+        }
+      } else if (currentIndex < widget.form.length) {
+        final q = widget.form[currentIndex];
+        if (q != null && q['type'] != null) {
+          final baseType = q['type'].toString().split(' ')[0];
+          if (!_isUnsupportedType(baseType) && !_shouldShowQuestion(q)) {
+            final nextStart = _findNextSectionStart(currentIndex + 1);
+            currentIndex =
+                nextStart >= widget.form.length
+                    ? (widget.form.length - 1).clamp(0, widget.form.length - 1)
+                    : nextStart;
+            isFormComplete = currentIndex >= widget.form.length - 1;
+          }
+        }
+      }
+    });
+    debugFormState();
+  }
+
+  // ---------- Renderability normalization ----------
+
+  /// Finds the next renderable section (a visible field-list group or a visible question),
+  /// skipping structural and invisible rows. If none, returns widget.form.length.
+  int _normalizeToRenderable(int from) {
+    int idx = _findNextSectionStart(from);
+
+    while (idx < widget.form.length) {
+      final q = widget.form[idx];
+      if (q == null) { idx++; continue; }
+
+      final String typeStr = q['type']?.toString() ?? '';
+      final String baseType = typeStr.split(' ')[0];
+
+      // Visible field-list group
+      if (baseType == 'begin_group' && q['appearance'] == 'field-list') {
+        if (_shouldShowGroup(q)) return idx;
+        // skip whole hidden group
+        idx = _findMatchingEnd(idx) + 1;
+        continue;
+      }
+
+      // Skip structural or unsupported rows
+      if (baseType == 'end_group' || _isUnsupportedType(baseType)) {
+        idx++;
+        continue;
+      }
+
+      // Visible question
+      if (_shouldShowQuestion(q)) return idx;
+
+      // Invisible question; skip
+      idx++;
+    }
+
+    return idx; // end (form complete)
+  }
+
+  // ---------- UI builders ----------
+
+  Widget _buildQuestionWidget(dynamic question) {
+    if (question == null) {
+      return const Text(
+        'Error: Question is null',
+        style: TextStyle(color: Colors.red),
+      );
+    }
+
+    final label = question['label']?.toString() ?? 'Unnamed Question';
+    final questionName = question['name']?.toString() ?? 'unknown_name';
+    final type = question['type']?.toString() ?? '';
+    final baseType = type.split(' ')[0];
+    final id = question['name']?.toString() ?? 'unknown_name';
+
+    // --- Avoid rendering structural rows ---
+    if (baseType == 'begin_group' || baseType == 'end_group') {
+      return const SizedBox.shrink();
+    }
+
+    if (_isUnsupportedType(baseType)) {
+      debugPrint('Unsupported question type: $baseType for $questionName');
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Unsupported question type: $baseType",
+            style: const TextStyle(fontSize: 20, color: Colors.red),
+          ),
+          const SizedBox(height: 8),
+          Text("Name: $questionName"),
+        ],
+      );
+    }
+
+    try {
+      Widget inputWidget;
+      switch (baseType) {
+        case 'text':
+          inputWidget = text_question.TextQuestion(
+            validationQuestion: () => question['required'] == true,
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+            appearance: question['appearance']?.toString() ?? '',
+            readOnly: question['read_only']?.toString() ?? '',
+            defaultValue: question['default']?.toString() ?? '',
+            constraint: question['constraint']?.toString() ?? '',
+            constraintMessage: question['constraint_message']?.toString() ?? '',
+          );
+          break;
+        case 'audio':
+          inputWidget = AudioQuestion(
+            label: label,
+            name: questionName,
+            kuid: id,
+            currentValue: answers[id]?.toString(),
+            onChanged: (value) => _onAnswerChanged(id, value),
+          );
+          break;
+        case 'datetime':
+          inputWidget = DatetimeQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+          );
+          break;
+        case 'acknowledge':
+          final String hint = question['guidance_hint']?.toString() ?? '';
+          inputWidget = AcknowledgeQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName] == 'OK' ? true : false,
+            onChanged: (value) {
+              _onAnswerChanged(questionName, value == true ? 'OK' : null);
+            },
+            hint: hint,
+          );
+          break;
+        case 'select_one':
+          final listName = type.split(' ').length > 1 ? type.split(' ')[1] : '';
+          final options = question['options'] ?? [];
+          final formChoices = options.map<Map<String, dynamic>>((choice) {
+            if (choice is Map) {
+              return choice.map<String, dynamic>((k, v) => MapEntry(k.toString(), v));
+            }
+            debugPrint('Invalid choice format for $questionName: $choice');
+            return <String, dynamic>{'name': 'invalid', 'label': 'Invalid option'};
+          }).toList();
+          final filterEnabled = question['filterEnabled'] == true;
+          final filterQuestionId = filterEnabled ? question['filterQuestionId']?.toString() : null;
+          final filterQuestionName = filterQuestionId != null ? uuidToName[filterQuestionId] : null;
+          final rawFilterMap = question['optionFilterMap'] ?? {};
+          final optionFilterMap =
+              filterEnabled ? rawFilterMap.map<String, List<String>>((k, v) => MapEntry(k.toString(), List<String>.from(v as List))) : null;
+          final filterOptionValues = filterEnabled ? List<String>.from(question['filterOptionValues'] ?? []) : null;
+
+          inputWidget = SelectOneQuestion(
+            validationQuestion: () => question['required'] == true,
+            readOnly: question['read_only']?.toString() ?? '',
+            defaultValue: question['default']?.toString() ?? '',
+            appearance: question['appearance']?.toString() ?? '',
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+            formChoices: formChoices,
+            listName: listName,
+            next: next,
+            filterEnabled: filterEnabled,
+            filterQuestionName: filterQuestionName,
+            optionFilterMap: optionFilterMap,
+            filterOptionValues: filterOptionValues,
+            answers: answers,
+          );
+          break;
+        case 'select_multiple':
+          final listName = type.split(' ').length > 1 ? type.split(' ')[1] : '';
+          final options = question['options'] ?? [];
+          final formChoices = options.map<Map<String, dynamic>>((choice) {
+            if (choice is Map) {
+              return choice.map<String, dynamic>((k, v) => MapEntry(k.toString(), v));
+            }
+            debugPrint('Invalid choice format for $questionName: $choice');
+            return <String, dynamic>{'name': 'invalid', 'label': 'Invalid option'};
+          }).toList();
+          final filterEnabled = question['filterEnabled'] == true;
+          final filterQuestionId = filterEnabled ? question['filterQuestionId']?.toString() : null;
+          final filterQuestionName = filterQuestionId != null ? uuidToName[filterQuestionId] : null;
+          final rawFilterMap = question['optionFilterMap'] ?? {};
+          final optionFilterMap =
+              filterEnabled ? rawFilterMap.map<String, List<String>>((k, v) => MapEntry(k.toString(), List<String>.from(v as List))) : null;
+          final filterOptionValues = filterEnabled ? List<String>.from(question['filterOptionValues'] ?? []) : null;
+
+          inputWidget = SelectMultipleQuestion(
+            readOnly: question['read_only']?.toString() ?? '',
+            defaultValue: question['default']?.toString() ?? '',
+            validationQuestion: () => question['required'] == true,
+            appearance: question['appearance']?.toString() ?? '',
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString().split(' ').where((v) => v.isNotEmpty).toList(),
+            onChanged: (value) => _onAnswerChanged(questionName, value?.join(' ') ?? ''),
+            formChoices: formChoices,
+            listName: listName,
+            next: next,
+            filterEnabled: filterEnabled,
+            filterQuestionId: filterQuestionId,
+            optionFilterMap: optionFilterMap,
+            filterOptionValues: filterOptionValues,
+            answers: answers,
+          );
+          break;
+        case 'video':
+          inputWidget = VideoQuestion(
+            label: label,
+            name: questionName,
+            kuid: id,
+            currentValue: answers[id]?.toString(),
+            onChanged: (value) => _onAnswerChanged(id, value),
+          );
+          break;
+        case 'image':
+          inputWidget = ImageQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+            validationQuestion: () => question['required'] == true,
+            appearance: question['appearance']?.toString() ?? '',
+          );
+          break;
+        case 'time':
+          inputWidget = TimeQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+          );
+          break;
+        case 'integer':
+          inputWidget = IntegerQuestion(
+            key: Key(questionName),
+            readOnly: question['read_only']?.toString() ?? '',
+            defaultValue: question['default']?.toString() ?? '',
+            validationQuestion: () => question['required'] == true,
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+          );
+          break;
+        case 'date':
+          inputWidget = DateQuestion(
+            validationQuestion: () => question['required'] == true,
+            appearance: question['appearance']?.toString() ?? '',
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+          );
+          break;
+        case 'geopoint':
+          inputWidget = GeopointQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+          );
+          break;
+        case 'decimal':
+          inputWidget = DecimalQuestion(
+            readOnly: question['read_only']?.toString() ?? '',
+            defaultValue: question['default']?.toString() ?? '',
+            validationQuestion: () => question['required'] == true,
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value.toString()),
+          );
+          break;
+        case 'range':
+          final parameters = question['parameters']?.toString() ?? '';
+          inputWidget = RangeQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName] != null ? int.tryParse(answers[questionName].toString()) : null,
+            onChanged: (value) => _onAnswerChanged(questionName, value?.toString()),
+            parameters: parameters,
+          );
+          break;
+        case 'file':
+          inputWidget = FileQuestion(
+            label: label,
+            name: questionName,
+            kuid: id,
+            currentValue: answers[id]?.toString(),
+            onChanged: (value) => _onAnswerChanged(id, value),
+          );
+          break;
+        case 'barcode':
+          inputWidget = BarcodeQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value.toString()),
+          );
+          break;
+        case 'geotrace':
+          inputWidget = GeotraceQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+          );
+          break;
+        case 'geoshape':
+          inputWidget = GeoshapeQuestion(
+            label: label,
+            xpath: questionName,
+            kuid: id,
+            currentValue: answers[questionName]?.toString(),
+            onChanged: (value) => _onAnswerChanged(questionName, value),
+          );
+          break;
+        case 'note':
+          inputWidget = NoteQuestion(label: label);
+          break;
+        default:
+          inputWidget = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Unsupported question type: $baseType",
+                style: const TextStyle(fontSize: 20, color: Colors.red),
+              ),
+              const SizedBox(height: 8),
+              Text("Name: $questionName"),
+            ],
+          );
+          break;
+      }
+      return inputWidget;
+    } catch (e, stack) {
+      debugPrint('Error building widget for $questionName: $e\n$stack');
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Error building question widget: $baseType",
+            style: const TextStyle(fontSize: 18, color: Colors.red),
+          ),
+          const SizedBox(height: 8),
+          Text("Name: $questionName"),
+          Text(
+            "Error: ${e.toString()}",
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Ensure currentIndex always points at something renderable (visible field-list group or visible question)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final normalized = _normalizeToRenderable(currentIndex);
+      if (normalized != currentIndex) {
+        setState(() {
+          currentIndex = (normalized >= widget.form.length)
+              ? (widget.form.length - 1).clamp(0, widget.form.length - 1)
+              : normalized;
+          isFormComplete = normalized >= widget.form.length;
+        });
+      }
+    });
+
+    if (isFormComplete) {
+      return BlocConsumer<FormPageBloc, FormPageState>(
+        bloc: _formPageBloc,
+        listenWhen: (previous, current) => current is FormPageAtionState,
+        listener: (context, state) {
+          if (state is FormPageFinalizeState) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => UserHome()),
+              (route) => false,
+            );
+          }
+        },
+        builder: (context, state) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(
+                widget.name.toString(),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              elevation: 2,
+            ),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Form Completed!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 2,
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FilledButton(
+                          onPressed: () {
+                            setState(() {
+                              currentIndex++;
+                            });
+                            previous();
+                          },
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            textStyle: const TextStyle(fontSize: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Back'),
+                        ),
+                        const SizedBox(width: 8),
+                        const VerticalDivider(
+                          width: 20,
+                          thickness: 1,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: () async {
+                            FocusScope.of(context).unfocus();
+
+                            final errors = _validateSection(currentIndex);
+                            if (errors.isNotEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(errors.join('\n')),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                              return;
+                            }
+
+                            final nonSystemKeys = answers.keys.where((key) => key != 'start' && key != 'end' && key != '_id');
+                            if (nonSystemKeys.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('You must answer at least one question.'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                              return;
+                            }
+
+                            final now = DateTime.now();
+                            answers['end'] = now.toIso8601String().substring(0, 23);
+                            answers['_id'] = "form_${widget.formUid}";
+
+                            _formPageBloc.add(
+                              FormPageFinalizeButtonPressed(
+                                answers: answers,
+                                formUid: widget.formUid,
+                              ),
+                            );
+
+                            Navigator.pop(context);
+                          },
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            textStyle: const TextStyle(fontSize: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Finalize'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // Handle empty form
+    if (widget.form.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.name.toString(),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          elevation: 2,
+        ),
+        body: const Center(child: Text('No questions available in this form.')),
+      );
+    }
+
+    // Handle out of bounds index
+    if (currentIndex >= widget.form.length) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.name.toString(),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          elevation: 2,
+        ),
+        body: const Center(
+          child: Text('Form navigation error. Please restart the form.'),
+        ),
+      );
+    }
+
+    // ------- Build content for current section -------
+    Widget content;
+
+    try {
+      if (_isGroupSection(currentIndex)) {
+        final groupQ = widget.form[currentIndex];
+        if (groupQ == null) {
+          content = const Text('Error: Group question is null');
+        } else {
+          final groupLabel = groupQ['label']?.toString() ?? '';
+          final end = _findMatchingEnd(currentIndex);
+
+          // Collect visible questions once (lightweight)
+          final List<int> visibleIndices = [];
+          for (int k = currentIndex + 1; k < end && k < widget.form.length; k++) {
+            final q = widget.form[k];
+            if (q == null) continue;
+
+            final String? typeStr = q['type']?.toString();
+            if (typeStr == null) continue;
+
+            final baseType = typeStr.split(' ')[0];
+            if (_isUnsupportedType(baseType)) continue;
+            if (_shouldShowQuestion(q)) visibleIndices.add(k);
+          }
+
+          content = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (groupLabel.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    groupLabel,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              if (visibleIndices.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Text('No visible questions in this section.'),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: visibleIndices.length,
+                  itemBuilder: (context, idx) {
+                    final k = visibleIndices[idx];
+                    try {
+                      final inputWidget = _buildQuestionWidget(widget.form[k]);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: inputWidget,
+                      );
+                    } catch (e, stack) {
+                      debugPrint('Error building widget at index $k: $e\n$stack');
+                      return const Padding(
+                        padding: EdgeInsets.only(bottom: 16),
+                        child: Text(
+                          'Error rendering question.',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      );
+                    }
+                  },
+                ),
+            ],
+          );
+        }
+      } else {
+        final question = widget.form[currentIndex];
+        // Guard against accidental structural landing (normalizer will fix next frame)
+        final typeStr = question?['type']?.toString() ?? '';
+        final baseType = typeStr.split(' ').first;
+        if (baseType == 'begin_group' || baseType == 'end_group') {
+          content = const SizedBox.shrink();
+        } else {
+          content = _buildQuestionWidget(question);
+        }
+      }
+    } catch (e, stack) {
+      debugPrint('Error building content: $e\n$stack');
+      content = Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error, color: Colors.red, size: 48),
+          const SizedBox(height: 16),
+          Text('Error building form content: ${e.toString()}'),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () {
+              setState(() {
+                _invalidateVisibilityCache();
+                currentIndex = _findNextSectionStart(0);
+              });
+            },
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              textStyle: const TextStyle(fontSize: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Reset Form'),
+          ),
+        ],
+      );
+    }
+
+    return WillPopScope(
+      onWillPop: () async {
+        if (_isDialogShowing) return false;
+        _isDialogShowing = true;
+
+        final nonSystemKeys =
+            answers.keys.where((key) => key != 'start' && key != 'end' && key != '_id').toList();
+
+        bool shouldExit = true;
+        if (nonSystemKeys.isNotEmpty) {
+          shouldExit = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text("Unsaved Changes"),
+                  content: const Text("Do you want to save as draft, discard changes, or cancel?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        final nonSystemKeys = answers.keys.where((key) => key != 'start' && key != 'end' && key != '_id');
+
+                        if (nonSystemKeys.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Cannot save an empty draft.'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final now = DateTime.now();
+                        answers['end'] = now.toIso8601String().substring(0, 23);
+                        answers['_id'] = "form_${widget.formUid}";
+
+                        _formPageBloc.add(
+                          FormPageFinalizeButtonPressed(
+                            answers: answers,
+                            formUid: widget.formUid,
+                          ),
+                        );
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => UserHome()),
+                          (route) => false,
+                        );
+                      },
+                      child: const Text("Save as Draft"),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(true);
+                      },
+                      child: const Text("Discard"),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(false);
+                      },
+                      child: const Text("Cancel"),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+        }
+
+        _isDialogShowing = false;
+        return shouldExit;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.name.toString(),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          elevation: 2,
+        ),
+        body: GestureDetector(
+          onHorizontalDragEnd: (details) {
+            if (details.primaryVelocity != null) {
+              if (details.primaryVelocity! < -200) {
+                next();
+              } else if (details.primaryVelocity! > 200) {
+                previous();
+              }
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.only(top: 40, left: 35, right: 35),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: SingleChildScrollView(child: content)),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.2),
+                          spreadRadius: 2,
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: currentIndex > 0 ? previous : null,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              textStyle: const TextStyle(fontSize: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              backgroundColor: currentIndex > 0 ? null : Colors.grey.shade300,
+                              foregroundColor: currentIndex > 0 ? null : Colors.grey.shade600,
+                            ),
+                            child: const Text('Back'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (currentIndex > 0)
+                          const VerticalDivider(
+                            width: 20,
+                            thickness: 1,
+                            color: Colors.grey,
+                          ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: next,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              textStyle: const TextStyle(fontSize: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Text(
+                              isFormComplete || currentIndex >= widget.form.length - 1 ? "Finish" : "Next",
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

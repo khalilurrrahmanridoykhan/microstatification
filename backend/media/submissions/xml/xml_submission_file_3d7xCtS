@@ -1,0 +1,29 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-08-25T10:48:51.889+06:00</start>
+          <end>2025-08-25T10:52:18.877+06:00</end>
+          <diagnostic_information>
+            <type_of_test>rdt</type_of_test>
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>fsdfsd</employee_name>
+            <designation_of_data_collector>special_health_worker__shw__2</designation_of_data_collector>
+            
+            <name_of_the_institution>brac</name_of_the_institution>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>fsdf</patient_name>
+            <guardians_name>sdfsfd</guardians_name>
+            <_nationality>burmese__myanamar_</_nationality>
+            <phone_number>01726848561</phone_number>
+            <_._nidbirth_id_number>232</_._nidbirth_id_number>
+            <age>45___64</age>
+            <weight>2323</weight>
+            <gender>female</gender>
+            <pregnent>yes</pregnent>
+            <racegroup>marma</racegroup>
+            <occupation_>agriculture</occupation_>
+          </patient_information>
+          <meta>
+            <instanceID>uuid:224506dd-e5b5-475a-a1d4-48458e521e50</instanceID>
+          </meta>
+        </data>

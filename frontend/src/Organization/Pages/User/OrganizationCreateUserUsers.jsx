@@ -1,0 +1,23 @@
+import React from 'react'
+import DashboardCard from '../../Components/Dashboard/DashboardCard'
+import CreateUsers from "../../Components/User/CreateUsers"
+
+function CreateUserUsers() {
+  return (
+    <div>
+      {/* <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 w-full px-4">
+        <DashboardCard color={"white"} number={120} title={"User"} />
+        <DashboardCard color={"white"} number={23} title={"Active user"} />
+        <DashboardCard color={"white"} number={543} title={"Inactive user"} />
+      </div> */}
+
+      <div className='px-4 py-4'>
+        <CreateUsers />
+      </div>
+
+
+    </div>
+  )
+}
+
+export default CreateUserUsers

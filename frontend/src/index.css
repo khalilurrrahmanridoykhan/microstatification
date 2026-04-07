@@ -1,0 +1,153 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+
+:root {
+  --primary: #2094f3;
+  --secondary: #ffffff;
+  --primary2: #2094f3;
+  --primarytextColor: white;
+  --secondarytextColor: black;
+  --svgMapBackgroundColor: #061328;
+  --gradientStart: #0f3777;
+  --gradientEnd: #22c55e00;
+}
+
+.btn {
+  padding: 6px !important;
+  border-radius: 6px !important;
+  font-weight: 400 !important;
+  font-size: medium !important;
+  border: 0.5px solid rgba(0, 0, 0, 0.346) !important;
+}
+
+.bg-color-custom {
+  background-color: var(--primary) !important;
+  color: var(--primarytextColor) !important;
+}
+
+.text-color-custom {
+  color: var(--primary) !important;
+}
+
+.btn-primaryColor {
+  background-color: var(--primary) !important;
+  color: var(--primarytextColor) !important;
+}
+
+.btn-secondaryColor {
+  background-color: var(--secondary) !important;
+  color: var(--secondarytextColor) !important;
+}
+
+/* to prevent browser autofill css */
+input:-webkit-autofill {
+  box-shadow: 0 0 0px 1000px white inset !important;
+  -webkit-box-shadow: 0 0 0px 1000px white inset !important;
+  -webkit-text-fill-color: black !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans Bengali", "Noto Sans", "Oxygen", "Segoe UI",
+    "Roboto", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+    "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+
+.bricolage {
+  font-family: "Noto Sans Bengali", "Noto Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
+  font-variation-settings: "wdth" 100;
+}
+
+code {
+  font-family: "Noto Sans Bengali", "Noto Sans", source-code-pro, Menlo,
+    Monaco, Consolas, "Courier New", monospace;
+}
+
+.inputForm {
+  border: 1.5px solid #ecedec;
+  border-radius: 10px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  transition: 0.2s ease-in-out;
+}
+
+.input {
+  margin-left: 10px;
+  border-radius: 10px;
+  border: none;
+  width: 85%;
+  height: 100%;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.inputForm:focus-within {
+  border: 1.5px solid #2d79f3;
+}
+
+.linkTag {
+  @apply no-underline text-[var(--primary)] text-sm;
+}
+
+/* custom checkmark design, overrriding default */
+.custom-checkbox {
+  -webkit-appearance: none;
+  /* for Safari */
+  -moz-appearance: none;
+  /* for Firefox */
+  appearance: none;
+  /* remove default styling */
+  width: 14px;
+  height: 14px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  background-color: #fff;
+  position: relative;
+  cursor: pointer;
+}
+
+.custom-checkbox:checked {
+  background-color: var(--primary);
+  border-color: #000;
+}
+
+/* Creating the checkmark */
+.custom-checkbox:checked::after {
+  content: "";
+  /* necessary to create a pseudo-element */
+  position: absolute;
+  top: 0px;
+  left: 3px;
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  /* rotate to form a checkmark */
+}
+
+.nav-link {
+  color: var(--primary) !important;
+}
+
+a {
+  color: var(--primary) !important;
+  text-decoration: none !important;
+}

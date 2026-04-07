@@ -1,0 +1,32 @@
+- 3eb5de1 zVoid24 2025-06-03: Improves form submission and data handling
+- 9c9ce33 zVoid24 2025-06-01: Adds location permissions and geo form types
+- 83e9c0c zVoid24 2025-05-31: Implements form page question types
+- 3445668 zVoid24 2025-05-29: Implements form enhancements and location services
+- 1754f2f zVoid24 2025-05-28: Merge branch 'main'
+- d00fa6a zVoid24 2025-05-28: ..
+- 6e95524 zVoid24 2025-05-25: Updates home screen import path
+- a2231f5 zVoid24 2025-05-25: improved super admin ui, auto hide navbar implement
+- 5b9717a zVoid24 2025-05-22: Improves organization and project user management
+- 9276b71 zVoid24 2025-05-21: Remove unused organization and user management features
+- e2e4787 zVoid24 2025-05-20: Removes unused project-related features and refactors imports
+- def648b zVoid24 2025-05-19: Improves project list UI and functionality
+- 1729ff6 zVoid24 2025-05-18: Improves form loading and UI
+- b8411af zVoid24 2025-05-18: Improves form loading and error handling
+- 50ac50b zVoid24 2025-05-17: Removes unused FillUp feature
+- b627e19 zVoid24 2025-05-17: Improves form update and sorting logic
+- 38681fc zVoid24 2025-05-17: ..
+- f743cbe zVoid24 2025-05-17: Improves resource management and validation
+- e9a69e1 zVoid24 2025-05-15: Removes download page feature
+- 6086537 zVoid24 2025-05-14: Persists user credentials securely.
+- 0a80f77 zVoid24 2025-05-13: Refactors login screen UI and functionality
+- 6dfcce2 zVoid24 2025-05-12: Integrates WebView for displaying external forms
+- e486fb3 zVoid24 2025-05-12: Improves UI and adds user creation alert
+- fe3b3e9 zVoid24 2025-05-12: Updates navigation and theme enhancements
+- c0c04ff zVoid24 2025-05-11: Updates navigation and default screen setup
+- 88f690a zVoid24 2025-05-11: Adds user navigation and updates UI components
+- cbb5454 zVoid24 2025-05-11: Implements login functionality and password validation
+- f2c1419 zVoid24 2025-05-11: Implements navigation flow in auth screens
+- 5d13bc4 zVoid24 2025-05-11: Merge remote-tracking branch 'refs/remotes/origin/zahidul' into zahidul
+- 98ae8f2 zVoid24 2025-05-11: ..
+- 892c91c Zahidul Islam Rabbi 2025-05-10: Update log_in.dart
+- f0f4bb8 zVoid24 2025-05-10: Sets up initial Flutter project structure

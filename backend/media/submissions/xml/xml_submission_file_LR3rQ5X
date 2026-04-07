@@ -1,0 +1,14 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1649" version="20240601">
+          <start>2025-09-21T11:09:14.224+06:00</start>
+          <end>2025-09-21T11:11:26.084+06:00</end>
+          <malaria_case_record_form_21082025>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test_1>rdt</type_of_test_1>
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            
+          </malaria_case_record_form_21082025>
+          <meta>
+            <instanceID>uuid:48ac4364-1716-43fd-b0e3-78fbf8034bf1</instanceID>
+          </meta>
+        </data>

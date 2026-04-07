@@ -1,0 +1,38 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_765" version="20240601">
+          <start>2025-09-03T11:38:37.406+06:00</start>
+          <end>2025-09-03T11:44:25.013+06:00</end>
+          <patient_id_type>birth_id</patient_id_type>
+          <user_identification_11_9943_01976848561>20042692525069554</user_identification_11_9943_01976848561>
+          <location>23.435608 90.050308 0 0</location>
+          <hh_id>3232</hh_id>
+          <hh_head_name>bighead</hh_head_name>
+          <mobile_number>01775366212</mobile_number>
+          <administrative>
+            <division>dhaka</division>
+            <district>dhaka</district>
+            <upazila>dhaka_metropolitan</upazila>
+            <name_of_the_person_with_suspected_case>zahid islam</name_of_the_person_with_suspected_case>
+            <age>15_</age>
+            <sex>male</sex>
+            
+            <disease>dengue</disease>
+            <suspected_in_the_disease>no</suspected_in_the_disease>
+            <referred>no</referred>
+            
+            
+            <no._of_already_diagnosed_cases_of_dengue>22</no._of_already_diagnosed_cases_of_dengue>
+            <no._of_already_diagnosed_cases_of_malaria_in_the_hh>22</no._of_already_diagnosed_cases_of_malaria_in_the_hh>
+            <no._of_already_diagnosed_cases_of_awd_in_the_hh>423</no._of_already_diagnosed_cases_of_awd_in_the_hh>
+            <bednet_use_practice_during_sleep>yes</bednet_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>yes</handwashing_practice_with_soap__water>
+            <type_latrine_use>pit_latrine</type_latrine_use>
+            <presence_of_stagnant_water_mosquito_breeding_sites>yes</presence_of_stagnant_water_mosquito_breeding_sites>
+            <presence_of_mosquito_larvae>anophilis</presence_of_mosquito_larvae>
+            <did_any_disaster_occur_in_last_7_days_>no</did_any_disaster_occur_in_last_7_days_>
+            <disaster>flood</disaster>
+            
+          </administrative>
+          <meta>
+            <instanceID>uuid:241807fe-a6e6-4ddb-8e9b-d1e2678679ed</instanceID>
+          </meta>
+        </data>

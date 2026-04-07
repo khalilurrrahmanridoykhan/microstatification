@@ -1,0 +1,127 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_2204" version="20240601">
+          <start>2025-11-23T11:03:13.415+06:00</start>
+          <end>2025-11-23T11:21:19.206+06:00</end>
+          <malaria_case_record_form>
+            <type_of_test_facility>facilities</type_of_test_facility>
+            <type_of_test>rdt</type_of_test>
+            
+            <type_result>positive</type_result>
+            
+          </malaria_case_record_form>
+          <data_collector_s_information>
+            <data_collector_name>sdfghjk</data_collector_name>
+            <designation_for_community>other</designation_for_community>
+            <other/>
+            
+            
+            
+            
+            <name_of_the_organization>mukti_cox_s_bazar</name_of_the_organization>
+            
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>sdfg</patient_name>
+            <guardians_name>sdfgh</guardians_name>
+            <relation_with_guardian>defrgh</relation_with_guardian>
+            <nationality>fdmn</nationality>
+            
+            <phone_number>01989492958</phone_number>
+            <user_identification>nid</user_identification>
+            <nid>0147014701</nid>
+            
+            
+            
+            
+            <age>52</age>
+            <age_group>5-14</age_group>
+            <weight>20</weight>
+            <gender>other</gender>
+            
+            <race_group>other</race_group>
+            <other_4>sdfghjkl</other_4>
+            <occupation>student</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division_2_2>chattogram_24_2</division_2_2>
+            <district_4_2>bandarban_10_2</district_4_2>
+            <upazila_2_2>alikadam_3_2</upazila_2_2>
+            <union_2_2>alikadam_4_2</union_2_2>
+            <ward_2>ward_no._01_90</ward_2>
+            <village_1>bojol_member_para</village_1>
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            <division>chattogram_24_2_2</division>
+            <district_4_2_2>bandarban_10_2_2</district_4_2_2>
+            <upazila_2_2_2>lama_3_2_2</upazila_2_2_2>
+            <union_2_2_2>aziznagar_2_2_2</union_2_2_2>
+            <ward_2_2>ward_no._01_89_2</ward_2_2>
+            <village_1_2>azizuddin_colony_para_2</village_1_2>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_in_the_12_month>yes</have_you_or_any_member_of_your_household_had_malaria_in_the_12_month>
+            <how_many_times>2</how_many_times>
+            <date_of_onset_fever>2025-12-03</date_of_onset_fever>
+            <date_of_first_test>2025-11-05</date_of_first_test>
+            <type_of_disease>plasmodium_falciparum__pf_</type_of_disease>
+            
+            
+            
+            <type_of_treatment>artemisinin_injection</type_of_treatment>
+            
+            <dose_of_treatment>coartem_disposable_120mg</dose_of_treatment>
+            <date_of_initiation_of_treatment>2025-11-19</date_of_initiation_of_treatment>
+            <does_the_patient_need_to_be_referred>yes</does_the_patient_need_to_be_referred>
+            <where_is_it_referred_to>medical_college</where_is_it_referred_to>
+            <medical_collage>cox_s_bazar_medical_college</medical_collage>
+            
+            
+            
+            
+            <case_classification>indigenous</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_itn_in_your_house>2</the_total_number_of_itn_in_your_house>
+            <used_itn_in_last_15_days>yes</used_itn_in_last_15_days>
+            <have_you_received_any_blood_related_product_in_last_3_months_1>yes</have_you_received_any_blood_related_product_in_last_3_months_1>
+            <last_treatment_received_from>medical_college</last_treatment_received_from>
+            <medical_collage_1>rangamati_medical_college</medical_collage_1>
+            
+            
+            
+            
+            <count_of_parasite_for_blood_test_1>2</count_of_parasite_for_blood_test_1>
+            <position_of_the_patient_coordinates_of_the_patient>23.756935 90.366944 0 0</position_of_the_patient_coordinates_of_the_patient>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>within_bangladesh</if_yes__type_of_travel>
+            <if_within_bangladesh__specify_the_last_travel_location.>chattogram_24_2_3</if_within_bangladesh__specify_the_last_travel_location.>
+            <district_4_2_3>bandarban_10_2_3</district_4_2_3>
+            <upazila_2_2_3>lama_3_2_3</upazila_2_2_3>
+            <union_2_2_3>aziznagar_2_2_3</union_2_2_3>
+            <ward_2_3>ward_no._01_89_3</ward_2_3>
+            <village_1_3>uttor_para_3</village_1_3>
+            
+            
+            
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:ffcb58c7-35b9-4614-9a1f-222d3ab0a075</instanceID>
+          </meta>
+        </data>

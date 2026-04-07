@@ -1,0 +1,32 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_480" version="20240601">
+          <start>2025-08-22T18:35:52.106+06:00</start>
+          <end>2025-08-22T18:43:31.816+06:00</end>
+          <location>23.706543 90.445715 0 35</location>
+          <hh_id>22 1</hh_id>
+          <hh_head_name>22 1</hh_head_name>
+          <mobile_no>22 1</mobile_no>
+          <name_of_the_person_with_suspected_case>22 1</name_of_the_person_with_suspected_case>
+          <age>22 1</age>
+          <sex>male</sex>
+          
+          <suspected_dengue_case>yes</suspected_dengue_case>
+          <awd_case>yes</awd_case>
+          <suspected_malaria_case>yes</suspected_malaria_case>
+          <referred>yes</referred>
+          <referral_place>brac</referral_place>
+          
+          <no._of_already_diagnosed_cases_of_dengue>221</no._of_already_diagnosed_cases_of_dengue>
+          <no._of_already_diagnosed_cases_of_malaria_in_the_hh>221</no._of_already_diagnosed_cases_of_malaria_in_the_hh>
+          <no._of_already_diagnosed_cases_of_awd_in_the_hh>221</no._of_already_diagnosed_cases_of_awd_in_the_hh>
+          <bednet_use_practice_during_sleep>yes</bednet_use_practice_during_sleep>
+          <handwashing_practice_with_soap__water>yes</handwashing_practice_with_soap__water>
+          <type_latrine_use>hanging_toilet</type_latrine_use>
+          <presence_of_stagnant_water_mosquito_breeding_sites>22 1</presence_of_stagnant_water_mosquito_breeding_sites>
+          <presence_of_mosquito_larvae>anophilis</presence_of_mosquito_larvae>
+          <did_any_disaster_occur_in_last_7_days_>yes</did_any_disaster_occur_in_last_7_days_>
+          <disaster>cyclone</disaster>
+          
+          <meta>
+            <instanceID>uuid:391e5b77-802a-4187-bc7d-e825263a5876</instanceID>
+          </meta>
+        </data>

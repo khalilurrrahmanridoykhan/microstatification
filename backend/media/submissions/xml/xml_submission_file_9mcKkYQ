@@ -1,0 +1,38 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_765" version="20240601">
+          <start>2025-09-03T11:33:43.633+06:00</start>
+          <end>2025-09-03T11:38:33.266+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <user_identification_11_9943_01976848561>9730468625</user_identification_11_9943_01976848561>
+          <location>24.696934 90.374951 0 0</location>
+          <hh_id>1111</hh_id>
+          <hh_head_name>Ayon</hh_head_name>
+          <mobile_number>01989492958</mobile_number>
+          <administrative>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>lama</upazila>
+            <name_of_the_person_with_suspected_case>jahid</name_of_the_person_with_suspected_case>
+            <age>5-14</age>
+            <sex>male</sex>
+            
+            <disease>dengue</disease>
+            <suspected_in_the_disease>yes</suspected_in_the_disease>
+            <referred>yes</referred>
+            <referral_place>govt</referral_place>
+            <if_referred_to_govt>medical_college_hospital</if_referred_to_govt>
+            <no._of_already_diagnosed_cases_of_dengue>1</no._of_already_diagnosed_cases_of_dengue>
+            <no._of_already_diagnosed_cases_of_malaria_in_the_hh>1</no._of_already_diagnosed_cases_of_malaria_in_the_hh>
+            <no._of_already_diagnosed_cases_of_awd_in_the_hh>1</no._of_already_diagnosed_cases_of_awd_in_the_hh>
+            <bednet_use_practice_during_sleep>yes</bednet_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>yes</handwashing_practice_with_soap__water>
+            <type_latrine_use>flush_latrine</type_latrine_use>
+            <presence_of_stagnant_water_mosquito_breeding_sites>1</presence_of_stagnant_water_mosquito_breeding_sites>
+            <presence_of_mosquito_larvae>aedes</presence_of_mosquito_larvae>
+            <did_any_disaster_occur_in_last_7_days_>yes</did_any_disaster_occur_in_last_7_days_>
+            <disaster>flood</disaster>
+            
+          </administrative>
+          <meta>
+            <instanceID>uuid:16101736-eeea-4243-8e11-c37accbe090c</instanceID>
+          </meta>
+        </data>

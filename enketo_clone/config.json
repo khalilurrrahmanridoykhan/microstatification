@@ -1,0 +1,10 @@
+{
+  "redis": {
+    "main": {
+      "host": "127.0.0.1",
+      "port": 6379
+    }
+  },
+  "trust proxy": true,
+  "base url": "http://119.40.87.37:9105"
+}

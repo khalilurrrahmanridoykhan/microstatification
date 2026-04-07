@@ -1,0 +1,111 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-09-03T10:26:25.012+06:00</start>
+          <end>2025-09-03T10:27:55.330+06:00</end>
+          <patient_id_type>birth_id</patient_id_type>
+          <user_identification_11_9943_01976848561>15</user_identification_11_9943_01976848561>
+          <diagnostic_information>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test>rdt</type_of_test>
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>sffsd</employee_name>
+            <designation_of_data_collector>nursing__ss</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>sdfdfs</patient_name>
+            <guardians_name>sdfdsfsfd</guardians_name>
+            <_nationality>burmese__myanamar_</_nationality>
+            
+            <phone_number>01726848561</phone_number>
+            <age>5-14</age>
+            <weight>435</weight>
+            <gender>male</gender>
+            
+            <racegroup>garo</racegroup>
+            
+            <occupation>dependent</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>barishal</division>
+            <district>barguna</district>
+            <upazila>amtali</upazila>
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            
+            <division_1>chattogram_2</division_1>
+            <district_1>cox_s_bazar</district_1>
+            <upazila_1>kutubdia</upazila_1>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_past_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_past_year>
+            <how_many_times>4</how_many_times>
+            <date_of_onset_fever>2025-09-03</date_of_onset_fever>
+            <date_of_first_test>2025-09-03</date_of_first_test>
+            <type_of_species>mixed__pf_pv_</type_of_species>
+            
+            
+            <treatment_1>artemisinin_injection</treatment_1>
+            <treatment_2>act__18-tab_ injection_artesunate__gf_</treatment_2>
+            
+            <date_of_initiation_of_treatment>2025-09-24</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>district_hospital</where_is_it_referred_to>
+            
+            
+            <district_hospital>khagrachari_district_hospital</district_hospital>
+            
+            
+            <case_classification>imported_non-local</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>45</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.767002 90.43001 0 0</position_of_the_patient_coordinates_of_the_patient>
+            
+            
+            
+            
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>outside_bangladesh</if_yes__type_of_travel>
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>mozambique_</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:2aba2423-0105-4bd2-9152-9fd1a8c6d4eb</instanceID>
+          </meta>
+        </data>

@@ -1,0 +1,123 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1867" version="20240601">
+          <start>2025-10-30T11:10:18.246+06:00</start>
+          <end>2025-10-30T11:26:04.113+06:00</end>
+          <malaria_case_record_form>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test_1>rdt</type_of_test_1>
+            <types_of_diseases_for_rdt>negative</types_of_diseases_for_rdt>
+            
+            
+          </malaria_case_record_form>
+          <data_collector_s_information>
+            <employee_name>sdf</employee_name>
+            <designation_of_data_collector>nursing__ss_</designation_of_data_collector>
+            
+            
+            
+            
+            
+            <name_of_the_organization>community_clinic</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>asd</patient_name>
+            <guardians_name>sd</guardians_name>
+            <nationality>bangladeshi</nationality>
+            
+            <phone_number>01722233344</phone_number>
+            <user_identification>nid_id</user_identification>
+            <nid_id>1234567890</nid_id>
+            
+            
+            
+            
+            <age>5-14</age>
+            <weight>23</weight>
+            <gander>male</gander>
+            
+            <racegroup>garo</racegroup>
+            
+            <occupation>business</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>dhaka</division>
+            <district>faridpur</district>
+            <upazila>alfadanga</upazila>
+            <union>alfadanga</union>
+            
+            
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            <division_1>chattogram</division_1>
+            <district_1>cox_s_bazar</district_1>
+            <upazila_1>cox_s_bazar_sadar</upazila_1>
+            <union_1>cox_s_bazar_paurashava</union_1>
+            <ward_2>word_no_1_6</ward_2>
+            <brac_village_1>uttar_kutubdia_para</brac_village_1>
+            
+            <village_1>uttar_kutubdia_para__veron_para_</village_1>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>yes</have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>
+            <how_many_times>2</how_many_times>
+            <date_of_onset_fever>2025-10-08</date_of_onset_fever>
+            <date_of_first_test>2025-10-23</date_of_first_test>
+            <type_of_species>plasmodium_vivax__pv_</type_of_species>
+            
+            
+            <treatment1>act___primaquine</treatment1>
+            
+            <treatment2>coartem_6_act</treatment2>
+            <date_of_initiation_of_treatment>2025-10-29</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>district_hospital</where_is_it_referred_to>
+            
+            <district_hospital>cox_s_bazar_250_bed_district_sadar_hospital</district_hospital>
+            
+            
+            
+            <case_classification>indigenous</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>pacd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>2</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.812506 90.374144 0 95543.56236449636</position_of_the_patient_coordinates_of_the_patient>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>mozambique</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:4a34464c-a369-494d-a431-e8bdb0c7f92e</instanceID>
+          </meta>
+        </data>

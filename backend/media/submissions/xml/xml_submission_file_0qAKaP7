@@ -1,0 +1,44 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_765" version="20240601">
+          <start>2025-09-08T13:07:30.554+06:00</start>
+          <end>2025-09-08T13:10:43.589+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <user_identification_11_9943_01976848561>1234567891</user_identification_11_9943_01976848561>
+          <location>23.752566 90.367502 0 0</location>
+          <hh_id>fg</hh_id>
+          <hh_head_name>dgg</hh_head_name>
+          <mobile_number>01726488561</mobile_number>
+          <administrative>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>lama</upazila>
+            <union>gojalia</union>
+            <ward>ward_no_1</ward>
+            <area>fg</area>
+            <name_of_the_person_with_suspected_case>dfsgf</name_of_the_person_with_suspected_case>
+            <age>10</age>
+            <sex>female</sex>
+            <pregnent>no</pregnent>
+            <suspected_in_the_disease>yes</suspected_in_the_disease>
+            <disease>dengue</disease>
+            
+            
+            
+            <no._of_already_diagnosed_cases_of_dengue>20</no._of_already_diagnosed_cases_of_dengue>
+            <no._of_already_diagnosed_cases_of_malaria_in_the_hh>546</no._of_already_diagnosed_cases_of_malaria_in_the_hh>
+            <no._of_already_diagnosed_cases_of_awd_in_the_hh>64</no._of_already_diagnosed_cases_of_awd_in_the_hh>
+            <bednet_use_practice_during_sleep>no</bednet_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>no</handwashing_practice_with_soap__water>
+            <type_latrine_use>flush_latrine</type_latrine_use>
+            <no._of_already_diagnosed_cases_of_dengue_in_the_hh>no</no._of_already_diagnosed_cases_of_dengue_in_the_hh>
+            
+            
+            <presence_of_stagnant_water_mosquito_breeding_sites>no</presence_of_stagnant_water_mosquito_breeding_sites>
+            <presence_of_mosquito_larvae>anophilis</presence_of_mosquito_larvae>
+            <did_any_disaster_occur_in_last_7_days_>no</did_any_disaster_occur_in_last_7_days_>
+            
+            
+          </administrative>
+          <meta>
+            <instanceID>uuid:197804aa-85b0-4597-b77e-3730c3579395</instanceID>
+          </meta>
+        </data>

@@ -1,0 +1,41 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_765" version="20240601">
+          <start>2025-09-08T11:56:03.305+06:00</start>
+          <end>2025-09-08T11:57:24.943+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <user_identification_11_9943_01976848561>5599559955</user_identification_11_9943_01976848561>
+          <location>23.556434 90.096026 0 0</location>
+          <hh_id>1122</hh_id>
+          <hh_head_name>Ayon</hh_head_name>
+          <mobile_number>01989492958</mobile_number>
+          <administrative>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>lama</upazila>
+            <union>gojalia</union>
+            <ward>ward_no_1</ward>
+            <area>2</area>
+            <name_of_the_person_with_suspected_case>Ayon Pal</name_of_the_person_with_suspected_case>
+            <age>25</age>
+            <sex>male</sex>
+            
+            <suspected_in_the_disease>yes</suspected_in_the_disease>
+            <disease>dengue</disease>
+            <referred>yes</referred>
+            <referral_place>govt</referral_place>
+            <if_referred_to_govt>district</if_referred_to_govt>
+            <no._of_already_diagnosed_cases_of_dengue>2</no._of_already_diagnosed_cases_of_dengue>
+            <no._of_already_diagnosed_cases_of_malaria_in_the_hh>1</no._of_already_diagnosed_cases_of_malaria_in_the_hh>
+            <no._of_already_diagnosed_cases_of_awd_in_the_hh>1</no._of_already_diagnosed_cases_of_awd_in_the_hh>
+            <bednet_use_practice_during_sleep>yes</bednet_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>yes</handwashing_practice_with_soap__water>
+            <type_latrine_use>flush_latrine</type_latrine_use>
+            <presence_of_stagnant_water_mosquito_breeding_sites>yes</presence_of_stagnant_water_mosquito_breeding_sites>
+            <presence_of_mosquito_larvae>aedes</presence_of_mosquito_larvae>
+            <did_any_disaster_occur_in_last_7_days_>yes</did_any_disaster_occur_in_last_7_days_>
+            <disaster>flood</disaster>
+            
+          </administrative>
+          <meta>
+            <instanceID>uuid:760f18f5-2647-444a-8153-d6ae1880cea5</instanceID>
+          </meta>
+        </data>

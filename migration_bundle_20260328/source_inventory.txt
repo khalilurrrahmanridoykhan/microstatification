@@ -1,0 +1,48 @@
+Migration bundle date: 2026-03-28
+Project directory: /var/www/ComMicPlanV2_clone_2_Mar
+Source host primary IP: 119.40.87.37
+Source host observed egress IP: 119.40.87.33
+
+Project/runtime summary
+- Project directory size: 5.2G
+- Database: commicplan_clone_2_Mar
+- Database size: 684 MB
+- Backend media size: 2.7G
+- Backend static size: 3.9M
+- Frontend dist size: 69M
+- Enketo runtime path: /opt/enketo/packages/enketo-express
+- Enketo runtime size: 38M
+
+Installed versions on source
+- Python: 3.10.12
+- Node: 20.19.4
+- npm: 10.8.2
+- PostgreSQL client/server family: 16.10
+- Redis: 6.0.16
+- Nginx: 1.18.0
+
+Current live clone wiring
+- Nginx listens on 9200 for this clone
+- Nginx proxies /api/forms/.../submit to 127.0.0.1:9212
+- Nginx proxies /api/ to 127.0.0.1:9202
+- Nginx serves frontend from /var/www/ComMicPlanV2_clone_2_Mar/frontend/dist
+- Nginx serves static from /var/www/ComMicPlanV2_clone_2_Mar/backend/static
+- Nginx serves media from /var/www/ComMicPlanV2_clone_2_Mar/backend/media
+
+Files staged in this bundle
+- db/commicplan_clone_2_Mar_20260328.dump
+- config/nginx/commicplan_clone_2_mar_9200.conf
+- config/nginx/enketo2.conf
+- config/pm2/dump.pm2
+- config/enketo/.env
+- config/enketo/package.json
+- config/enketo/config.json
+- config/project.env
+- config/frontend.env
+- config/frontend.env.development
+- config/frontend.env.production.nmcp
+- config/start_clone_stack.sh
+- config/enketo-express_20260328.tar.gz
+
+Important note
+- The repo contains /var/www/ComMicPlanV2_clone_2_Mar/enketo_clone, but the live Enketo service for enketo2.commicplan.com is a separate runtime under /opt/enketo/packages/enketo-express.

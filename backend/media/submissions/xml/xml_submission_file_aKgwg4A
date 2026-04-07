@@ -1,0 +1,38 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_765" version="20240601">
+          <start>2025-09-03T11:39:16.294+06:00</start>
+          <end>2025-09-03T11:40:51.704+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <user_identification_11_9943_01976848561>6911345004</user_identification_11_9943_01976848561>
+          <location>-1.933227 6.601196 0 0</location>
+          <hh_id>gjhgjh</hh_id>
+          <hh_head_name>vgfhhgf</hh_head_name>
+          <mobile_number>01634328659</mobile_number>
+          <administrative>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>lama</upazila>
+            <name_of_the_person_with_suspected_case>kjkjh</name_of_the_person_with_suspected_case>
+            <age>1-4</age>
+            <sex>male</sex>
+            
+            <disease>dengue</disease>
+            <suspected_in_the_disease>no</suspected_in_the_disease>
+            <referred>no</referred>
+            
+            
+            <no._of_already_diagnosed_cases_of_dengue>554</no._of_already_diagnosed_cases_of_dengue>
+            <no._of_already_diagnosed_cases_of_malaria_in_the_hh>54</no._of_already_diagnosed_cases_of_malaria_in_the_hh>
+            <no._of_already_diagnosed_cases_of_awd_in_the_hh>54</no._of_already_diagnosed_cases_of_awd_in_the_hh>
+            <bednet_use_practice_during_sleep>no</bednet_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>yes_2</handwashing_practice_with_soap__water>
+            <type_latrine_use>flush_latrine</type_latrine_use>
+            <presence_of_stagnant_water_mosquito_breeding_sites>gfhghfgh</presence_of_stagnant_water_mosquito_breeding_sites>
+            <presence_of_mosquito_larvae>aedes</presence_of_mosquito_larvae>
+            <did_any_disaster_occur_in_last_7_days_>no</did_any_disaster_occur_in_last_7_days_>
+            <disaster>flood</disaster>
+            
+          </administrative>
+          <meta>
+            <instanceID>uuid:f6469cd2-7f49-4eee-be61-a320ab804c1d</instanceID>
+          </meta>
+        </data>

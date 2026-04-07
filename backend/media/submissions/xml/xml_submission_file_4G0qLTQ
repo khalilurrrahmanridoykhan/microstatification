@@ -1,0 +1,113 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-09-07T09:17:39.142+06:00</start>
+          <end>2025-09-07T09:31:25.002+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <patient_identification_numbers>5646456456</patient_identification_numbers>
+          <diagnostic_information>
+            <type_of_test_facility>community</type_of_test_facility>
+            <type_of_test>rdt</type_of_test>
+            
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>sasbbb</employee_name>
+            <designation_of_data_collector>special_health_worker__shw_</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>brac</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>sasasas</patient_name>
+            <guardians_name>sasas</guardians_name>
+            <_nationality>bangladeshi</_nationality>
+            
+            <phone_number>01628361528</phone_number>
+            <age>1-4</age>
+            <weight/>
+            <gender>male</gender>
+            
+            <racegroup>tongchangya</racegroup>
+            
+            <occupation>businessman</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>barishal</division>
+            <district>barishal</district>
+            <upazila>babuganj</upazila>
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>india</patients_country_of_origin>
+            
+            
+            
+            
+            
+            
+            
+            <state>jharkhand</state>
+            
+            <district_2>west_singhbhum</district_2>
+            
+            <subdistrict>anandpur</subdistrict>
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>
+            <how_many_times>9</how_many_times>
+            <date_of_onset_fever>2025-09-09</date_of_onset_fever>
+            <date_of_first_test>2025-09-10</date_of_first_test>
+            <type_of_species>mixed__pf_pv_</type_of_species>
+            <_is_this_case_identify_as_a_several_malaria_case>yes</_is_this_case_identify_as_a_several_malaria_case>
+            <are_you_provided_artesunate_suppository_>yes</are_you_provided_artesunate_suppository_>
+            <are_you_refer_this_test>yes</are_you_refer_this_test>
+            <where_are_you_referred>name__bangla_</where_are_you_referred>
+            <medicines_type>act___primaquine</medicines_type>
+            <medicines_name>act__12-tab_</medicines_name>
+            
+            <date_of_initiation_of_treatment>2025-09-02</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>district_hospital</where_is_it_referred_to>
+            
+            
+            <district_hospital>cox_s_bazar_250_bed_district_sadar_hospital</district_hospital>
+            
+            
+            <case_classification>imported_non-local</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_active_llin_or_itn_available_in_your_house>77676</the_total_number_of_active_llin_or_itn_available_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.496153 90.96578 0 0</position_of_the_patient_coordinates_of_the_patient>
+            
+            
+            
+            
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>outside_bangladesh</if_yes__type_of_travel>
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>myanmar_</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:aa293226-fec3-413f-88cc-4fe03de67b3d</instanceID>
+          </meta>
+        </data>

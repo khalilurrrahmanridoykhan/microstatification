@@ -1,0 +1,122 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1158" version="20240601">
+          <start>2025-09-11T09:39:58.821+06:00</start>
+          <end>2025-09-11T09:45:28.089+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <user_identification_11_9943_01976848561>1234567890</user_identification_11_9943_01976848561>
+          <diagnostic_information>
+            <type_of_test_facility>community</type_of_test_facility>
+            <type_of_test>rdt</type_of_test>
+            
+            <types_of_diseases_for_rdt>nagative</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>Dulal</employee_name>
+            <designation_of_data_collector>health_worker__sk_hw___</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>Jalal</patient_name>
+            <guardians_name>Kamal</guardians_name>
+            <_nationality>bangladeshi</_nationality>
+            
+            <phone_number_1>bangladesh</phone_number_1>
+            <phone_number>01234567890</phone_number>
+            <age>5-14</age>
+            <weight>20</weight>
+            <gender>male</gender>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>farmar</occupation>
+          </patient_information>
+          <reporting_site_details>
+            <division>dhaka</division>
+            <district>gazipur</district>
+            <upazila>kaliakair</upazila>
+            
+            
+            
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            
+            <division_1>mymensingh</division_1>
+            <district_1>sherpur</district_1>
+            <upazila_1>nakla</upazila_1>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>
+            <how_many_times>1</how_many_times>
+            <date_of_onset_fever>2025-09-10</date_of_onset_fever>
+            <date_of_first_test>2025-09-09</date_of_first_test>
+            <type_of_species>plasmodium_ovale__po_</type_of_species>
+            
+            
+            
+            
+            <medicines_type>act___primaquine</medicines_type>
+            <medicines_name>injection_quinine__gf_</medicines_name>
+            
+            <date_of_initiation_of_treatment>2025-09-24</date_of_initiation_of_treatment>
+            <are_you_refered_this_patient_1>yes</are_you_refered_this_patient_1>
+            <where_is_it_referred_to>upazila_helath_complex</where_is_it_referred_to>
+            
+            
+            
+            
+            <upazila_health_complex>rajasthali_upazila_health_complex</upazila_health_complex>
+            <case_classification>imported_local</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_active_llin_or_itn_available_in_your_house>1</the_total_number_of_active_llin_or_itn_available_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>35.56798 -45.705324 0 0</position_of_the_patient_coordinates_of_the_patient>
+            
+            
+            
+            
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>within_bangladesh</if_yes__type_of_travel>
+            <if_within_bangladesh__specify_the_last_travel_location.>mymensingh</if_within_bangladesh__specify_the_last_travel_location.>
+            <district_3>netrakona</district_3>
+            <upazila_2>atpara</upazila_2>
+            
+            
+            
+            
+            
+            
+            
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:d59e1cd1-7d80-4fb6-b5cb-66d3479703c7</instanceID>
+          </meta>
+        </data>

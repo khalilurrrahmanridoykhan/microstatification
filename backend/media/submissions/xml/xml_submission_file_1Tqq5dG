@@ -1,0 +1,123 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1867" version="20240601">
+          <start>2025-10-30T14:20:55.286+06:00</start>
+          <end>2025-10-30T14:59:38.164+06:00</end>
+          <malaria_case_record_form>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test_1>rdt</type_of_test_1>
+            <types_of_diseases_for_rdt>negative</types_of_diseases_for_rdt>
+            
+            
+          </malaria_case_record_form>
+          <data_collector_s_information>
+            <employee_name>fghj</employee_name>
+            <designation_of_data_collector>special_health_worker__shw_</designation_of_data_collector>
+            
+            
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>tyui</patient_name>
+            <guardians_name>ghjk</guardians_name>
+            <nationality>bangladeshi</nationality>
+            
+            <phone_number>01788899909</phone_number>
+            <user_identification>nid_id</user_identification>
+            <nid_id>1234567890</nid_id>
+            
+            
+            
+            
+            <age>15_</age>
+            <weight>56</weight>
+            <gander>male</gander>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>business</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>barishal</division>
+            <district>barguna</district>
+            <upazila>amtali</upazila>
+            <union>amtali_3</union>
+            
+            
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            <division_1>barishal</division_1>
+            <district_1>barishal</district_1>
+            <upazila_1>bakerganj</upazila_1>
+            <union_1>bhar_pasha</union_1>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>yes</have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>
+            <how_many_times>1</how_many_times>
+            <date_of_onset_fever>2025-10-08</date_of_onset_fever>
+            <date_of_first_test>2025-10-22</date_of_first_test>
+            <type_of_species>plasmodium_falciparum__pf_</type_of_species>
+            
+            
+            <treatment1>primaquine___chloroquine</treatment1>
+            
+            <treatment2>coartem_6_act</treatment2>
+            <date_of_initiation_of_treatment>2025-10-22</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>district_hospital</where_is_it_referred_to>
+            
+            <district_hospital>cox_s_bazar_250_bed_district_sadar_hospital</district_hospital>
+            
+            
+            
+            <case_classification>indigenous</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>pacd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>3</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.812506 90.374144 0 95543.56236449636</position_of_the_patient_coordinates_of_the_patient>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>india</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:e3323015-8732-45ec-914a-c6845f810f54</instanceID>
+          </meta>
+        </data>

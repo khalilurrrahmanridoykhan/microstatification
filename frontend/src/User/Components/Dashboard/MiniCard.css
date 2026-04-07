@@ -1,0 +1,100 @@
+.new-data-section {
+    margin-top: 11%;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    width: 76%; /* Adjust width as needed */
+}
+
+.new-data-title {
+    color: #495057;
+    font-size: 1.2em;
+    font-weight: normal;
+    margin-bottom: 15px;
+}
+
+.new-data-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.new-data-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.new-data-item:last-child {
+    border-bottom: none;
+}
+
+.data-info {
+    display: flex;
+    align-items: center;
+}
+
+.data-icon-container {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 10px;
+    font-size: 1.2em;
+    color: #495057;
+}
+
+/* Placeholder for actual icons/logos */
+.data-icon-container.napm {
+    background-color: #e0f7fa; /* Light teal */
+    color: #00acc1; /* Teal */
+    font-size: 1.5em;
+}
+
+.data-icon-container.who {
+    background-color: #fffde7; /* Light yellow */
+    color: #fdd835; /* Yellow */
+    font-size: 1.5em;
+}
+
+.data-icon-container.bd-health {
+    background-color: #e3f2fd; /* Light blue */
+    color: #1e88e5; /* Blue */
+    font-size: 1.5em;
+}
+
+.data-icon-container.usa-health {
+    background-color: #ffebee; /* Light red */
+    color: #e53935; /* Red */
+    font-size: 1.5em;
+}
+
+.data-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.data-name {
+    font-weight: normal;
+    color: #343a40;
+    font-size: 0.95em;
+    margin-bottom: 2px;
+}
+
+.data-time {
+    color: #6c757d;
+    font-size: 0.8em;
+}
+
+.data-value {
+    font-weight:normal;
+    color: #343a40;
+    font-size: 1em;
+}

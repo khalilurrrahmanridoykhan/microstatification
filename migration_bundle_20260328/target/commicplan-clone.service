@@ -1,0 +1,21 @@
+[Unit]
+Description=ComMicPlan clone 2 Mar stack
+After=network.target postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=www-data
+Group=www-data
+WorkingDirectory=__PROJECT_DIR__
+ExecStart=/bin/bash __PROJECT_DIR__/start_clone_stack.sh
+ExecStop=/bin/bash -lc 'test -f /tmp/commicplan_clone2_9202.pid && kill "$(cat /tmp/commicplan_clone2_9202.pid)" || true'
+ExecStop=/bin/bash -lc 'test -f /tmp/commicplan_clone2_submit_9212.pid && kill "$(cat /tmp/commicplan_clone2_submit_9212.pid)" || true'
+ExecStop=/bin/bash -lc 'test -f /tmp/commicplan_clone2_celery_general.pid && kill "$(cat /tmp/commicplan_clone2_celery_general.pid)" || true'
+ExecStop=/bin/bash -lc 'test -f /tmp/commicplan_clone2_celery_submit.pid && kill "$(cat /tmp/commicplan_clone2_celery_submit.pid)" || true'
+ExecStop=/bin/bash -lc 'test -f /tmp/commicplan_clone2_celery_beat.pid && kill "$(cat /tmp/commicplan_clone2_celery_beat.pid)" || true'
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

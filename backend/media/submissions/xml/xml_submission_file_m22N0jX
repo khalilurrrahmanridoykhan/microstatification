@@ -1,0 +1,46 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_2288" version="20240601">
+          <start>2025-12-08T15:48:50.192+06:00</start>
+          <end>2025-12-08T16:00:46.066+06:00</end>
+          <basic_information>
+            <name_of_the_assessee>Manju Khanam</name_of_the_assessee>
+            <national_id_no/>
+            <utin/>
+            <etin>197143289170</etin>
+            <circle>26</circle>
+            <taxes_zone>02, Chattogram</taxes_zone>
+            <assessment_year>2024_25</assessment_year>
+            <residential_status>resident</residential_status>
+            <status>individual</status>
+            <business_name/>
+            <wife_husband_name__tin>Md. Abdur Rouf Mondal</wife_husband_name__tin>
+            <fathers_name>Late Abdul Kuddus Khan</fathers_name>
+            <mothers_name>Most. Nurnahar Begum</mothers_name>
+            <date_of_birth/>
+            <address__present>Jubilee Road, Kotowali, Chattogram</address__present>
+            <address__permanent>Vill: Sundorganj Bazar, PO: &amp; PS: Sundarganj, Dist. Gaibandha</address__permanent>
+            <telephone_office_residence/>
+            <vat_registration_number/>
+          </basic_information>
+          <income_statement_section>
+            <income_from_business/>
+            <income_from_salary/>
+            <income_from_house_property/>
+            <capital_gains/>
+            <agricultural_income/>
+            <interest_on_securities>115200</interest_on_securities>
+            <foreign_income/>
+          </income_statement_section>
+          <tax_payment_section>
+            <tax_deducted_at_source>11520</tax_deducted_at_source>
+            <advance_tax/>
+            <tax_paid_us_173/>
+            <refund_adjustment/>
+          </tax_payment_section>
+          <verification>
+            <signature>WhatsApp Image 2025-12-08 at 16.00.00_582aa7cc-16_0_34.jpg</signature>
+            <date>2025-12-08T16:00:00.000+06:00</date>
+          </verification>
+          <meta>
+            <instanceID>uuid:33dcb9fe-50d6-4343-9260-7aa9d4737fc3</instanceID>
+          </meta>
+        </data>

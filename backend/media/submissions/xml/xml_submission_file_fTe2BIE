@@ -1,0 +1,46 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_2288" version="20240601">
+          <start>2025-12-08T14:35:43.103+06:00</start>
+          <end>2025-12-08T14:41:13.046+06:00</end>
+          <basic_information>
+            <name_of_the_assessee>Ayon pal</name_of_the_assessee>
+            <national_id_no>7012314098</national_id_no>
+            <utin/>
+            <etin>197143289170</etin>
+            <circle>26</circle>
+            <taxes_zone>Dhaka</taxes_zone>
+            <assessment_year>2024_25</assessment_year>
+            <residential_status>resident</residential_status>
+            <status>individual</status>
+            <business_name/>
+            <wife_husband_name__tin>N/A</wife_husband_name__tin>
+            <fathers_name>Gour Chandra Pal</fathers_name>
+            <mothers_name>Archana Pal</mothers_name>
+            <date_of_birth/>
+            <address__present>hazaribag,dhaka</address__present>
+            <address__permanent>hazaribag,dhaka</address__permanent>
+            <telephone_office_residence>01989492958</telephone_office_residence>
+            <vat_registration_number/>
+          </basic_information>
+          <income_statement_section>
+            <income_from_business/>
+            <income_from_salary/>
+            <income_from_house_property/>
+            <capital_gains/>
+            <agricultural_income/>
+            <interest_on_securities/>
+            <foreign_income/>
+          </income_statement_section>
+          <tax_payment_section>
+            <tax_deducted_at_source>1152000</tax_deducted_at_source>
+            <advance_tax/>
+            <tax_paid_us_173/>
+            <refund_adjustment/>
+          </tax_payment_section>
+          <verification>
+            <signature>1-14_41_9.jpg</signature>
+            <date/>
+          </verification>
+          <meta>
+            <instanceID>uuid:523bbc57-3e2c-469e-b203-66d3a97c3a32</instanceID>
+          </meta>
+        </data>

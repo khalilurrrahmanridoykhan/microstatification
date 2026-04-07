@@ -1,0 +1,122 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1158" version="20240601">
+          <start>2025-09-10T15:07:26.027+06:00</start>
+          <end>2025-09-10T15:10:19.477+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <user_identification_11_9943_01976848561>1234567890</user_identification_11_9943_01976848561>
+          <diagnostic_information>
+            <type_of_test_facility>facilities</type_of_test_facility>
+            <type_of_test>both</type_of_test>
+            <government_health_facilities>opt_1</government_health_facilities>
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            <types_of_diseases_for_bse>positive</types_of_diseases_for_bse>
+          </diagnostic_information>
+          <data_collector_s_information>
+            
+            
+            
+            
+            
+            <name_of_the_organization>brac</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>jamal</patient_name>
+            <guardians_name>kamal</guardians_name>
+            <_nationality>bangladeshi</_nationality>
+            
+            <phone_number_1>bangladesh</phone_number_1>
+            <phone_number>12345678901</phone_number>
+            <age>15_</age>
+            <weight>89</weight>
+            <gender>male</gender>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>service</occupation>
+          </patient_information>
+          <reporting_site_details>
+            <division>dhaka</division>
+            <district>dhaka</district>
+            <upazila>savar</upazila>
+            
+            
+            
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            
+            <division_1>dhaka</division_1>
+            <district_1>dhaka</district_1>
+            <upazila_1>savar</upazila_1>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>
+            <how_many_times>2</how_many_times>
+            <date_of_onset_fever>2025-09-02</date_of_onset_fever>
+            <date_of_first_test>2025-09-09</date_of_first_test>
+            <type_of_species>plasmodium_falciparum__pf_</type_of_species>
+            
+            
+            
+            
+            <medicines_type>primaquine___chloroquine</medicines_type>
+            <medicines_name>act__6-tab_ act__12-tab_</medicines_name>
+            
+            <date_of_initiation_of_treatment>2025-09-09</date_of_initiation_of_treatment>
+            <are_you_refered_this_patient_1>yes</are_you_refered_this_patient_1>
+            <where_is_it_referred_to>medical_college</where_is_it_referred_to>
+            
+            <medical_collage>cox_s_bazar_medical_college</medical_collage>
+            
+            
+            
+            <case_classification>indigenous</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_active_llin_or_itn_available_in_your_house>2</the_total_number_of_active_llin_or_itn_available_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>46.002059 -51.337814 0 0</position_of_the_patient_coordinates_of_the_patient>
+            <lab_district>cox_sbazar</lab_district>
+            <lab_upazila>pekua</lab_upazila>
+            <lab_organization>aclab_2</lab_organization>
+            <lab_location_list_of_the_lab>barobakia_bazar</lab_location_list_of_the_lab>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:19c7068e-2d5d-49a0-8096-481ad7fee9d4</instanceID>
+          </meta>
+        </data>

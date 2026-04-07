@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/enketo-offline-fallback.js"],
+  "sourcesContent": ["import settings from './module/settings';\n\nif (\n    settings.offline &&\n    settings.enketoId &&\n    settings.submissionParameter &&\n    settings.submissionParameter.value\n) {\n    location.href = window.location.pathname + window.location.hash;\n}\n"],
+  "mappings": "kFAGIA,EAAS,SACTA,EAAS,UACTA,EAAS,qBACTA,EAAS,oBAAoB,QAE7B,SAAS,KAAO,OAAO,SAAS,SAAW,OAAO,SAAS",
+  "names": ["settings_default"]
+}

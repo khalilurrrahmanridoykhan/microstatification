@@ -1,0 +1,13 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_129" version="20240601">
+          <start>2025-07-22T23:42:42.834+06:00</start>
+          <end>2025-07-23T00:57:16.824+06:00</end>
+          <name_of_para_mahalla_camp>Ridoy Khan</name_of_para_mahalla_camp>
+          <name_of_the_ward>other</name_of_the_ward>
+          <latitude_and_longitude_of_the_para_mahalla_camp>23.706472 90.445751 0 42.666666666666664</latitude_and_longitude_of_the_para_mahalla_camp>
+          <waypoint>nearby_location</waypoint>
+          <nearby_location__for_example_park_or_communal_space___specify_it>Dhaka</nearby_location__for_example_park_or_communal_space___specify_it>
+          <picture_of_the_villages>ridoy-0_57_13.jpg</picture_of_the_villages>
+          <meta>
+            <instanceID>uuid:3bb1cd42-e855-4377-a6f6-2094346687aa</instanceID>
+          </meta>
+        </data>

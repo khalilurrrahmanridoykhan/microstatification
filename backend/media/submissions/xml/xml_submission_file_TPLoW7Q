@@ -1,0 +1,41 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_540" version="20240601">
+          <start>2025-08-18T17:56:41.500+06:00</start>
+          <end>2025-08-18T17:57:57.920+06:00</end>
+          <type_of_test>rdt</type_of_test>
+          <employee_name>vvcb</employee_name>
+          <data_collectors_position>project_assistant__pa_</data_collectors_position>
+          
+          
+          <name_of_the_institution>community_clinic</name_of_the_institution>
+          <patient_name>er</patient_name>
+          <guardians_name>erte</guardians_name>
+          <phone_number>01726848561</phone_number>
+          <administrative>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>alikadam</upazila>
+            <union>alikadam</union>
+            <ward>ward_no_03_9</ward>
+            <village>sabek_beelchhari_marma_para__uttor_</village>
+          </administrative>
+          <age>0__10</age>
+          <weight>50</weight>
+          <gender>male</gender>
+          <race_i_group>marma</race_i_group>
+          <occupation>student</occupation>
+          <have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>yes</have_youany_member_of_your_household_suffered_from_malaria_in_the_last_year>
+          <date_of_onset_fever>2025-08-18</date_of_onset_fever>
+          <date_of_doing_test>2025-08-18</date_of_doing_test>
+          <type_of_disease>plasmodium_vivax</type_of_disease>
+          <severe_malaria>no</severe_malaria>
+          <treatment>act___primaquine</treatment>
+          <date_of_initiation_of_treatment>2025-08-18</date_of_initiation_of_treatment>
+          <the_patient_is_referred>yes</the_patient_is_referred>
+          <case_identification>acd</case_identification>
+          <the_total_number_of_llins_limited_insecticides_in_your_house>5</the_total_number_of_llins_limited_insecticides_in_your_house>
+          <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+          <lab_location>23.754348 90.365316 0 35</lab_location>
+          <meta>
+            <instanceID>uuid:98b29907-aed6-4fa0-916f-3a1aea176fb6</instanceID>
+          </meta>
+        </data>

@@ -1,0 +1,24 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_99" version="20240601">
+          <start>2025-07-22T12:35:28.642+06:00</start>
+          <end>2025-07-22T12:37:26.426+06:00</end>
+          <what_s_your_name_>jahid</what_s_your_name_>
+          <how_old_are_you_>25</how_old_are_you_>
+          <what_s_time_now_>2025-07-22</what_s_time_now_>
+          <what_s_time_now__1>12:45:00.000+06:00</what_s_time_now__1>
+          <what_s_date_and_time_now_/>
+          <your_current_location>23.754465 90.3654 0 13.991</your_current_location>
+          <draw_a_line>23.754118 90.360288 0 0;23.756828 90.36772 0 0</draw_a_line>
+          <draw_a_shape>23.758023 90.362478 0 0;23.753506 90.362823 0 0;23.753617 90.3664 0 0;23.757938 90.36554 0 0;23.758036 90.362728 0 0;23.755542 90.364574 0 0;23.754501 90.364424 0 0;23.754678 90.363715 0 0;23.755365 90.363114 0 0;23.756818 90.362685 0 0;23.758023 90.362478 0 0</draw_a_shape>
+          <write_a_fraction_value>88</write_a_fraction_value>
+          <scan_barcode>not working in web version</scan_barcode>
+          <company_rating>5</company_rating>
+          <select_alphabet>a</select_alphabet>
+          <select_multiple_alphabet>x y</select_multiple_alphabet>
+          <note_will_be_read_out_loud/>
+          <confirm_terms_and_conditions>OK</confirm_terms_and_conditions>
+          <take_picture>pngtree-web-programmer-avatar-png-image_15495271-12_36_32.png</take_picture>
+          <pick_file>Css selector1-12_37_24.docx</pick_file>
+          <meta>
+            <instanceID>uuid:2ad3e7d2-f3fa-4048-bafd-03a8601463df</instanceID>
+          </meta>
+        </data>

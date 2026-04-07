@@ -1,0 +1,63 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1079" version="20240601">
+          <start>2026-02-18T14:37:00.025+06:00</start>
+          <end>2026-02-18T14:38:24.004+06:00</end>
+          <health_worker_s_information>
+            <date>2026-02-18</date>
+            <name_of_staff>Ayon Pal</name_of_staff>
+            <organization>brac</organization>
+            <designation_1>chw</designation_1>
+            
+          </health_worker_s_information>
+          <suspected_patient-related_information>
+            <reporting_sites>city_corporation</reporting_sites>
+            
+            
+            
+            
+            
+            <city_corporation>dhaka_south</city_corporation>
+            <ward_1>ward_no_2</ward_1>
+            <area>kamrangichar</area>
+            <location>24.026397 89.896334 0 0</location>
+            <hh_id>2200</hh_id>
+            <hh_head_name>sakib</hh_head_name>
+            <suspected_in_the_disease>yes</suspected_in_the_disease>
+            <name_of_the_person_with_suspected_case>rakib</name_of_the_person_with_suspected_case>
+            <mobile_number>01989492958</mobile_number>
+            <patient_id_type>nid</patient_id_type>
+            <user_identification_11_9943_01976848561>1470258011</user_identification_11_9943_01976848561>
+            <age_month>20</age_month>
+            <age_year>0</age_year>
+            <sex>male</sex>
+            
+            <suspected_disease>dengue awd malaria</suspected_disease>
+          </suspected_patient-related_information>
+          <referral-related_information>
+            <referred>yes</referred>
+            <referral_place>brac</referral_place>
+            
+            
+          </referral-related_information>
+          <health_behaviour>
+            <bed_net_use_practice_during_sleep>no</bed_net_use_practice_during_sleep>
+            <handwashing_practice_with_soap__water>no</handwashing_practice_with_soap__water>
+            <type_latrine_use>flush_latrine</type_latrine_use>
+          </health_behaviour>
+          <information_of_already_identified_patient_s_>
+            
+            
+            
+          </information_of_already_identified_patient_s_>
+          <environmental_related_information_>
+            <presence_of_stagnant_water_mosquito_breeding_sites>no</presence_of_stagnant_water_mosquito_breeding_sites>
+            
+          </environmental_related_information_>
+          <disaster-related_information>
+            <did_any_disaster_occur_in_last_7_days_>no</did_any_disaster_occur_in_last_7_days_>
+            
+          </disaster-related_information>
+          <remarks>N/A</remarks>
+          <meta>
+            <instanceID>uuid:405b6594-0c0b-4f29-a1ee-9a8680af3bad</instanceID>
+          </meta>
+        </data>

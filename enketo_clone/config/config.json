@@ -1,0 +1,35 @@
+{
+  "redis": {
+    "main": {
+      "url": "redis://127.0.0.1:6379/11"
+    },
+    "cache": {
+      "url": "redis://127.0.0.1:6379/12"
+    }
+  },
+  "trust proxy": true,
+  "base url": "http://119.40.87.37:9105",
+  "offline enabled": true,
+  "default theme": "kobo",
+  "support": {
+    "email": "support@example.org"
+  },
+  "query parameter to pass to submission": "form_id",
+  "encryption key": "9IayZpXg0vevx9BbwIcoj8D6K7LN6HqHpsowM2GfuwQ",
+  "less secure encryption key": "txCWDeEws5Wk-AU58DW-EYQV9fD02K7O",
+  "cors allowed origins": [
+    "http://119.40.87.37:9101",
+    "http://127.0.0.1:9101",
+    "http://localhost:9101"
+  ],
+  "linked form and data server": {
+    "name": "ComMicPlanV2 Clone OpenRosa",
+    "server url": "http://119.40.87.37:9102/api/openrosa",
+    "legacy formhub": false,
+    "authentication": {
+      "type": "cookie",
+      "url": "http://119.40.87.37:9101/auth/enketo-login?return={RETURNURL}"
+    },
+    "api key": "f0aee05c21e520f7a57154c7"
+  }
+}

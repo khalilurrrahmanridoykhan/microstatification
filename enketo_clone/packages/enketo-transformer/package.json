@@ -1,0 +1,111 @@
+{
+    "name": "enketo-transformer",
+    "version": "4.2.0",
+    "description": "Library that transforms ODK-compliant XForms into a format that Enketo can consume",
+    "license": "Apache-2.0",
+    "type": "module",
+    "main": "./dist/enketo-transformer/transformer.cjs",
+    "module": "./dist/enketo-transformer/enketo-transformer.js",
+    "browser": "./dist/enketo-transformer/web/transformer.js",
+    "types": "./dist/types/src/transformer.d.ts",
+    "files": [
+        "app.js",
+        "dist/**/*"
+    ],
+    "exports": {
+        ".": {
+            "import": "./dist/enketo-transformer/enketo-transformer.js",
+            "require": "./dist/enketo-transformer/transformer.cjs",
+            "browser": "./dist/enketo-transformer/web/transformer.js",
+            "types": "./dist/types/src/transformer.d.ts"
+        },
+        "./dom": {
+            "import": "./dist/enketo-transformer/dom/node/index.js",
+            "require": "./dist/enketo-transformer/dom/node/index.cjs",
+            "browser": "./dist/dom/web/index.js",
+            "types": "./dist/types/src/dom/node/index.d.ts"
+        },
+        "./web": {
+            "types": "./dist/enketo-transformer/web/src/transformer.d.ts",
+            "default": "./dist/enketo-transformer/web/transformer.js"
+        }
+    },
+    "typesVersions": {
+        "*": {
+            "web": [
+                "./dist/enketo-transformer/web/src/transformer.d.ts"
+            ]
+        }
+    },
+    "bugs": {
+        "url": "https://github.com/enketo/enketo/issues"
+    },
+    "scripts": {
+        "benchmarks": "vite-node ./test/benchmarks.ts",
+        "build": "EMPTY_OUT_DIR=true vite build && ENV=web vite build && yarn tsc && echo 'enketo-transformer build complete'",
+        "watch:web": "ENV=web vite build -w",
+        "watch:node": "vite build -w",
+        "prepare": "yarn build",
+        "test": "vitest run --coverage && yarn tsc && node update-readme-with-shield-badge.cjs",
+        "test:watch": "vitest",
+        "test:watch:web": "ENV=web vitest",
+        "test:web": "ENV=web vitest run",
+        "develop": "DEBUG=api,transformer,markdown,language vite-node ./src/app.ts & http-server test/forms -p 8081",
+        "tsc": "tsc --project ./tsconfig.json && tsc --project ./tsconfig.web.json && tsc --project ./test/tsconfig.json"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/enketo/enketo"
+    },
+    "keywords": [
+        "Enketo",
+        "ODK",
+        "OpenRosa",
+        "XSLT",
+        "XSL",
+        "Transformer"
+    ],
+    "dependencies": {
+        "body-parser": "^1.20.3",
+        "css.escape": "^1.5.1",
+        "express": "^4.21.2",
+        "language-tags": "1.0.5",
+        "linkedom": "^0.14.26",
+        "string-direction": "0.1.x",
+        "undici": "^5.28.4",
+        "xpath-to-css": "^1.1.0"
+    },
+    "devDependencies": {
+        "@prettier/sync": "^0.3.0",
+        "@prettier/plugin-xml": "^3.2.0",
+        "@types/benchmark": "^2.1.2",
+        "@types/css.escape": "^1.5.0",
+        "@types/prettier": "^3.0.0",
+        "benchmark": "^2.1.4",
+        "http-server": "^13.1.0",
+        "libxslt": "0.10.2",
+        "pretty-format": "^29.6.2"
+    },
+    "peerDependencies": {
+        "libxslt": "0.10.2"
+    },
+    "peerDependenciesMeta": {
+        "libxslt": {
+            "optional": true
+        }
+    },
+    "resolutions": {
+        "nan": "^2.22.0",
+        "libxslt/nan": "^2.22.0",
+        "node1-libxmljsmt-myh/nan": "^2.22.0"
+    },
+    "engines": {
+        "node": ">=20 <23",
+        "npm": "please-use-yarn",
+        "yarn": ">= 1.22.22 <2"
+    },
+    "volta": {
+        "node": "22.12.0",
+        "yarn": "1.22.22"
+    }
+}

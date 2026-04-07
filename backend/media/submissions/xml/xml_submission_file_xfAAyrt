@@ -1,0 +1,111 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-09-03T10:32:22.603+06:00</start>
+          <end>2025-09-03T10:33:57.096+06:00</end>
+          <diagnostic_information>
+            <patient_id_type>nid</patient_id_type>
+            <user_identification_11_9943_01976848561>16</user_identification_11_9943_01976848561>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test>rdt</type_of_test>
+            <types_of_diseases_for_rdt>nagative</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>efsrgd</employee_name>
+            <designation_of_data_collector>special_health_worker__shw_</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>werfw</patient_name>
+            <guardians_name>sdffds</guardians_name>
+            <_nationality>burmese__myanamar_</_nationality>
+            
+            <phone_number>01726848561</phone_number>
+            <age>1-4</age>
+            <weight>45</weight>
+            <gender>male</gender>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>student</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>khulna</division>
+            <district>chuadanga</district>
+            <upazila>chuadanga_sadar</upazila>
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>other</patients_country_of_origin>
+            <other_7>rfd</other_7>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_past_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_past_year>
+            <how_many_times>453</how_many_times>
+            <date_of_onset_fever>2025-09-03</date_of_onset_fever>
+            <date_of_first_test>2025-09-03</date_of_first_test>
+            <type_of_species>plasmodium_vivax__pv_</type_of_species>
+            <severe_malaria>yes</severe_malaria>
+            <artesunate_supositorios>yes</artesunate_supositorios>
+            <treatment_1>artemisinin_injection</treatment_1>
+            <treatment_2>act__24-tab_</treatment_2>
+            
+            <date_of_initiation_of_treatment>2025-09-03</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>upazila_helath_complex</where_is_it_referred_to>
+            
+            
+            
+            
+            <upazila_health_complex>banshkhali_upazila_health_complex</upazila_health_complex>
+            <case_classification>imported_non-local</case_classification>
+            <case_identification>pcd__passive_case_detection_</case_identification>
+            
+            <the_total_number_of_llins_limited_insecticides_in_your_house>6</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>no</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.771732 90.422151 0 0</position_of_the_patient_coordinates_of_the_patient>
+            
+            
+            
+            
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>myanmar_</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:0f4eaca4-bcb1-458a-9c17-57dcc33ce01c</instanceID>
+          </meta>
+        </data>

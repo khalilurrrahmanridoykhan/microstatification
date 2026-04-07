@@ -1,0 +1,26 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_764" version="20240601">
+          <start>2025-09-02T00:16:44.269+06:00</start>
+          <end>2025-09-02T00:17:33.978+06:00</end>
+          <test>
+            <acknowledge/>
+            <barcode/>
+            <note/>
+            <video/>
+            <audio/>
+            <image/>
+            <multiple>opt opt_2</multiple>
+            <decimal>3.2</decimal>
+            <geoshape>23.727163 90.366018 0 3993.208274564879;23.72674 90.36586 0 0;23.726495 90.366124 0 0;23.727163 90.366018 0 3993.208274564879</geoshape>
+            <geotrace>23.725514 90.369961 0 0;23.71742 90.377349 0 0</geotrace>
+            <geopoint>23.727163 90.366018 0 3993.208274564879</geopoint>
+            <datetime>2025-10-08T00:15:00.000+06:00</datetime>
+            <time>00:30:00.000+06:00</time>
+            <date>2025-09-18</date>
+            <number>8520556</number>
+            <text>agh</text>
+            <test_1>opt</test_1>
+          </test>
+          <meta>
+            <instanceID>uuid:67e64eca-3860-4231-8f11-8e071a7a751f</instanceID>
+          </meta>
+        </data>

@@ -1,0 +1,46 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_2288" version="20240601">
+          <start>2025-12-08T14:32:13.886+06:00</start>
+          <end>2025-12-08T14:35:08.070+06:00</end>
+          <basic_information>
+            <name_of_the_assessee>Zahidul Islam Rabbi</name_of_the_assessee>
+            <national_id_no>1234567890</national_id_no>
+            <utin>1234567890</utin>
+            <etin>1234567890</etin>
+            <circle>1234567890</circle>
+            <taxes_zone>Dhaka</taxes_zone>
+            <assessment_year>2025_26</assessment_year>
+            <residential_status>non-resident</residential_status>
+            <status>individual</status>
+            <business_name>Zahidul Islam Rabbi</business_name>
+            <wife_husband_name__tin>Unmarried</wife_husband_name__tin>
+            <fathers_name>Saidur Rahman Said</fathers_name>
+            <mothers_name>Renuara</mothers_name>
+            <date_of_birth>2025-12-08T14:45:00.000+06:00</date_of_birth>
+            <address__present>27/11/1(Ka),Topkhana Road, Beside of Segun Bagicha High school</address__present>
+            <address__permanent>27/11/1(Ka),Topkhana Road, Beside of Segun Bagicha High school</address__permanent>
+            <telephone_office_residence>01634328659</telephone_office_residence>
+            <vat_registration_number>123456</vat_registration_number>
+          </basic_information>
+          <income_statement_section>
+            <income_from_business>15000</income_from_business>
+            <income_from_salary>10000</income_from_salary>
+            <income_from_house_property>0</income_from_house_property>
+            <capital_gains>5000</capital_gains>
+            <agricultural_income>0</agricultural_income>
+            <interest_on_securities>500</interest_on_securities>
+            <foreign_income>0</foreign_income>
+          </income_statement_section>
+          <tax_payment_section>
+            <tax_deducted_at_source>500</tax_deducted_at_source>
+            <advance_tax>200</advance_tax>
+            <tax_paid_us_173>15</tax_paid_us_173>
+            <refund_adjustment>56</refund_adjustment>
+          </tax_payment_section>
+          <verification>
+            <signature>Untitled diagram-2025-12-06-141012-14_34_47.png</signature>
+            <date>2025-12-08T14:45:00.000+06:00</date>
+          </verification>
+          <meta>
+            <instanceID>uuid:41919a4b-65e1-4142-96ce-a64316f221c3</instanceID>
+          </meta>
+        </data>

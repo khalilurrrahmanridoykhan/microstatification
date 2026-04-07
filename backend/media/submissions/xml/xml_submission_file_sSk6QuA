@@ -1,0 +1,113 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-09-08T10:27:37.788+06:00</start>
+          <end>2025-09-08T10:30:02.601+06:00</end>
+          <patient_id_type>nid</patient_id_type>
+          <patient_identification_numbers>4417441744</patient_identification_numbers>
+          <diagnostic_information>
+            <type_of_test_facility>community</type_of_test_facility>
+            <type_of_test>rdt</type_of_test>
+            
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>ayon</employee_name>
+            <designation_of_data_collector>health_worker__sk_hw___</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>asdfghjkl</patient_name>
+            <guardians_name>asdfghjk</guardians_name>
+            <_nationality>bangladeshi</_nationality>
+            
+            <phone_number_1>bangladesh</phone_number_1>
+            <phone_number>01989492958</phone_number>
+            <age>5-14</age>
+            <weight>22</weight>
+            <gender>male</gender>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>dependent</occupation>
+          </patient_information>
+          <reporting_site_details>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>alikadam</upazila>
+            
+            
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            
+            <division_1>chattogram_2</division_1>
+            <district_1>bandarban</district_1>
+            <upazila_1>alikadam</upazila_1>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_last_1_year>
+            <how_many_times>1</how_many_times>
+            <date_of_onset_fever>2025-09-28</date_of_onset_fever>
+            <date_of_first_test>2025-09-29</date_of_first_test>
+            <type_of_species>plasmodium_falciparum__pf_</type_of_species>
+            
+            
+            
+            
+            <medicines_type>primaquine___chloroquine</medicines_type>
+            <medicines_name>act__6-tab_ act__12-tab_ act__18-tab_</medicines_name>
+            
+            <date_of_initiation_of_treatment/>
+            <are_you_refered_this_patient_1>yes</are_you_refered_this_patient_1>
+            <where_is_it_referred_to>medical_college</where_is_it_referred_to>
+            
+            <medical_collage/>
+            
+            
+            
+            <case_classification>indigenous</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>pacd</acd_identification>
+            <the_total_number_of_active_llin_or_itn_available_in_your_house>1</the_total_number_of_active_llin_or_itn_available_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days>yes</used_llin_insecticide_mosquito_repellent_in_last_15_days>
+            <position_of_the_patient_coordinates_of_the_patient>23.478362 90.039301 0 0</position_of_the_patient_coordinates_of_the_patient>
+            
+            
+            
+            
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>no</do_the_patient_have_any_travel_history>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:5e55a4d0-cb66-44bf-ab73-0b3f603b36fa</instanceID>
+          </meta>
+        </data>

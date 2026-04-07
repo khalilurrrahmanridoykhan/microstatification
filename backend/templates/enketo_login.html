@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>CommicPlan Authentication</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        margin: 0;
+        padding: 20px;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .login-container {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        width: 100%;
+        max-width: 400px;
+      }
+      .logo {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+        font-weight: 500;
+      }
+      input[type="text"],
+      input[type="password"] {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        box-sizing: border-box;
+        font-size: 16px;
+      }
+      .btn-primary {
+        background: #667eea;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        width: 100%;
+        font-size: 16px;
+        font-weight: 500;
+      }
+      .btn-primary:hover {
+        background: #5a6fd8;
+      }
+      .error {
+        color: #e74c3c;
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #fdf2f2;
+        border-radius: 6px;
+        border: 1px solid #fecaca;
+      }
+      .info {
+        color: #2563eb;
+        margin-bottom: 15px;
+        font-size: 14px;
+      }
+      .debug-info {
+        background: #f0f0f0;
+        padding: 10px;
+        margin-bottom: 15px;
+        font-size: 12px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="logo">
+        <h2>CommicPlan</h2>
+        <p class="info">Please login to access the form</p>
+      </div>
+
+      {% if return_url %}
+      <div class="debug-info">
+        <strong>Return URL:</strong> {{ return_url|truncatechars:80 }}
+      </div>
+      {% endif %} {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="return_url" value="{{ return_url }}" />
+
+        <div class="form-group">
+          <label for="username">Username:</label>
+          <input type="text" id="username" name="username" required autofocus />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password:</label>
+          <input type="password" id="password" name="password" required />
+        </div>
+
+        <button type="submit" class="btn-primary">Login</button>
+      </form>
+
+      <script>
+        // Auto-focus on username field
+        document.getElementById("username").focus();
+
+        // Debug: Log return URL
+        console.log("Return URL:", "{{ return_url }}");
+      </script>
+    </div>
+  </body>
+</html>

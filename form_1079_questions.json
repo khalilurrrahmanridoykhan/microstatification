@@ -1,0 +1,3933 @@
+{
+  "id": 1079,
+  "name": "Community Diseases Surveillance Reporting",
+  "project": 55,
+  "default_language": {
+    "id": 19,
+    "description": "Bangla",
+    "subtag": "bn"
+  },
+  "other_languages": [
+    {
+      "id": 38,
+      "description": "English",
+      "subtag": "en"
+    }
+  ],
+  "question_count": 56,
+  "questions": [
+    {
+      "id": "begin_gm4mifx0u",
+      "name": "health_worker_s_information",
+      "type": "begin_group",
+      "_uuid": "begin_gm4mifx0u",
+      "label": "স্বাস্থ্যকর্মীর তথ্য",
+      "default": "",
+      "groupId": "gm4mifx0u",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "field-list",
+      "parameters": "",
+      "isGroupStart": true,
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "স্বাস্থ্যকর্মীর তথ্য",
+        "English (en)": "Health worker’s information"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "r8tivamqv",
+      "name": "date",
+      "type": "date",
+      "_uuid": "r8tivamqv",
+      "label": "হাউজ হোল্ড/খানা পরিদর্শনের তারিখ",
+      "default": "",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": true,
+      "appearance": "",
+      "parameters": "",
+      "calculation": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "হাউজ হোল্ড/খানা পরিদর্শনের তারিখ",
+        "English (en)": "Date"
+      },
+      "guidance_hint": "",
+      "make_mandatory": true,
+      "constraint_message": ""
+    },
+    {
+      "id": "0f0j65jnr",
+      "name": "name_of_staff",
+      "type": "text",
+      "_uuid": "0f0j65jnr",
+      "label": "কর্মীর নাম",
+      "default": "",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": true,
+      "appearance": "",
+      "parameters": "",
+      "calculation": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "কর্মীর নাম",
+        "English (en)": "Name of Staff"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "name": "organization",
+      "type": "select_one bfwtdir",
+      "_uuid": "w17bmal6r",
+      "label": "প্রতিষ্ঠান",
+      "options": [
+        {
+          "name": "brac",
+          "label": "ব্র্যাক",
+          "translations": {
+            "Bangla (bn)": "ব্র্যাক",
+            "English (en)": "BRAC"
+          }
+        },
+        {
+          "name": "govt",
+          "label": "সরকারি",
+          "translations": {
+            "Bangla (bn)": "সরকারি",
+            "English (en)": "Govt"
+          }
+        }
+      ],
+      "required": true,
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "প্রতিষ্ঠান",
+        "English (en)": "Organization"
+      }
+    },
+    {
+      "name": "designation_1",
+      "type": "select_one ufann4f",
+      "_uuid": "xvkiecwal",
+      "label": "পদবী",
+      "options": [
+        {
+          "name": "chw",
+          "label": "সিএইচডব্লিউ",
+          "translations": {
+            "Bangla (bn)": "সিএইচডব্লিউ",
+            "English (en)": "CHW"
+          }
+        },
+        {
+          "name": "cm",
+          "label": "সিএম",
+          "translations": {
+            "Bangla (bn)": "সিএম",
+            "English (en)": "CM"
+          }
+        }
+      ],
+      "relevant": "${organization} = 'brac'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "brac",
+          "question": "organization",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "পদবী",
+        "English (en)": "Designation"
+      }
+    },
+    {
+      "name": "designation",
+      "type": "text",
+      "_uuid": "dhdmiwqzr",
+      "label": "পদবী",
+      "options": [
+        {
+          "name": "",
+          "label": "",
+          "translations": {}
+        }
+      ],
+      "relevant": "${organization} = 'govt'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "govt",
+          "question": "organization",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "পদবী",
+        "English (en)": "Designation"
+      }
+    },
+    {
+      "id": "end_gm4mifx0u",
+      "name": "",
+      "type": "end_group",
+      "_uuid": "end_gm4mifx0u",
+      "label": "",
+      "default": "",
+      "groupId": "gm4mifx0u",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "",
+      "isGroupEnd": true,
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {},
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "begin_l330hi2xe",
+      "name": "suspected_patient-related_information",
+      "type": "begin_group",
+      "_uuid": "begin_l330hi2xe",
+      "label": "রোগী সম্পর্কিত তথ্য",
+      "default": "",
+      "groupId": "l330hi2xe",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "field-list",
+      "parameters": "",
+      "isGroupStart": true,
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "রোগী সম্পর্কিত তথ্য",
+        "English (en)": "Suspected Patient-related information"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "name": "reporting_sites",
+      "type": "select_one q19svme",
+      "_uuid": "m4y2kysg",
+      "label": "রিপোর্টিং সাইট",
+      "options": [
+        {
+          "name": "district",
+          "label": "জেলা",
+          "translations": {
+            "Bangla (bn)": "জেলা",
+            "English (en)": "District"
+          }
+        },
+        {
+          "name": "city_corporation",
+          "label": "সিটি কর্পোরেশন",
+          "translations": {
+            "Bangla (bn)": "সিটি কর্পোরেশন",
+            "English (en)": "City Corporation"
+          }
+        }
+      ],
+      "required": true,
+      "appearance": "minimal",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "রিপোর্টিং সাইট",
+        "English (en)": "Reporting Sites"
+      }
+    },
+    {
+      "name": "division",
+      "type": "select_one hhocg5u",
+      "_uuid": "oaf7hiqa",
+      "label": "বিভাগ",
+      "options": [
+        {
+          "name": "chattogram",
+          "_uuid": "1756913568903_0_1im3bu",
+          "label": "চট্টগ্রাম",
+          "value": "Chattogram",
+          "translations": {
+            "Bangla (bn)": "চট্টগ্রাম",
+            "English (en)": "Chattogram"
+          }
+        },
+        {
+          "name": "barishal",
+          "_uuid": "1756913568903_1_ta85xa",
+          "label": "বরিশাল",
+          "value": "Barishal",
+          "translations": {
+            "Bangla (bn)": "বরিশাল",
+            "English (en)": "Barishal"
+          }
+        },
+        {
+          "name": "rajshahi",
+          "_uuid": "1756913568903_2_zd9bqh",
+          "label": "রাজশাহী",
+          "value": "Rajshahi",
+          "translations": {
+            "Bangla (bn)": "রাজশাহী",
+            "English (en)": "Rajshahi"
+          }
+        },
+        {
+          "name": "dhaka",
+          "_uuid": "1756913568903_3_fmqqtw",
+          "label": "ঢাকা",
+          "value": "Dhaka",
+          "translations": {
+            "Bangla (bn)": "ঢাকা",
+            "English (en)": "Dhaka"
+          }
+        },
+        {
+          "name": "khulna",
+          "_uuid": "1756913568903_4_v51mpz",
+          "label": "খুলনা",
+          "value": "Khulna",
+          "translations": {
+            "Bangla (bn)": "খুলনা",
+            "English (en)": "Khulna"
+          }
+        },
+        {
+          "name": "sylhet",
+          "_uuid": "1756913568903_5_pi08a4",
+          "label": "সিলেট",
+          "value": "Sylhet",
+          "translations": {
+            "Bangla (bn)": "সিলেট",
+            "English (en)": "Sylhet"
+          }
+        }
+      ],
+      "relevant": "${reporting_sites} = 'district'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "district",
+          "question": "reporting_sites",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বিভাগ",
+        "English (en)": "Division"
+      },
+      "filterEnabled": true
+    },
+    {
+      "name": "district",
+      "type": "select_one znnr6ek",
+      "_uuid": "gasd4ml7w",
+      "label": "জেলা",
+      "options": [
+        {
+          "name": "bandarban",
+          "_uuid": "1756913578176_0_qqz9ky",
+          "label": "বান্দরবান ",
+          "value": "Bandarban",
+          "translations": {
+            "Bangla (bn)": "বান্দরবান ",
+            "English (en)": "Bandarban"
+          }
+        },
+        {
+          "name": "chottogram",
+          "_uuid": "1756913578176_1_8qnayx",
+          "label": "চট্টগ্রাম",
+          "value": "Chottogram",
+          "translations": {
+            "Bangla (bn)": "চট্টগ্রাম",
+            "English (en)": "Chottogram"
+          }
+        },
+        {
+          "name": "cox_s_bazar",
+          "_uuid": "1756913578176_2_12ufhj",
+          "label": "কক্সবাজার ",
+          "value": "Cox's Bazar",
+          "translations": {
+            "Bangla (bn)": "কক্সবাজার ",
+            "English (en)": "Cox's Bazar"
+          }
+        },
+        {
+          "name": "khagrachari",
+          "_uuid": "1756913578176_3_mvuf5p",
+          "label": "খাগড়াছড়ি ",
+          "value": "Khagrachari",
+          "translations": {
+            "Bangla (bn)": "খাগড়াছড়ি ",
+            "English (en)": "Khagrachari"
+          }
+        },
+        {
+          "name": "rangamati",
+          "_uuid": "1756913578176_4_4klppj",
+          "label": "রাঙামাটি",
+          "value": "Rangamati",
+          "translations": {
+            "Bangla (bn)": "রাঙামাটি",
+            "English (en)": "Rangamati"
+          }
+        },
+        {
+          "name": "barishal",
+          "_uuid": "1756913578176_5_ytykfv",
+          "label": "বরিশাল",
+          "value": "Barishal",
+          "translations": {
+            "Bangla (bn)": "বরিশাল",
+            "English (en)": "Barishal"
+          }
+        },
+        {
+          "name": "barguna",
+          "_uuid": "1756913578176_6_c4cgpx",
+          "label": "বরগুনা",
+          "value": "Barguna",
+          "translations": {
+            "Bangla (bn)": "বরগুনা",
+            "English (en)": "Barguna"
+          }
+        },
+        {
+          "name": "patuakhali",
+          "_uuid": "1756913578176_7_167vg0",
+          "label": "পটুয়াখালি",
+          "value": "Patuakhali",
+          "translations": {
+            "Bangla (bn)": "পটুয়াখালি",
+            "English (en)": "Patuakhali"
+          }
+        },
+        {
+          "name": "naogaon",
+          "_uuid": "1756913578176_8_wcc7hs",
+          "label": "নওগাঁ",
+          "value": "Naogaon",
+          "translations": {
+            "Bangla (bn)": "নওগাঁ",
+            "English (en)": "Naogaon"
+          }
+        },
+        {
+          "name": "narayanganj",
+          "_uuid": "1756913578176_9_ggn57a",
+          "label": "নারায়ণগঞ্জ",
+          "value": "Narayanganj",
+          "translations": {
+            "Bangla (bn)": "নারায়ণগঞ্জ",
+            "English (en)": "Narayanganj"
+          }
+        },
+        {
+          "name": "satkhira",
+          "_uuid": "1756913578176_10_opse2t",
+          "label": "সাতক্ষীরা",
+          "value": "Satkhira",
+          "translations": {
+            "Bangla (bn)": "সাতক্ষীরা",
+            "English (en)": "Satkhira"
+          }
+        },
+        {
+          "name": "sunamganj",
+          "_uuid": "1756913578176_11_bsbyyr",
+          "label": "সুনামগঞ্জ",
+          "value": "Sunamganj",
+          "translations": {
+            "Bangla (bn)": "সুনামগঞ্জ",
+            "English (en)": "Sunamganj"
+          }
+        },
+        {
+          "name": "rajbari",
+          "label": "রাজবাড়ী",
+          "translations": {
+            "Bangla (bn)": "রাজবাড়ী",
+            "English (en)": "Rajbari"
+          }
+        }
+      ],
+      "trigger": "${division}",
+      "relevant": "${reporting_sites} = 'district'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "district",
+          "question": "reporting_sites",
+          "condition": "="
+        }
+      ],
+      "calculation": "if(${division} = 'rajshahi', 'naogaon',\nif(${division} = 'dhaka', 'narayanganj',\nif(${division} = 'khulna', 'satkhira',\nif(${division} = 'sylhet', 'sunamganj', '')\n)))",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "জেলা",
+        "English (en)": "District"
+      },
+      "filterEnabled": true,
+      "conditionLogic": "and",
+      "optionFilterMap": {
+        "dhaka": [
+          "narayanganj",
+          "rajbari"
+        ],
+        "khulna": [
+          "satkhira"
+        ],
+        "sylhet": [
+          "sunamganj"
+        ],
+        "barishal": [
+          "barishal",
+          "barguna",
+          "patuakhali"
+        ],
+        "rajshahi": [
+          "naogaon"
+        ],
+        "chattogram": [
+          "bandarban",
+          "chottogram",
+          "cox_s_bazar",
+          "khagrachari",
+          "rangamati"
+        ]
+      },
+      "filterQuestionId": "oaf7hiqa",
+      "filterOptionValues": [
+        "chattogram",
+        "barishal",
+        "rajshahi",
+        "dhaka",
+        "khulna",
+        "sylhet"
+      ]
+    },
+    {
+      "name": "upazila",
+      "type": "select_one 5unbm2g",
+      "_uuid": "2ycqznkdj",
+      "label": "উপজেলা",
+      "options": [
+        {
+          "name": "lama",
+          "_uuid": "1756913630753_0_z43009",
+          "label": "লামা",
+          "value": "Lama",
+          "translations": {
+            "Bangla (bn)": "লামা",
+            "English (en)": "Lama"
+          }
+        },
+        {
+          "name": "baskhali",
+          "_uuid": "1756913630753_1_acdncu",
+          "label": "বাশখালি",
+          "value": "Baskhali",
+          "translations": {
+            "Bangla (bn)": "বাশখালি",
+            "English (en)": "Baskhali"
+          }
+        },
+        {
+          "name": "moheskhali",
+          "_uuid": "1756913630753_2_8q9ma8",
+          "label": "মহেশখালি",
+          "value": "Moheskhali",
+          "translations": {
+            "Bangla (bn)": "মহেশখালি",
+            "English (en)": "Moheskhali"
+          }
+        },
+        {
+          "name": "laxmichhari",
+          "_uuid": "1756913630753_3_vich0w",
+          "label": "লক্ষীছড়ি",
+          "value": "Laxmichhari",
+          "translations": {
+            "Bangla (bn)": "লক্ষীছড়ি",
+            "English (en)": "Laxmichhari"
+          }
+        },
+        {
+          "name": "juraichhari",
+          "_uuid": "1756913630753_4_hmg94f",
+          "label": "জুরাছড়ি",
+          "value": "Juraichhari",
+          "translations": {
+            "Bangla (bn)": "জুরাছড়ি",
+            "English (en)": "Juraichhari"
+          }
+        },
+        {
+          "name": "hizla",
+          "_uuid": "1756913630753_5_vjvcfk",
+          "label": "হিজলা ",
+          "value": "Hizla",
+          "translations": {
+            "Bangla (bn)": "হিজলা ",
+            "English (en)": "Hizla"
+          }
+        },
+        {
+          "name": "taltali",
+          "_uuid": "1756913630753_6_y0krom",
+          "label": "তালতলী",
+          "value": "Taltali",
+          "translations": {
+            "Bangla (bn)": "তালতলী",
+            "English (en)": "Taltali"
+          }
+        },
+        {
+          "name": "kalapara",
+          "_uuid": "1756913630753_7_cl8hd3",
+          "label": "কলাপাড়া",
+          "value": "Kalapara",
+          "translations": {
+            "Bangla (bn)": "কলাপাড়া",
+            "English (en)": "Kalapara"
+          }
+        },
+        {
+          "name": "porsha",
+          "_uuid": "1756913630753_8_ci9l5k",
+          "label": "পোরশা",
+          "value": "Porsha",
+          "translations": {
+            "Bangla (bn)": "পোরশা",
+            "English (en)": "Porsha"
+          }
+        },
+        {
+          "name": "araihazar",
+          "_uuid": "1756913630753_9_tfehbk",
+          "label": "আড়াইহাজার\n",
+          "value": "Araihazar",
+          "translations": {
+            "Bangla (bn)": "আড়াইহাজার\n",
+            "English (en)": "Araihazar"
+          }
+        },
+        {
+          "name": "shyamnagar",
+          "_uuid": "1756913630753_10_b9x3ww",
+          "label": "শ্যামনগর",
+          "value": "Shyamnagar",
+          "translations": {
+            "Bangla (bn)": "শ্যামনগর",
+            "English (en)": "Shyamnagar"
+          }
+        },
+        {
+          "name": "tahirpur",
+          "_uuid": "1756913630753_11_b8kgj3",
+          "label": "তাহিরপুর",
+          "value": "Tahirpur",
+          "translations": {
+            "Bangla (bn)": "তাহিরপুর",
+            "English (en)": "Tahirpur"
+          }
+        },
+        {
+          "name": "goalanda",
+          "label": "গোয়ালন্দ",
+          "translations": {
+            "Bangla (bn)": "গোয়ালন্দ",
+            "English (en)": "Goalanda"
+          }
+        }
+      ],
+      "trigger": "${district}",
+      "relevant": "${reporting_sites} = 'district'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "district",
+          "question": "reporting_sites",
+          "condition": "="
+        }
+      ],
+      "calculation": "if(${district} = 'bandarban', 'lama',\nif(${district} = 'chottogram', 'baskhali',\nif(${district} = 'cox_s_bazar', 'moheskhali',\nif(${district} = 'khagrachari', 'laxmichhari',\nif(${district} = 'rangamati', 'juraichhari',\nif(${district} = 'barguna', 'taltali',\nif(${district} = 'patuakhali', 'kalapara',\nif(${district} = 'naogaon', 'porsha',\nif(${district} = 'narayanganj', 'araihazar',\nif(${district} = 'satkhira', 'shyamnagar',\nif(${district} = 'sunamganj', 'tahirpur',\nif(${district} = 'barishal', 'hizla', '')\n)))))))))))\n",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "উপজেলা",
+        "English (en)": "Upazila"
+      },
+      "filterEnabled": true,
+      "conditionLogic": "and",
+      "optionFilterMap": {
+        "barguna": [
+          "taltali"
+        ],
+        "naogaon": [
+          "porsha"
+        ],
+        "rajbari": [
+          "goalanda"
+        ],
+        "barishal": [
+          "hizla"
+        ],
+        "satkhira": [
+          "shyamnagar"
+        ],
+        "bandarban": [
+          "lama"
+        ],
+        "rangamati": [
+          "juraichhari"
+        ],
+        "sunamganj": [
+          "tahirpur"
+        ],
+        "chottogram": [
+          "baskhali"
+        ],
+        "patuakhali": [
+          "kalapara"
+        ],
+        "cox_s_bazar": [
+          "moheskhali"
+        ],
+        "khagrachari": [
+          "laxmichhari"
+        ],
+        "narayanganj": [
+          "araihazar"
+        ]
+      },
+      "filterQuestionId": "gasd4ml7w",
+      "filterOptionValues": [
+        "bandarban",
+        "chottogram",
+        "cox_s_bazar",
+        "khagrachari",
+        "rangamati",
+        "barishal",
+        "barguna",
+        "patuakhali",
+        "naogaon",
+        "narayanganj",
+        "satkhira",
+        "sunamganj",
+        "rajbari"
+      ]
+    },
+    {
+      "name": "union",
+      "type": "select_one icqkdom",
+      "_uuid": "7h81o2tt3",
+      "label": "ইউনিয়ন",
+      "options": [
+        {
+          "name": "gojalia",
+          "_uuid": "1756913641842_0_n13iv2",
+          "label": "গজালিয়া ",
+          "value": "Gojalia",
+          "translations": {
+            "Bangla (bn)": "গজালিয়া ",
+            "English (en)": "Gojalia"
+          }
+        },
+        {
+          "name": "khankanabad",
+          "_uuid": "1756913641842_1_tmb2at",
+          "label": "খানখানাবাদ",
+          "value": "Khankanabad",
+          "translations": {
+            "Bangla (bn)": "খানখানাবাদ",
+            "English (en)": "Khankanabad"
+          }
+        },
+        {
+          "name": "kutubjum",
+          "_uuid": "1756913641842_2_3aiois",
+          "label": "কুতুবজোম",
+          "value": "Kutubjum",
+          "translations": {
+            "Bangla (bn)": "কুতুবজোম",
+            "English (en)": "Kutubjum"
+          }
+        },
+        {
+          "name": "_1_no_laxmichari",
+          "_uuid": "1756913641842_3_2lgkky",
+          "label": "১ নং লক্ষ্মীছড়ি\n",
+          "value": "1 No Laxmichari",
+          "translations": {
+            "Bangla (bn)": "১ নং লক্ষ্মীছড়ি\n",
+            "English (en)": "1 No Laxmichari"
+          }
+        },
+        {
+          "name": "banojughichara",
+          "_uuid": "1756913641842_4_unk9oj",
+          "label": "বনযোগীছড়া",
+          "value": "Banojughichara",
+          "translations": {
+            "Bangla (bn)": "বনযোগীছড়া",
+            "English (en)": "Banojughichara"
+          }
+        },
+        {
+          "name": "guabaria",
+          "_uuid": "1756913641842_5_j35ba6",
+          "label": "গুয়াবাড়িয়া",
+          "value": "Guabaria",
+          "translations": {
+            "Bangla (bn)": "গুয়াবাড়িয়া",
+            "English (en)": "Guabaria"
+          }
+        },
+        {
+          "name": "barobogi",
+          "_uuid": "1756913641842_6_fp26lq",
+          "label": "বরবোগী",
+          "value": "Barobogi",
+          "translations": {
+            "Bangla (bn)": "বরবোগী",
+            "English (en)": "Barobogi"
+          }
+        },
+        {
+          "name": "lalua",
+          "_uuid": "1756913641842_7_k4zzfl",
+          "label": "লালুয়া",
+          "value": "Lalua",
+          "translations": {
+            "Bangla (bn)": "লালুয়া",
+            "English (en)": "Lalua"
+          }
+        },
+        {
+          "name": "mushidpur",
+          "_uuid": "1756913641842_8_po5y59",
+          "label": "মুর্শিদপুর",
+          "value": "Mushidpur",
+          "translations": {
+            "Bangla (bn)": "মুর্শিদপুর",
+            "English (en)": "Mushidpur"
+          }
+        },
+        {
+          "name": "bramandi",
+          "_uuid": "1756913641842_9_ogtc87",
+          "label": "ব্রাহ্মণদি",
+          "value": "Bramandi",
+          "translations": {
+            "Bangla (bn)": "ব্রাহ্মণদি",
+            "English (en)": "Bramandi"
+          }
+        },
+        {
+          "name": "burigoalini",
+          "_uuid": "1756913641842_10_fdb7ol",
+          "label": "বুড়িগোয়ালিনী ",
+          "value": "Burigoalini",
+          "translations": {
+            "Bangla (bn)": "বুড়িগোয়ালিনী ",
+            "English (en)": "Burigoalini"
+          }
+        },
+        {
+          "name": "tahirpur",
+          "_uuid": "1756913641842_11_x7ctx6",
+          "label": "তাহিরপুর",
+          "value": "Tahirpur",
+          "translations": {
+            "Bangla (bn)": "তাহিরপুর",
+            "English (en)": "Tahirpur"
+          }
+        },
+        {
+          "name": "daulatia",
+          "label": "দৌলতদিয়া",
+          "translations": {
+            "Bangla (bn)": "দৌলতদিয়া",
+            "English (en)": "Daulatia"
+          }
+        }
+      ],
+      "trigger": "${upazila}",
+      "relevant": "${reporting_sites} = 'district'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "district",
+          "question": "reporting_sites",
+          "condition": "="
+        }
+      ],
+      "calculation": "if(${upazila} = 'kalapara', 'lalua', if(${upazila} = 'taltali', 'barobogi', if(${upazila} = 'hizla', 'guabaria', if(${upazila} = 'porsha', 'mushidpur', if(${upazila} = 'araihazar', 'bramandi', if(${upazila} = 'shyamnagar', 'burigoalini',if(${upazila} = 'tahirpur', 'tahirpur', if(${upazila} = 'lama', 'gojalia', if(${upazila} = 'baskhali', 'khankanabad', if(${upazila} = 'moheskhali', 'kutubjum', if(${upazila} = 'laxmichhari', '_1_no_laxmichari', if(${upazila} = 'juraichhari', 'banojughichara', '') )))))))))))",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "ইউনিয়ন",
+        "English (en)": "Union"
+      },
+      "filterEnabled": true,
+      "conditionLogic": "or",
+      "optionFilterMap": {
+        "lama": [
+          "gojalia"
+        ],
+        "hizla": [
+          "guabaria"
+        ],
+        "porsha": [
+          "mushidpur"
+        ],
+        "taltali": [
+          "barobogi"
+        ],
+        "baskhali": [
+          "khankanabad"
+        ],
+        "goalanda": [
+          "daulatia"
+        ],
+        "kalapara": [
+          "lalua"
+        ],
+        "tahirpur": [
+          "tahirpur"
+        ],
+        "araihazar": [
+          "bramandi"
+        ],
+        "moheskhali": [
+          "kutubjum"
+        ],
+        "shyamnagar": [
+          "burigoalini"
+        ],
+        "juraichhari": [
+          "banojughichara"
+        ],
+        "laxmichhari": [
+          "_1_no_laxmichari"
+        ]
+      },
+      "filterQuestionId": "2ycqznkdj",
+      "filterOptionValues": [
+        "lama",
+        "baskhali",
+        "moheskhali",
+        "laxmichhari",
+        "juraichhari",
+        "hizla",
+        "taltali",
+        "kalapara",
+        "porsha",
+        "araihazar",
+        "shyamnagar",
+        "tahirpur",
+        "goalanda"
+      ]
+    },
+    {
+      "name": "ward",
+      "type": "select_one j0q0y4u",
+      "_uuid": "7a8so3plj",
+      "label": "ওয়ার্ড",
+      "options": [
+        {
+          "name": "ward_no_1",
+          "_uuid": "1756914726701_0_jxucja",
+          "label": "ওয়ার্ড নং ১",
+          "value": "Ward No 1",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১",
+            "English (en)": "Ward No 1"
+          }
+        },
+        {
+          "name": "ward_no_4",
+          "_uuid": "1756914726701_1_qodljy",
+          "label": "ওয়ার্ড নং ৪",
+          "value": "Ward No 4",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪",
+            "English (en)": "Ward No 4"
+          }
+        },
+        {
+          "name": "ward_no_1_2",
+          "_uuid": "1756914726701_2_6ha90t",
+          "label": "ওয়ার্ড নং ১",
+          "value": "Ward No 1",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১",
+            "English (en)": "Ward No 1"
+          }
+        },
+        {
+          "name": "ward_no_2",
+          "_uuid": "1756914726701_3_j0gpbe",
+          "label": "ওয়ার্ড নং ২",
+          "value": "Ward No 2",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২",
+            "English (en)": "Ward No 2"
+          }
+        },
+        {
+          "name": "ward_no_1_3",
+          "_uuid": "1756914726701_4_a3gs9x",
+          "label": "ওয়ার্ড নং ১",
+          "value": "Ward No 1",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১",
+            "English (en)": "Ward No 1"
+          }
+        },
+        {
+          "name": "ward_no_3",
+          "_uuid": "1756914726701_5_d82ast",
+          "label": "ওয়ার্ড নং ৩",
+          "value": "Ward No 3",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩",
+            "English (en)": "Ward No 3"
+          }
+        },
+        {
+          "name": "ward_no_2_5",
+          "_uuid": "1756914726701_6_z8dum0",
+          "label": "ওয়ার্ড নং ২",
+          "value": "Ward No 3",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২",
+            "English (en)": "Ward No 2"
+          }
+        },
+        {
+          "name": "ward_no_3_2",
+          "_uuid": "1756914726701_7_qjqhgy",
+          "label": "ওয়ার্ড নং ৩",
+          "value": "Ward No 2",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩",
+            "English (en)": "Ward No 3"
+          }
+        },
+        {
+          "name": "ward_no_2_3",
+          "_uuid": "1756914726701_8_rxmjnr",
+          "label": "ওয়ার্ড নং ২",
+          "value": "Ward No 2",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২",
+            "English (en)": "Ward No 2"
+          }
+        },
+        {
+          "name": "ward_no_3_3",
+          "_uuid": "1756914726701_9_46yv5m",
+          "label": "ওয়ার্ড নং ৩",
+          "value": "Ward No 3",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩",
+            "English (en)": "Ward No 3"
+          }
+        },
+        {
+          "name": "ward_no_7",
+          "_uuid": "1756914726701_10_on5va5",
+          "label": "ওয়ার্ড নং ৭",
+          "value": "Ward No 7",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৭",
+            "English (en)": "Ward No 7"
+          }
+        },
+        {
+          "name": "ward_no_8",
+          "_uuid": "1756914726701_11_xfxjhu",
+          "label": "ওয়ার্ড নং ৮",
+          "value": "Ward No 8",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৮",
+            "English (en)": "Ward No 8"
+          }
+        },
+        {
+          "name": "ward_no_1_4",
+          "_uuid": "1756914726701_12_s9b7c9",
+          "label": "ওয়ার্ড নং ১",
+          "value": "Ward No 1",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১",
+            "English (en)": "Ward No 1"
+          }
+        },
+        {
+          "name": "ward_no_4_2",
+          "_uuid": "1756914726701_13_slumqy",
+          "label": "ওয়ার্ড নং ৪",
+          "value": "Ward No 4",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪",
+            "English (en)": "Ward No 4"
+          }
+        },
+        {
+          "name": "ward_no_4_3",
+          "_uuid": "1756914726701_14_0lw6ep",
+          "label": "ওয়ার্ড নং ৪",
+          "value": "Ward No 4",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪",
+            "English (en)": "Ward No 4"
+          }
+        },
+        {
+          "name": "ward_no_7_2",
+          "_uuid": "1756914726701_15_quj9wf",
+          "label": "ওয়ার্ড নং ৭",
+          "value": "Ward No 7",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৭",
+            "English (en)": "Ward No 7"
+          }
+        },
+        {
+          "name": "ward_no_4_4",
+          "_uuid": "1756914726701_16_xdkfu1",
+          "label": "ওয়ার্ড নং ৪",
+          "value": "Ward No 4",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪",
+            "English (en)": "Ward No 4"
+          }
+        },
+        {
+          "name": "ward_no_6",
+          "_uuid": "1756914726701_17_p65giu",
+          "label": "ওয়ার্ড নং ৬",
+          "value": "Ward No 6",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৬",
+            "English (en)": "Ward No 6"
+          }
+        },
+        {
+          "name": "ward_no_7_3",
+          "_uuid": "1756914726701_18_2uzw7o",
+          "label": "ওয়ার্ড নং ৭",
+          "value": "Ward No 7",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৭",
+            "English (en)": "Ward No 7"
+          }
+        },
+        {
+          "name": "ward_no_8_2",
+          "_uuid": "1756914726701_19_goppn6",
+          "label": "ওয়ার্ড নং ৮",
+          "value": "Ward No 8",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৮",
+            "English (en)": "Ward No 8"
+          }
+        },
+        {
+          "name": "ward_no_2_4",
+          "_uuid": "1756914726701_20_dkk9ci",
+          "label": "ওয়ার্ড নং ২",
+          "value": "Ward No 2",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২",
+            "English (en)": "Ward No 2"
+          }
+        },
+        {
+          "name": "ward_no_4_5",
+          "_uuid": "1756914726701_21_7v5dih",
+          "label": "ওয়ার্ড নং ৪",
+          "value": "Ward No 4",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪",
+            "English (en)": "Ward No 4"
+          }
+        },
+        {
+          "name": "ward_no_5",
+          "_uuid": "1756914726701_22_4cg8jo",
+          "label": "ওয়ার্ড নং ৫",
+          "value": "Ward No 5",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৫",
+            "English (en)": "Ward No 5"
+          }
+        },
+        {
+          "name": "ward_no_8_3",
+          "_uuid": "1756914726701_23_v0txp2",
+          "label": "ওয়ার্ড নং ৮",
+          "value": "Ward No 8",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৮",
+            "English (en)": "Ward No 8"
+          }
+        },
+        {
+          "name": "ward_no_2_2",
+          "label": "ওয়ার্ড নং ২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২",
+            "English (en)": "Ward No 2"
+          }
+        },
+        {
+          "name": "ward_no_3_4",
+          "label": "ওয়ার্ড নং ৩",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩",
+            "English (en)": "Ward No 3"
+          }
+        },
+        {
+          "name": "___________",
+          "label": "ওয়ার্ড নং ৮",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৮",
+            "English (en)": "Ward No 8"
+          }
+        }
+      ],
+      "relevant": "${reporting_sites} = 'district'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "district",
+          "question": "reporting_sites",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "ওয়ার্ড",
+        "English (en)": "Ward"
+      },
+      "filterEnabled": true,
+      "conditionLogic": "or",
+      "optionFilterMap": {
+        "lalua": [
+          "ward_no_4_3",
+          "ward_no_7_2"
+        ],
+        "gojalia": [
+          "ward_no_1",
+          "ward_no_4",
+          "___________"
+        ],
+        "barobogi": [
+          "ward_no_1_4",
+          "ward_no_4_2"
+        ],
+        "bramandi": [
+          "ward_no_7_3",
+          "ward_no_8_2"
+        ],
+        "daulatia": [
+          "ward_no_2_2",
+          "ward_no_3_4"
+        ],
+        "guabaria": [
+          "ward_no_7",
+          "ward_no_8"
+        ],
+        "kutubjum": [
+          "ward_no_1_3",
+          "ward_no_3"
+        ],
+        "tahirpur": [
+          "ward_no_5",
+          "ward_no_8_3"
+        ],
+        "mushidpur": [
+          "ward_no_4_4",
+          "ward_no_6"
+        ],
+        "burigoalini": [
+          "ward_no_2_4",
+          "ward_no_4_5"
+        ],
+        "khankanabad": [
+          "ward_no_1_2",
+          "ward_no_2"
+        ],
+        "banojughichara": [
+          "ward_no_2_3",
+          "ward_no_3_3"
+        ],
+        "_1_no_laxmichari": [
+          "ward_no_2_5",
+          "ward_no_3_2"
+        ]
+      },
+      "filterQuestionId": "7h81o2tt3",
+      "filterOptionValues": [
+        "gojalia",
+        "khankanabad",
+        "kutubjum",
+        "_1_no_laxmichari",
+        "banojughichara",
+        "guabaria",
+        "barobogi",
+        "lalua",
+        "mushidpur",
+        "bramandi",
+        "burigoalini",
+        "tahirpur",
+        "daulatia"
+      ]
+    },
+    {
+      "name": "city_corporation",
+      "type": "select_one m7a03ys",
+      "_uuid": "y0g469xe",
+      "label": "সিটি কর্পোরেশন",
+      "options": [
+        {
+          "name": "chattogram",
+          "label": "চট্টগ্রাম",
+          "translations": {
+            "Bangla (bn)": "চট্টগ্রাম",
+            "English (en)": "Chattogram"
+          }
+        },
+        {
+          "name": "dhaka_north",
+          "label": "ঢাকা উত্তর",
+          "translations": {
+            "Bangla (bn)": "ঢাকা উত্তর",
+            "English (en)": "Dhaka North"
+          }
+        },
+        {
+          "name": "dhaka_south",
+          "label": "ঢাকা দক্ষিণ",
+          "translations": {
+            "Bangla (bn)": "ঢাকা দক্ষিণ",
+            "English (en)": "Dhaka South"
+          }
+        },
+        {
+          "name": "gazipur",
+          "label": "গাজীপুর",
+          "translations": {
+            "Bangla (bn)": "গাজীপুর",
+            "English (en)": "Gazipur"
+          }
+        },
+        {
+          "name": "khulna",
+          "label": "খুলনা",
+          "translations": {
+            "Bangla (bn)": "খুলনা",
+            "English (en)": "Khulna"
+          }
+        },
+        {
+          "name": "narayanganj",
+          "label": "নারায়ণগঞ্জ",
+          "translations": {
+            "Bangla (bn)": "নারায়ণগঞ্জ",
+            "English (en)": "Narayanganj"
+          }
+        }
+      ],
+      "relevant": "${reporting_sites} = 'city_corporation'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "city_corporation",
+          "question": "reporting_sites",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "সিটি কর্পোরেশন",
+        "English (en)": "City Corporation"
+      },
+      "filterEnabled": true,
+      "_originalOptions": [
+        {
+          "name": "chattogram",
+          "label": "Chattogram"
+        },
+        {
+          "name": "dhaka_north",
+          "label": "Dhaka North"
+        },
+        {
+          "name": "dhaka_south",
+          "label": "Dhaka South"
+        },
+        {
+          "name": "gazipur",
+          "label": "Gazipur"
+        },
+        {
+          "name": "khulna",
+          "label": "Khulna"
+        },
+        {
+          "name": "narayanganj",
+          "label": "Narayanganj"
+        }
+      ]
+    },
+    {
+      "name": "ward_1",
+      "type": "select_one 4xp04rb",
+      "_uuid": "n0f097mg",
+      "label": "ওয়ার্ড",
+      "options": [
+        {
+          "name": "ward_no_22",
+          "label": "ওয়ার্ড নং ২২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২২",
+            "English (en)": "Ward No 22"
+          }
+        },
+        {
+          "name": "ward_no_28",
+          "label": "ওয়ার্ড নং ২৮",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২৮",
+            "English (en)": "Ward No 28"
+          }
+        },
+        {
+          "name": "ward_no_29",
+          "label": "ওয়ার্ড নং ২৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২৯",
+            "English (en)": "Ward No 29"
+          }
+        },
+        {
+          "name": "ward_no_30",
+          "label": "ওয়ার্ড নং ৩০",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩০",
+            "English (en)": "Ward No 30"
+          }
+        },
+        {
+          "name": "ward_no_4",
+          "label": "ওয়ার্ড নং ৪",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪",
+            "English (en)": "Ward No 4"
+          }
+        },
+        {
+          "name": "ward_no_7",
+          "label": "ওয়ার্ড নং ৭",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৭",
+            "English (en)": "Ward No 7"
+          }
+        },
+        {
+          "name": "ward_no_14",
+          "label": "ওয়ার্ড নং ১৪",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৪",
+            "English (en)": "Ward No 14"
+          }
+        },
+        {
+          "name": "ward_no_11",
+          "label": "ওয়ার্ড নং ১১",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১১",
+            "English (en)": "Ward No 11"
+          }
+        },
+        {
+          "name": "ward_no_13",
+          "label": "ওয়ার্ড নং ১৩",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৩",
+            "English (en)": "Ward No 13"
+          }
+        },
+        {
+          "name": "ward_no_39",
+          "label": "ওয়ার্ড নং ৩৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩৯",
+            "English (en)": "Ward No 39"
+          }
+        },
+        {
+          "name": "ward_no_40",
+          "label": "ওয়ার্ড নং ৪০",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪০",
+            "English (en)": "Ward No 40"
+          }
+        },
+        {
+          "name": "ward_no_17",
+          "label": "ওয়ার্ড নং ১৭",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৭",
+            "English (en)": "Ward No 17"
+          }
+        },
+        {
+          "name": "ward_no_18",
+          "label": "ওয়ার্ড নং ১৮",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৮",
+            "English (en)": "Ward No 18"
+          }
+        },
+        {
+          "name": "ward_no_34",
+          "label": "ওয়ার্ড নং ৩৪",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩৪",
+            "English (en)": "Ward No 34"
+          }
+        },
+        {
+          "name": "ward_no_35",
+          "label": "ওয়ার্ড নং ৩৫",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩৫",
+            "English (en)": "Ward No 35"
+          }
+        },
+        {
+          "name": "ward_no_3",
+          "label": "ওয়ার্ড নং ৩",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩",
+            "English (en)": "Ward No 3"
+          }
+        },
+        {
+          "name": "ward_no_6",
+          "label": "ওয়ার্ড নং ৬",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৬",
+            "English (en)": "Ward No 6"
+          }
+        },
+        {
+          "name": "ward_no_12",
+          "label": "ওয়ার্ড নং ১২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১২",
+            "English (en)": "Ward No 12"
+          }
+        },
+        {
+          "name": "ward_no_8",
+          "label": "ওয়ার্ড নং ৮",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৮",
+            "English (en)": "Ward No 8"
+          }
+        },
+        {
+          "name": "ward_no_19",
+          "label": "ওয়ার্ড নং ১৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৯",
+            "English (en)": "Ward No 19"
+          }
+        },
+        {
+          "name": "ward_no_20",
+          "label": "ওয়ার্ড নং ২০",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২০",
+            "English (en)": "Ward No 20"
+          }
+        },
+        {
+          "name": "ward_no_33",
+          "label": "ওয়ার্ড নং ৩৩",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩৩",
+            "English (en)": "Ward No 33"
+          }
+        },
+        {
+          "name": "ward_no_38",
+          "label": "ওয়ার্ড নং ৩৮",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩৮",
+            "English (en)": "Ward No 38"
+          }
+        },
+        {
+          "name": "ward_no_45",
+          "label": "ওয়ার্ড নং ৪৫",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪৫",
+            "English (en)": "Ward No 45"
+          }
+        },
+        {
+          "name": "ward_no_47",
+          "label": "ওয়ার্ড নং ৪৭",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪৭",
+            "English (en)": "Ward No 47"
+          }
+        },
+        {
+          "name": "ward_no_2",
+          "label": "ওয়ার্ড নং ২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২",
+            "English (en)": "Ward No 2"
+          }
+        },
+        {
+          "name": "ward_no_3_2",
+          "label": "ওয়ার্ড নং ৩",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩",
+            "English (en)": "Ward No 3"
+          }
+        },
+        {
+          "name": "ward_no_4_2",
+          "label": "ওয়ার্ড নং ৪",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪",
+            "English (en)": "Ward No 4"
+          }
+        },
+        {
+          "name": "ward_no_74",
+          "label": "ওয়ার্ড নং ৭৪",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৭৪",
+            "English (en)": "Ward No 74"
+          }
+        },
+        {
+          "name": "ward_no_71",
+          "label": "ওয়ার্ড নং ৭১",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৭১",
+            "English (en)": "Ward No 71"
+          }
+        },
+        {
+          "name": "ward_no_12_2",
+          "label": "ওয়ার্ড নং ১২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১২",
+            "English (en)": "Ward No 12"
+          }
+        },
+        {
+          "name": "ward_no_56",
+          "label": "ওয়ার্ড নং ৫৬",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৫৬",
+            "English (en)": "Ward No 56"
+          }
+        },
+        {
+          "name": "ward_no_22_2",
+          "label": "ওয়ার্ড নং ২২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২২",
+            "English (en)": "Ward No 22"
+          }
+        },
+        {
+          "name": "ward_no_59",
+          "label": "ওয়ার্ড নং ৫৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৫৯",
+            "English (en)": "Ward No 59"
+          }
+        },
+        {
+          "name": "ward_no_30_2",
+          "label": "ওয়ার্ড নং ৩০",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩০",
+            "English (en)": "Ward No 30"
+          }
+        },
+        {
+          "name": "ward_no_62",
+          "label": "ওয়ার্ড নং ৬২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৬২",
+            "English (en)": "Ward No 62"
+          }
+        },
+        {
+          "name": "ward_no_69",
+          "label": "ওয়ার্ড নং ৬৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৬৯",
+            "English (en)": "Ward No 69"
+          }
+        },
+        {
+          "name": "ward_no_46",
+          "label": "ওয়ার্ড নং ৪৬",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪৬",
+            "English (en)": "Ward No 46"
+          }
+        },
+        {
+          "name": "ward_no_52",
+          "label": "ওয়ার্ড নং ৫২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৫২",
+            "English (en)": "Ward No 52"
+          }
+        },
+        {
+          "name": "ward_no_49",
+          "label": "ওয়ার্ড নং ৪৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪৯",
+            "English (en)": "Ward No 49"
+          }
+        },
+        {
+          "name": "ward_no_5",
+          "label": "ওয়ার্ড নং ৫",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৫",
+            "English (en)": "Ward No 5"
+          }
+        },
+        {
+          "name": "ward_no_6_2",
+          "label": "ওয়ার্ড নং ৬",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৬",
+            "English (en)": "Ward No 6"
+          }
+        },
+        {
+          "name": "ward_no_15",
+          "label": "ওয়ার্ড নং ১৫",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৫",
+            "English (en)": "Ward No 15"
+          }
+        },
+        {
+          "name": "ward_no_17_2",
+          "label": "ওয়ার্ড নং ১৭",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৭",
+            "English (en)": "Ward No 17"
+          }
+        },
+        {
+          "name": "ward_no_34_2",
+          "label": "ওয়ার্ড নং ৩৪",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩৪",
+            "English (en)": "Ward No 34"
+          }
+        },
+        {
+          "name": "ward_no_36",
+          "label": "ওয়ার্ড নং ৩৬",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩৬",
+            "English (en)": "Ward No 36"
+          }
+        },
+        {
+          "name": "ward_no_45_2",
+          "label": "ওয়ার্ড নং ৪৫",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪৫",
+            "English (en)": "Ward No 45"
+          }
+        },
+        {
+          "name": "ward_no_49_2",
+          "label": "ওয়ার্ড নং ৪৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৪৯",
+            "English (en)": "Ward No 49"
+          }
+        },
+        {
+          "name": "ward_no_55",
+          "label": "ওয়ার্ড নং ৫৫",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৫৫",
+            "English (en)": "Ward No 55"
+          }
+        },
+        {
+          "name": "ward_no_56_2",
+          "label": "ওয়ার্ড নং ৫৬",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৫৬",
+            "English (en)": "Ward No 56"
+          }
+        },
+        {
+          "name": "ward_no_2_2",
+          "label": "ওয়ার্ড নং ২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২",
+            "English (en)": "Ward No 2"
+          }
+        },
+        {
+          "name": "ward_no_3_3",
+          "label": "ওয়ার্ড নং ৩",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩",
+            "English (en)": "Ward No 3"
+          }
+        },
+        {
+          "name": "ward_no_8_2",
+          "label": "ওয়ার্ড নং ৮",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৮",
+            "English (en)": "Ward No 8"
+          }
+        },
+        {
+          "name": "ward_no_9",
+          "label": "ওয়ার্ড নং ৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৯",
+            "English (en)": "Ward No 9"
+          }
+        },
+        {
+          "name": "ward_no_15_2",
+          "label": "ওয়ার্ড নং ১৫",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৫",
+            "English (en)": "Ward No 15"
+          }
+        },
+        {
+          "name": "ward_no_17_3",
+          "label": "ওয়ার্ড নং ১৭",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৭",
+            "English (en)": "Ward No 17"
+          }
+        },
+        {
+          "name": "ward_no_18_2",
+          "label": "ওয়ার্ড নং ১৮",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৮",
+            "English (en)": "Ward No 18"
+          }
+        },
+        {
+          "name": "ward_no_21",
+          "label": "ওয়ার্ড নং ২১",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২১",
+            "English (en)": "Ward No 21"
+          }
+        },
+        {
+          "name": "ward_no_22_3",
+          "label": "ওয়ার্ড নং ২২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২২",
+            "English (en)": "Ward No 22"
+          }
+        },
+        {
+          "name": "ward_no_31",
+          "label": "ওয়ার্ড নং ৩১",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৩১",
+            "English (en)": "Ward No 31"
+          }
+        },
+        {
+          "name": "ward_no_6_3",
+          "label": "ওয়ার্ড নং ৬",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৬",
+            "English (en)": "Ward No 6"
+          }
+        },
+        {
+          "name": "ward_no_9_2",
+          "label": "ওয়ার্ড নং ৯",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ৯",
+            "English (en)": "Ward No 9"
+          }
+        },
+        {
+          "name": "ward_no_11_2",
+          "label": "ওয়ার্ড নং ১১",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১১",
+            "English (en)": "Ward No 11"
+          }
+        },
+        {
+          "name": "ward_no_14_2",
+          "label": "ওয়ার্ড নং ১৪",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৪",
+            "English (en)": "Ward No 14"
+          }
+        },
+        {
+          "name": "ward_no_15_3",
+          "label": "ওয়ার্ড নং ১৫",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৫",
+            "English (en)": "Ward No 15"
+          }
+        },
+        {
+          "name": "ward_no_16",
+          "label": "ওয়ার্ড নং ১৬",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৬",
+            "English (en)": "Ward No 16"
+          }
+        },
+        {
+          "name": "ward_no_17_4",
+          "label": "ওয়ার্ড নং ১৭",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৭",
+            "English (en)": "Ward No 17"
+          }
+        },
+        {
+          "name": "ward_no_18_3",
+          "label": "ওয়ার্ড নং ১৮",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ১৮",
+            "English (en)": "Ward No 18"
+          }
+        },
+        {
+          "name": "ward_no_20_2",
+          "label": "ওয়ার্ড নং ২০",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২০",
+            "English (en)": "Ward No 20"
+          }
+        },
+        {
+          "name": "ward_no_22_4",
+          "label": "ওয়ার্ড নং ২২",
+          "translations": {
+            "Bangla (bn)": "ওয়ার্ড নং ২২",
+            "English (en)": "Ward No 22"
+          }
+        }
+      ],
+      "relevant": "${city_corporation} != ''",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "",
+          "question": "city_corporation",
+          "condition": "was_answered"
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "ওয়ার্ড",
+        "English (en)": "Ward"
+      },
+      "filterEnabled": true,
+      "optionFilterMap": {
+        "khulna": [
+          "ward_no_2_2",
+          "ward_no_3_3",
+          "ward_no_8_2",
+          "ward_no_9",
+          "ward_no_15_2",
+          "ward_no_17_3",
+          "ward_no_18_2",
+          "ward_no_21",
+          "ward_no_22_3",
+          "ward_no_31"
+        ],
+        "gazipur": [
+          "ward_no_5",
+          "ward_no_6_2",
+          "ward_no_15",
+          "ward_no_17_2",
+          "ward_no_34_2",
+          "ward_no_36",
+          "ward_no_45_2",
+          "ward_no_49_2",
+          "ward_no_55",
+          "ward_no_56_2"
+        ],
+        "chattogram": [
+          "ward_no_22",
+          "ward_no_28",
+          "ward_no_29",
+          "ward_no_30",
+          "ward_no_4",
+          "ward_no_7",
+          "ward_no_14",
+          "ward_no_11",
+          "ward_no_13",
+          "ward_no_39",
+          "ward_no_40",
+          "ward_no_17",
+          "ward_no_18",
+          "ward_no_34",
+          "ward_no_35"
+        ],
+        "dhaka_north": [
+          "ward_no_3",
+          "ward_no_6",
+          "ward_no_12",
+          "ward_no_8",
+          "ward_no_19",
+          "ward_no_20",
+          "ward_no_33",
+          "ward_no_38",
+          "ward_no_45",
+          "ward_no_47"
+        ],
+        "dhaka_south": [
+          "ward_no_2",
+          "ward_no_3_2",
+          "ward_no_4_2",
+          "ward_no_74",
+          "ward_no_71",
+          "ward_no_12_2",
+          "ward_no_56",
+          "ward_no_22_2",
+          "ward_no_59",
+          "ward_no_30_2",
+          "ward_no_62",
+          "ward_no_69",
+          "ward_no_46",
+          "ward_no_52",
+          "ward_no_49"
+        ],
+        "narayanganj": [
+          "ward_no_6_3",
+          "ward_no_9_2",
+          "ward_no_11_2",
+          "ward_no_14_2",
+          "ward_no_15_3",
+          "ward_no_16",
+          "ward_no_17_4",
+          "ward_no_18_3",
+          "ward_no_20_2",
+          "ward_no_22_4"
+        ]
+      },
+      "_originalOptions": [
+        {
+          "name": "ward_no_22",
+          "label": "Ward No 22"
+        },
+        {
+          "name": "ward_no_28",
+          "label": "Ward No 28"
+        },
+        {
+          "name": "ward_no_29",
+          "label": "Ward No 29"
+        },
+        {
+          "name": "ward_no_30",
+          "label": "Ward No 30"
+        },
+        {
+          "name": "ward_no_4",
+          "label": "Ward No 4"
+        },
+        {
+          "name": "ward_no_7",
+          "label": "Ward No 7"
+        },
+        {
+          "name": "ward_no_14",
+          "label": "Ward No 14"
+        },
+        {
+          "name": "ward_no_11",
+          "label": "Ward No 11"
+        },
+        {
+          "name": "ward_no_13",
+          "label": "Ward No 13"
+        },
+        {
+          "name": "ward_no_39",
+          "label": "Ward No 39"
+        },
+        {
+          "name": "ward_no_40",
+          "label": "Ward No 40"
+        },
+        {
+          "name": "ward_no_17",
+          "label": "Ward No 17"
+        },
+        {
+          "name": "ward_no_18",
+          "label": "Ward No 18"
+        },
+        {
+          "name": "ward_no_34",
+          "label": "Ward No 34"
+        },
+        {
+          "name": "ward_no_35",
+          "label": "Ward No 35"
+        },
+        {
+          "name": "ward_no_3",
+          "label": "Ward No 3"
+        },
+        {
+          "name": "ward_no_6",
+          "label": "Ward No 6"
+        },
+        {
+          "name": "ward_no_12",
+          "label": "Ward No 12"
+        },
+        {
+          "name": "ward_no_8",
+          "label": "Ward No 8"
+        },
+        {
+          "name": "ward_no_19",
+          "label": "Ward No 19"
+        },
+        {
+          "name": "ward_no_20",
+          "label": "Ward No 20"
+        },
+        {
+          "name": "ward_no_33",
+          "label": "Ward No 33"
+        },
+        {
+          "name": "ward_no_38",
+          "label": "Ward No 38"
+        },
+        {
+          "name": "ward_no_45",
+          "label": "Ward No 45"
+        },
+        {
+          "name": "ward_no_47",
+          "label": "Ward No 47"
+        },
+        {
+          "name": "ward_no_2",
+          "label": "Ward No 2"
+        },
+        {
+          "name": "ward_no_3_2",
+          "label": "Ward No 3"
+        },
+        {
+          "name": "ward_no_4_2",
+          "label": "Ward No 4"
+        },
+        {
+          "name": "ward_no_74",
+          "label": "Ward No 74"
+        },
+        {
+          "name": "ward_no_71",
+          "label": "Ward No 71"
+        },
+        {
+          "name": "ward_no_12_2",
+          "label": "Ward No 12"
+        },
+        {
+          "name": "ward_no_56",
+          "label": "Ward No 56"
+        },
+        {
+          "name": "ward_no_22_2",
+          "label": "Ward No 22"
+        },
+        {
+          "name": "ward_no_59",
+          "label": "Ward No 59"
+        },
+        {
+          "name": "ward_no_30_2",
+          "label": "Ward No 30"
+        },
+        {
+          "name": "ward_no_62",
+          "label": "Ward No 62"
+        },
+        {
+          "name": "ward_no_69",
+          "label": "Ward No 69"
+        },
+        {
+          "name": "ward_no_46",
+          "label": "Ward No 46"
+        },
+        {
+          "name": "ward_no_52",
+          "label": "Ward No 52"
+        },
+        {
+          "name": "ward_no_49",
+          "label": "Ward No 49"
+        },
+        {
+          "name": "ward_no_5",
+          "label": "Ward No 5"
+        },
+        {
+          "name": "ward_no_6_2",
+          "label": "Ward No 6"
+        },
+        {
+          "name": "ward_no_15",
+          "label": "Ward No 15"
+        },
+        {
+          "name": "ward_no_17_2",
+          "label": "Ward No 17"
+        },
+        {
+          "name": "ward_no_34_2",
+          "label": "Ward No 34"
+        },
+        {
+          "name": "ward_no_36",
+          "label": "Ward No 36"
+        },
+        {
+          "name": "ward_no_45_2",
+          "label": "Ward No 45"
+        },
+        {
+          "name": "ward_no_49_2",
+          "label": "Ward No 49"
+        },
+        {
+          "name": "ward_no_55",
+          "label": "Ward No 55"
+        },
+        {
+          "name": "ward_no_56_2",
+          "label": "Ward No 56"
+        },
+        {
+          "name": "ward_no_2_2",
+          "label": "Ward No 2"
+        },
+        {
+          "name": "ward_no_3_3",
+          "label": "Ward No 3"
+        },
+        {
+          "name": "ward_no_8_2",
+          "label": "Ward No 8"
+        },
+        {
+          "name": "ward_no_9",
+          "label": "Ward No 9"
+        },
+        {
+          "name": "ward_no_15_2",
+          "label": "Ward No 15"
+        },
+        {
+          "name": "ward_no_17_3",
+          "label": "Ward No 17"
+        },
+        {
+          "name": "ward_no_18_2",
+          "label": "Ward No 18"
+        },
+        {
+          "name": "ward_no_21",
+          "label": "Ward No 21"
+        },
+        {
+          "name": "ward_no_22_3",
+          "label": "Ward No 22"
+        },
+        {
+          "name": "ward_no_31",
+          "label": "Ward No 31"
+        },
+        {
+          "name": "ward_no_6_3",
+          "label": "Ward No 6"
+        },
+        {
+          "name": "ward_no_9_2",
+          "label": "Ward No 9"
+        },
+        {
+          "name": "ward_no_11_2",
+          "label": "Ward No 11"
+        },
+        {
+          "name": "ward_no_14_2",
+          "label": "Ward No 14"
+        },
+        {
+          "name": "ward_no_15_3",
+          "label": "Ward No 15"
+        },
+        {
+          "name": "ward_no_16",
+          "label": "Ward No 16"
+        },
+        {
+          "name": "ward_no_17_4",
+          "label": "Ward No 17"
+        },
+        {
+          "name": "ward_no_18_3",
+          "label": "Ward No 18"
+        },
+        {
+          "name": "ward_no_20_2",
+          "label": "Ward No 20"
+        },
+        {
+          "name": "ward_no_22_4",
+          "label": "Ward No 22"
+        }
+      ],
+      "filterQuestionId": "y0g469xe",
+      "filterOptionValues": [
+        "chattogram",
+        "dhaka_north",
+        "dhaka_south",
+        "gazipur",
+        "khulna",
+        "narayanganj"
+      ]
+    },
+    {
+      "name": "area",
+      "type": "text",
+      "_uuid": "7bcbm5o8i",
+      "label": "এলাকার নাম",
+      "options": [
+        {
+          "name": "brick_field_para",
+          "label": "ব্রিক ফিল্ড পাড়া",
+          "translations": {
+            "Bangla (bn)": "ব্রিক ফিল্ড পাড়া",
+            "English (en)": "Brick Field Para"
+          }
+        },
+        {
+          "name": "burir_jhiri",
+          "label": "বুড়ির ঝিরি ",
+          "translations": {
+            "Bangla (bn)": "বুড়ির ঝিরি ",
+            "English (en)": "Burir Jhiri"
+          }
+        },
+        {
+          "name": "muslim_para",
+          "label": "মুসলিম পাড়া",
+          "translations": {
+            "Bangla (bn)": "মুসলিম পাড়া",
+            "English (en)": "Muslim Para"
+          }
+        },
+        {
+          "name": "khrijjanuna_para",
+          "label": "খ্রিজ্জানুনা পাড়া",
+          "translations": {
+            "Bangla (bn)": "খ্রিজ্জানুনা পাড়া",
+            "English (en)": "Khrijjanuna Para"
+          }
+        },
+        {
+          "name": "minjhiri_para",
+          "label": "মিনঝিরি  পাড়া",
+          "translations": {
+            "Bangla (bn)": "মিনঝিরি  পাড়া",
+            "English (en)": "Minjhiri Para"
+          }
+        },
+        {
+          "name": "sapmara_jhiri_para",
+          "label": "সাপমারা ঝিরি পাড়া",
+          "translations": {
+            "Bangla (bn)": "সাপমারা ঝিরি পাড়া",
+            "English (en)": "Sapmara Jhiri Para"
+          }
+        },
+        {
+          "name": "shiler_jhiri_para",
+          "label": "শিলের ঝিরি পাড়া",
+          "translations": {
+            "Bangla (bn)": "শিলের ঝিরি পাড়া",
+            "English (en)": "Shiler Jhiri Para"
+          }
+        },
+        {
+          "name": "other_2",
+          "label": "অন্যান্য",
+          "translations": {
+            "Bangla (bn)": "অন্যান্য",
+            "English (en)": "Other"
+          }
+        },
+        {
+          "name": "gajalia_bazar_para",
+          "label": "গজালিয়া বাজার পাড়া",
+          "translations": {
+            "Bangla (bn)": "গজালিয়া বাজার পাড়া",
+            "English (en)": "Gajalia Bazar Para"
+          }
+        },
+        {
+          "name": "gajalia",
+          "label": "গজালিয়া",
+          "translations": {
+            "Bangla (bn)": "গজালিয়া",
+            "English (en)": "Gajalia"
+          }
+        },
+        {
+          "name": "headman_para",
+          "label": "হেডম্যান পাড়া",
+          "translations": {
+            "Bangla (bn)": "হেডম্যান পাড়া",
+            "English (en)": "Headman Para"
+          }
+        },
+        {
+          "name": "harun_para",
+          "label": "হারুন পাড়া",
+          "translations": {
+            "Bangla (bn)": "হারুন পাড়া",
+            "English (en)": "Harun Para"
+          }
+        },
+        {
+          "name": "hindu_para",
+          "label": "হিন্দু পাড়া",
+          "translations": {
+            "Bangla (bn)": "হিন্দু পাড়া",
+            "English (en)": "Hindu Para"
+          }
+        },
+        {
+          "name": "cristan_hostel",
+          "label": "ক্রিস্টান হোস্টেল",
+          "translations": {
+            "Bangla (bn)": "ক্রিস্টান হোস্টেল",
+            "English (en)": "Cristan Hostel"
+          }
+        },
+        {
+          "name": "gajalia_army_camp",
+          "label": "গজালিয়া সেনা ক্যাম্প",
+          "translations": {
+            "Bangla (bn)": "গজালিয়া সেনা ক্যাম্প",
+            "English (en)": "Gajalia Army Camp"
+          }
+        },
+        {
+          "name": "gajalia_police_fari",
+          "label": "গজালিয়া পুলিশ ফারি",
+          "translations": {
+            "Bangla (bn)": "গজালিয়া পুলিশ ফারি",
+            "English (en)": "Gajalia Police Fari"
+          }
+        },
+        {
+          "name": "other",
+          "label": "অন্যান্য",
+          "translations": {
+            "Bangla (bn)": "অন্যান্য",
+            "English (en)": "Other"
+          }
+        }
+      ],
+      "relevant": "${reporting_sites} != ''",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "",
+          "question": "reporting_sites",
+          "condition": "was_answered"
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "এলাকার নাম",
+        "English (en)": "Area"
+      },
+      "filterEnabled": true,
+      "optionFilterMap": {
+        "ward_no_1": [
+          "brick_field_para",
+          "burir_jhiri",
+          "muslim_para",
+          "khrijjanuna_para",
+          "minjhiri_para",
+          "sapmara_jhiri_para",
+          "shiler_jhiri_para",
+          "other_2"
+        ],
+        "ward_no_4": [
+          "gajalia_bazar_para",
+          "gajalia",
+          "headman_para",
+          "harun_para",
+          "hindu_para",
+          "cristan_hostel",
+          "gajalia_army_camp",
+          "gajalia_police_fari",
+          "other"
+        ]
+      },
+      "filterQuestionId": "7a8so3plj",
+      "filterOptionValues": [
+        "ward_no_1",
+        "ward_no_4"
+      ]
+    },
+    {
+      "id": "yusfss4r5",
+      "name": "location",
+      "type": "geopoint",
+      "_uuid": "yusfss4r5",
+      "label": "ঠিকানা ",
+      "default": "",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": true,
+      "appearance": "",
+      "constraint": "selected-at(., 3) <= 10",
+      "parameters": "",
+      "calculation": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "ঠিকানা ",
+        "English (en)": "Location"
+      },
+      "guidance_hint": "",
+      "constraintType": "custom",
+      "constraint_message": ""
+    },
+    {
+      "name": "hh_id",
+      "type": "text",
+      "_uuid": "6xxt685ht",
+      "label": "হাউজহোল্ড আইডি",
+      "options": [
+        {
+          "name": "",
+          "label": "",
+          "translations": {}
+        }
+      ],
+      "relevant": "",
+      "required": true,
+      "conditions": [],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "হাউজহোল্ড আইডি",
+        "English (en)": "HH ID"
+      },
+      "make_mandatory": true
+    },
+    {
+      "id": "yupu4vdfu",
+      "name": "hh_head_name",
+      "type": "text",
+      "_uuid": "yupu4vdfu",
+      "label": "হাউজহোল্ড/ খানা প্রধানের নাম",
+      "default": "",
+      "options": [],
+      "relevant": "",
+      "required": true,
+      "appearance": "",
+      "conditions": [],
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "হাউজহোল্ড/ খানা প্রধানের নাম",
+        "English (en)": "HH Head Name"
+      },
+      "guidance_hint": "",
+      "make_mandatory": true,
+      "constraint_message": ""
+    },
+    {
+      "name": "suspected_in_the_disease",
+      "type": "select_one 93ktr0m",
+      "_uuid": "ak9ptsfab",
+      "label": "হাউজ হোল্ড/খানায় কোনো আশঙ্কাকৃত রোগী আছে কি?",
+      "options": [
+        {
+          "name": "yes",
+          "label": "হ্যাঁ",
+          "translations": {
+            "Bangla (bn)": "হ্যাঁ",
+            "English (en)": "Yes"
+          }
+        },
+        {
+          "name": "no",
+          "label": "না",
+          "translations": {
+            "Bangla (bn)": "না",
+            "English (en)": "No"
+          }
+        }
+      ],
+      "relevant": "",
+      "required": true,
+      "conditions": [],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "হাউজ হোল্ড/খানায় কোনো আশঙ্কাকৃত রোগী আছে কি?",
+        "English (en)": "Is there any Suspected case in the HH"
+      },
+      "make_mandatory": true
+    },
+    {
+      "name": "name_of_the_person_with_suspected_case",
+      "type": "text",
+      "_uuid": "h7cfebzqz",
+      "label": "আশঙ্কাকৃত রোগীর নাম",
+      "options": [
+        {
+          "name": "",
+          "label": "",
+          "translations": {}
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "আশঙ্কাকৃত রোগীর নাম",
+        "English (en)": "Name of the person with suspected case"
+      },
+      "make_mandatory": true
+    },
+    {
+      "id": "epgiz16ue",
+      "name": "mobile_number",
+      "type": "text",
+      "_uuid": "epgiz16ue",
+      "label": "মোবাইল নম্বর",
+      "default": "",
+      "options": [],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "appearance": "",
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "constraint": "regex(., '^01[0-9]{9}$')",
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "মোবাইল নম্বর",
+        "English (en)": "Mobile Number"
+      },
+      "guidance_hint": "",
+      "regexPatterns": [
+        {
+          "type": "digits",
+          "value": "11",
+          "description": "Exactly 11 digits"
+        }
+      ],
+      "constraintType": "custom",
+      "constraint_message": "This will work only for start by 01, and the 11-digit must be."
+    },
+    {
+      "id": "cjcxd50p",
+      "hint": "এই রোগীর জন্য আপনি যে ধরণের শনাক্তকরণ নথি ব্যবহার করবেন তা বেছে নিন।",
+      "name": "patient_id_type",
+      "type": "select_one patient_id_types",
+      "_uuid": "xydmp2un",
+      "hints": {
+        "Bangla (bn)": "এই রোগীর জন্য আপনি যে ধরণের শনাক্তকরণ নথি ব্যবহার করবেন তা বেছে নিন।",
+        "English (en)": "Choose the type of identification document you will use for this patient."
+      },
+      "label": "রোগীর আইডি",
+      "default": "",
+      "options": [
+        {
+          "name": "nid",
+          "_uuid": "nid_option",
+          "label": "জাতীয় পরিচয়পত্র (এনআইডি)",
+          "translations": {
+            "Bangla (bn)": "জাতীয় পরিচয়পত্র (এনআইডি)",
+            "English (en)": "NID (National ID)"
+          }
+        },
+        {
+          "name": "birth_certificate",
+          "_uuid": "birth_certificate_option",
+          "label": "জন্ম নিবন্ধন",
+          "translations": {
+            "Bangla (bn)": "জন্ম নিবন্ধন",
+            "English (en)": "Birth Certificate ID"
+          }
+        }
+      ],
+      "trigger": "",
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": false,
+      "appearance": "",
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "constraint": ". != ''",
+      "parameters": "",
+      "calculation": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "রোগীর আইডি",
+        "English (en)": "Patient ID Type"
+      },
+      "guidance_hint": "",
+      "constraint_message": "Please select ID type"
+    },
+    {
+      "id": "vfilolbo",
+      "hint": "উপরে নির্বাচিত ধরণের উপর ভিত্তি করে প্রকৃত আইডি নম্বরটি লিখুন। এটি সিস্টেমে রোগীর রেকর্ড সনাক্ত এবং পরিচালনা করতে ব্যবহৃত হবে।",
+      "name": "user_identification_11_9943_01976848561",
+      "type": "integer",
+      "_uuid": "34fdab53",
+      "hints": {
+        "Bangla (bn)": "উপরে নির্বাচিত ধরণের উপর ভিত্তি করে প্রকৃত আইডি নম্বরটি লিখুন। এটি সিস্টেমে রোগীর রেকর্ড সনাক্ত এবং পরিচালনা করতে ব্যবহৃত হবে।",
+        "English (en)": "Enter the actual ID number based on the type selected above. This will be used to identify and manage patient records in the system."
+      },
+      "label": "রোগীর আইডি নম্বর",
+      "default": "",
+      "options": [],
+      "trigger": "",
+      "relevant": "${patient_id_type} != ''",
+      "required": false,
+      "appearance": "",
+      "conditions": [
+        {
+          "value": "",
+          "question": "patient_id_type",
+          "condition": "was_answered"
+        }
+      ],
+      "constraint": "(${patient_id_type} = 'nid' and regex(., '^[0-9]{10}$|^[0-9]{13}$|^[0-9]{17}$')) or (${patient_id_type} = 'birth_certificate' and regex(., '^[0-9]{17}$')) or (${patient_id_type} != 'nid' and ${patient_id_type} != 'birth_certificate')",
+      "parameters": "",
+      "calculation": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "রোগীর আইডি নম্বর",
+        "English (en)": "Patient Identification Number"
+      },
+      "guidance_hint": "",
+      "constraintType": "custom",
+      "constraint_message": "For NID, enter exactly 10, 13, or 17 digits. For Birth Certificate, enter exactly 17 digits."
+    },
+    {
+      "id": "bq4r5etrp",
+      "name": "age_year",
+      "type": "integer",
+      "_uuid": "bq4r5etrp",
+      "label": "বয়স (বছর)",
+      "default": "",
+      "options": [],
+      "trigger": "",
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "appearance": "",
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "parameters": "",
+      "calculation": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বয়স (বছর)",
+        "English (en)": "Age Year"
+      },
+      "guidance_hint": "১ বছরের কম বয়সী শিশুদের জন্য, মাসের কলামটিতে একটি সংখ্যা পূরণ করুন এবং বছরের কলামে ০ লিখুন।",
+      "guidance_hints": {
+        "Bangla (bn)": "১ বছরের কম বয়সী শিশুদের জন্য, মাসের কলামটিতে একটি সংখ্যা পূরণ করুন এবং বছরের কলামে ০ লিখুন।"
+      },
+      "constraint_message": ""
+    },
+    {
+      "name": "age_month",
+      "type": "integer",
+      "_uuid": "9r8416292",
+      "label": "বয়স (মাস)",
+      "options": [
+        {
+          "name": "_1",
+          "label": "<১",
+          "translations": {
+            "Bangla (bn)": "<১",
+            "English (en)": "<1"
+          }
+        },
+        {
+          "name": "1-4",
+          "label": "১-৪",
+          "translations": {
+            "Bangla (bn)": "১-৪",
+            "English (en)": "1-4"
+          }
+        },
+        {
+          "name": "5-14",
+          "label": "৫-১৪",
+          "translations": {
+            "Bangla (bn)": "৫-১৪",
+            "English (en)": "5-14"
+          }
+        },
+        {
+          "name": "15_",
+          "label": "১৫+",
+          "translations": {
+            "Bangla (bn)": "১৫+",
+            "English (en)": "15+"
+          }
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বয়স (মাস)",
+        "English (en)": "Age Month"
+      },
+      "filterEnabled": false,
+      "guidance_hint": ""
+    },
+    {
+      "name": "sex",
+      "type": "select_one b49h2gl",
+      "_uuid": "75ubw55s7",
+      "label": "লিঙ্গ",
+      "options": [
+        {
+          "name": "male",
+          "label": "পুরুষ",
+          "translations": {
+            "Bangla (bn)": "পুরুষ",
+            "English (en)": "Male"
+          }
+        },
+        {
+          "name": "female",
+          "label": "নারী",
+          "translations": {
+            "Bangla (bn)": "নারী",
+            "English (en)": "Female"
+          }
+        },
+        {
+          "name": "other",
+          "label": "অন্যান্য",
+          "translations": {
+            "Bangla (bn)": "অন্যান্য",
+            "English (en)": "Others"
+          }
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "লিঙ্গ",
+        "English (en)": "Sex"
+      },
+      "filterEnabled": false
+    },
+    {
+      "name": "pregnent",
+      "type": "select_one 0t4nsjg",
+      "_uuid": "cxo5pprsn",
+      "label": "গর্ভবতী",
+      "options": [
+        {
+          "name": "yes",
+          "label": "হ্যাঁ",
+          "translations": {
+            "Bangla (bn)": "হ্যাঁ",
+            "English (en)": "Yes"
+          }
+        },
+        {
+          "name": "no",
+          "label": "না",
+          "translations": {
+            "Bangla (bn)": "না",
+            "English (en)": "No"
+          }
+        }
+      ],
+      "relevant": "${sex} = 'female' and ${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "female",
+          "question": "sex",
+          "condition": "="
+        },
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "গর্ভবতী",
+        "English (en)": "Pregnent"
+      }
+    },
+    {
+      "name": "suspected_disease",
+      "type": "select_multiple edfxn94",
+      "_uuid": "vci6xz1a1",
+      "label": "আশঙ্কাকৃত রোগের নাম",
+      "options": [
+        {
+          "name": "dengue",
+          "label": "ডেঙ্গু",
+          "translations": {
+            "Bangla (bn)": "ডেঙ্গু",
+            "English (en)": "Dengue"
+          }
+        },
+        {
+          "name": "awd",
+          "label": "ডায়রিয়া",
+          "translations": {
+            "Bangla (bn)": "ডায়রিয়া",
+            "English (en)": "AWD"
+          }
+        },
+        {
+          "name": "malaria",
+          "label": "ম্যালেরিয়া",
+          "translations": {
+            "Bangla (bn)": "ম্যালেরিয়া",
+            "English (en)": "Malaria"
+          }
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "আশঙ্কাকৃত রোগের নাম",
+        "English (en)": "Suspected Disease"
+      }
+    },
+    {
+      "id": "end_l330hi2xe",
+      "name": "",
+      "type": "end_group",
+      "_uuid": "end_l330hi2xe",
+      "label": "",
+      "default": "",
+      "groupId": "l330hi2xe",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "",
+      "isGroupEnd": true,
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {},
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "begin_3sqgiasah",
+      "name": "referral-related_information",
+      "type": "begin_group",
+      "_uuid": "begin_3sqgiasah",
+      "label": "রেফারাল সর্ম্পকিত তথ্য",
+      "default": "",
+      "groupId": "3sqgiasah",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "field-list",
+      "parameters": "",
+      "isGroupStart": true,
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "রেফারাল সর্ম্পকিত তথ্য",
+        "English (en)": "Referral-related information"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "name": "referred",
+      "type": "select_one x28s7ip",
+      "_uuid": "bgowihrim",
+      "label": "রেফার করা হয়েছে??",
+      "options": [
+        {
+          "name": "yes",
+          "label": "হ্যাঁ",
+          "translations": {
+            "Bangla (bn)": "হ্যাঁ",
+            "English (en)": "Yes"
+          }
+        },
+        {
+          "name": "no",
+          "label": "না",
+          "translations": {
+            "Bangla (bn)": "না",
+            "English (en)": "No"
+          }
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "রেফার করা হয়েছে??",
+        "English (en)": "Referred"
+      },
+      "conditionLogic": "or"
+    },
+    {
+      "name": "referral_place",
+      "type": "select_one lolyxv9",
+      "_uuid": "xz08d10br",
+      "label": "রেফারকৃত স্থানের নাম",
+      "options": [
+        {
+          "name": "govt",
+          "label": "সরকারি",
+          "translations": {
+            "Bangla (bn)": "সরকারি",
+            "English (en)": "Govt"
+          }
+        },
+        {
+          "name": "brac",
+          "label": "ব্র্যাক",
+          "translations": {
+            "Bangla (bn)": "ব্র্যাক",
+            "English (en)": "BRAC"
+          }
+        },
+        {
+          "name": "private",
+          "label": "বেসরকারী",
+          "translations": {
+            "Bangla (bn)": "বেসরকারী",
+            "English (en)": "Private"
+          }
+        }
+      ],
+      "relevant": "${referred} = 'yes' and ${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "referred",
+          "condition": "="
+        },
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "রেফারকৃত স্থানের নাম",
+        "English (en)": "Referral Place"
+      }
+    },
+    {
+      "name": "if_referred_to_govt",
+      "type": "select_one 8oz66q7",
+      "_uuid": "ug2hw8say",
+      "label": "সরকারী স্বাস্থ্য সেবা কেন্দ্রে রেফার করা হয়ে থাকে",
+      "options": [
+        {
+          "name": "community_clinic",
+          "label": "কমিউনিটি ক্লিনিক",
+          "translations": {
+            "Bangla (bn)": "কমিউনিটি ক্লিনিক",
+            "English (en)": "Community Clinic"
+          }
+        },
+        {
+          "name": "union_sub-centre",
+          "label": "ইউনিয়ন সাব সেন্টার",
+          "translations": {
+            "Bangla (bn)": "ইউনিয়ন সাব সেন্টার",
+            "English (en)": "Union Sub-Centre"
+          }
+        },
+        {
+          "name": "upazila_health_complex",
+          "label": "উপজেলা স্বাস্থ্য কমপ্লেক্স",
+          "translations": {
+            "Bangla (bn)": "উপজেলা স্বাস্থ্য কমপ্লেক্স",
+            "English (en)": "Upazila Health Complex"
+          }
+        },
+        {
+          "name": "_________________",
+          "label": "জেলা/সদর হাসপাতাল",
+          "translations": {
+            "Bangla (bn)": "জেলা\\সদর হাসপাতাল",
+            "English (en)": "District Hospital"
+          }
+        },
+        {
+          "name": "medical_college_hospital",
+          "label": "মেডিকেল কলেজ হাসপাতাল",
+          "translations": {
+            "Bangla (bn)": "মেডিকেল কলেজ হাসপাতাল",
+            "English (en)": "Medical College Hospital"
+          }
+        },
+        {
+          "name": "others__applicable_to_city_corporation_",
+          "label": "অন্যান্য (সিটি কর্পোরেশন এর জন্য প্রযোজ্য)",
+          "translations": {
+            "Bangla (bn)": "অন্যান্য (সিটি কর্পোরেশন এর জন্য প্রযোজ্য)",
+            "English (en)": "Others (Applicable to City Corporation)"
+          }
+        }
+      ],
+      "relevant": "${referral_place} = 'govt' and ${referred} = 'yes' and ${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "govt",
+          "question": "referral_place",
+          "condition": "="
+        },
+        {
+          "value": "yes",
+          "question": "referred",
+          "condition": "="
+        },
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "সরকারী স্বাস্থ্য সেবা কেন্দ্রে রেফার করা হয়ে থাকে",
+        "English (en)": "If referred to Govt"
+      },
+      "filterEnabled": false,
+      "_originalOptions": [
+        {
+          "name": "community_clinic",
+          "label": "Community Clinic",
+          "translations": {
+            "Bangla (bn)": "কমিউনিটি ক্লিনিক"
+          }
+        },
+        {
+          "name": "union_sub-centre",
+          "label": "Union Sub-Centre",
+          "translations": {
+            "Bangla (bn)": "ইউনিয়ন উপ-কেন্দ্র"
+          }
+        },
+        {
+          "name": "upazila_health_complex",
+          "label": "Upazila Health Complex",
+          "translations": {
+            "Bangla (bn)": "উপজেলা স্বাস্থ্য কমপ্লেক্স"
+          }
+        },
+        {
+          "name": "district_hospital",
+          "label": "District Hospital",
+          "translations": {
+            "Bangla (bn)": "জেলা হাসপাতাল"
+          }
+        },
+        {
+          "name": "medical_college_hospital",
+          "label": "Medical College Hospital",
+          "translations": {
+            "Bangla (bn)": "মেডিকেল কলেজ হাসপাতাল"
+          }
+        },
+        {
+          "name": "others__applicable_to_city_corporation_",
+          "label": "Others (Applicable to City Corporation)"
+        }
+      ]
+    },
+    {
+      "id": "opdryjbkt",
+      "name": "other",
+      "type": "text",
+      "_uuid": "opdryjbkt",
+      "label": "অন্যান্য",
+      "default": "",
+      "options": [],
+      "trigger": "",
+      "relevant": "${if_referred_to_govt} = 'others__applicable_to_city_corporation_'",
+      "required": false,
+      "appearance": "",
+      "conditions": [
+        {
+          "value": "others__applicable_to_city_corporation_",
+          "question": "if_referred_to_govt",
+          "condition": "="
+        }
+      ],
+      "parameters": "",
+      "calculation": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "অন্যান্য",
+        "English (en)": "Other"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "end_3sqgiasah",
+      "name": "",
+      "type": "end_group",
+      "_uuid": "end_3sqgiasah",
+      "label": "",
+      "default": "",
+      "groupId": "3sqgiasah",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "",
+      "isGroupEnd": true,
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {},
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "begin_zpxpci4st",
+      "name": "health_behaviour",
+      "type": "begin_group",
+      "_uuid": "begin_zpxpci4st",
+      "label": "স্বাস্থ্যবিধি সংক্রান্ত",
+      "default": "",
+      "groupId": "zpxpci4st",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "field-list",
+      "parameters": "",
+      "isGroupStart": true,
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "স্বাস্থ্যবিধি সংক্রান্ত",
+        "English (en)": "Health Behaviour"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "name": "bed_net_use_practice_during_sleep",
+      "type": "select_one q0u6n6h",
+      "_uuid": "hop6zo261",
+      "label": "মশারী ব্যবহার করেন কি না",
+      "options": [
+        {
+          "name": "yes",
+          "label": "হ্যাঁ",
+          "translations": {
+            "Bangla (bn)": "হ্যাঁ",
+            "English (en)": "Yes"
+          }
+        },
+        {
+          "name": "no",
+          "label": "না",
+          "translations": {
+            "Bangla (bn)": "না",
+            "English (en)": "No"
+          }
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "মশারী ব্যবহার করেন কি না",
+        "English (en)": "Bed net use practice during sleep"
+      }
+    },
+    {
+      "name": "handwashing_practice_with_soap__water",
+      "type": "select_one jebncwy",
+      "_uuid": "t83ohvbjc",
+      "label": "সাবান-পানি ব্যবহার করে হাত পরিষ্কার করেন কি না",
+      "options": [
+        {
+          "name": "yes",
+          "label": "হ্যাঁ",
+          "translations": {
+            "Bangla (bn)": "হ্যাঁ",
+            "English (en)": "Yes"
+          }
+        },
+        {
+          "name": "no",
+          "label": "না",
+          "translations": {
+            "Bangla (bn)": "না",
+            "English (en)": "No"
+          }
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "সাবান-পানি ব্যবহার করে হাত পরিষ্কার করেন কি না",
+        "English (en)": "Hand-washing practice with Soap & Water"
+      }
+    },
+    {
+      "name": "type_latrine_use",
+      "type": "select_one v05n432",
+      "_uuid": "opwe6a9op",
+      "label": "বাথরুমের ধরন",
+      "options": [
+        {
+          "name": "flush_latrine",
+          "label": "ফ্লাশ ল্যাট্রিন",
+          "translations": {
+            "Bangla (bn)": "ফ্লাশ ল্যাট্রিন",
+            "English (en)": "Flush Latrine"
+          }
+        },
+        {
+          "name": "pit_latrine",
+          "label": "পিট ল্যাট্রিন",
+          "translations": {
+            "Bangla (bn)": "পিট ল্যাট্রিন",
+            "English (en)": "Pit Latrine"
+          }
+        },
+        {
+          "name": "hanging_toilet",
+          "label": "ঝুলন্ত টয়লেট",
+          "translations": {
+            "Bangla (bn)": "ঝুলন্ত টয়লেট",
+            "English (en)": "Hanging Toilet"
+          }
+        },
+        {
+          "name": "open_defecation",
+          "label": "খোলা মলত্যাগ",
+          "translations": {
+            "Bangla (bn)": "খোলা মলত্যাগ",
+            "English (en)": "Open Defecation"
+          }
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'yes'",
+      "required": true,
+      "appearance": "minimal",
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বাথরুমের ধরন",
+        "English (en)": "Type Latrine Use"
+      }
+    },
+    {
+      "id": "end_zpxpci4st",
+      "name": "",
+      "type": "end_group",
+      "_uuid": "end_zpxpci4st",
+      "label": "",
+      "default": "",
+      "groupId": "zpxpci4st",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "",
+      "isGroupEnd": true,
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {},
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "begin_beoedh7o",
+      "name": "information_of_already_identified_patient_s_",
+      "type": "begin_group",
+      "_uuid": "82z1fqwu",
+      "label": "বিগত সাত দিনে শনাক্তকৃত রোগীর তথ্য",
+      "default": "",
+      "groupId": "beoedh7o",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "field-list",
+      "parameters": "",
+      "isGroupStart": true,
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বিগত সাত দিনে শনাক্তকৃত রোগীর তথ্য",
+        "English (en)": "Information of already identified patient(s)"
+      },
+      "guidance_hint": "যদি না থাকে ০ দিতে হবে",
+      "constraint_message": ""
+    },
+    {
+      "name": "no._of_already_diagnosed_cases_of_dengue_in_the_hh_1",
+      "type": "integer",
+      "_uuid": "mz3amyw70",
+      "label": "বিগত সাত দিনে খানাপ্রতি শনাক্তকৃত ডেঙ্গু রোগীর সংখ্যা।",
+      "options": [
+        {
+          "name": "",
+          "label": "",
+          "translations": {}
+        }
+      ],
+      "relevant": "${suspected_in_the_disease} = 'no'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "no",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বিগত সাত দিনে খানাপ্রতি শনাক্তকৃত ডেঙ্গু রোগীর সংখ্যা।",
+        "English (en)": "No of already diagnosed cases of dengue in the HH in the last 7 days"
+      }
+    },
+    {
+      "id": "kaqgieou9",
+      "name": "no._of_already_diagnosed_cases_of_malaria_in_the_hh",
+      "type": "integer",
+      "_uuid": "kaqgieou9",
+      "label": "বিগত সাত দিনে খানাপ্রতি শনাক্তকৃত ম্যালেরিয়া রোগীর সংখ্যা। ",
+      "default": "",
+      "options": [],
+      "relevant": "${suspected_in_the_disease} = 'no'",
+      "required": true,
+      "appearance": "",
+      "conditions": [
+        {
+          "value": "no",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বিগত সাত দিনে খানাপ্রতি শনাক্তকৃত ম্যালেরিয়া রোগীর সংখ্যা। ",
+        "English (en)": "No of already diagnosed cases of Malaria in the HH in the last 7 days"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "n09wadub6",
+      "name": "no._of_already_diagnosed_cases_of_awd_in_the_hh",
+      "type": "integer",
+      "_uuid": "n09wadub6",
+      "label": "বিগত সাত দিনে খানাপ্রতি শনাক্তকৃত ডায়রিয়া রোগীর সংখ্যা।",
+      "default": "",
+      "options": [],
+      "relevant": "${suspected_in_the_disease} = 'no'",
+      "required": true,
+      "appearance": "",
+      "conditions": [
+        {
+          "value": "no",
+          "question": "suspected_in_the_disease",
+          "condition": "="
+        }
+      ],
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বিগত সাত দিনে খানাপ্রতি শনাক্তকৃত ডায়রিয়া রোগীর সংখ্যা।",
+        "English (en)": "No of already diagnosed cases of AWD in the HH in the last 7 days"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "end_beoedh7o",
+      "name": "",
+      "type": "end_group",
+      "_uuid": "zhgelhiz",
+      "label": "",
+      "default": "",
+      "groupId": "beoedh7o",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "",
+      "isGroupEnd": true,
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {},
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "begin_8a1l8oah",
+      "name": "environmental_related_information_",
+      "type": "begin_group",
+      "_uuid": "xpyo6qj1",
+      "label": "পরিবেশগত তথ্য",
+      "default": "",
+      "groupId": "8a1l8oah",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "field-list",
+      "parameters": "",
+      "isGroupStart": true,
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "পরিবেশগত তথ্য",
+        "English (en)": "Environmental related information "
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "name": "presence_of_stagnant_water_mosquito_breeding_sites",
+      "type": "select_one kj7j9f8",
+      "_uuid": "b8zbf3j55",
+      "label": "জমে থাকা পানি/ মশার প্রজনন স্থল আছে কি না?",
+      "options": [
+        {
+          "name": "yes",
+          "label": "হ্যাঁ",
+          "translations": {
+            "Bangla (bn)": "হ্যাঁ",
+            "English (en)": "Yes"
+          }
+        },
+        {
+          "name": "no",
+          "label": "না",
+          "translations": {
+            "Bangla (bn)": "না",
+            "English (en)": "No"
+          }
+        }
+      ],
+      "relevant": "",
+      "required": true,
+      "conditions": [],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "জমে থাকা পানি/ মশার প্রজনন স্থল আছে কি না?",
+        "English (en)": "Presence of stagnant water/mosquito breeding sites"
+      }
+    },
+    {
+      "name": "presence_of_mosquito_larvae",
+      "type": "select_one ec3m7hp",
+      "_uuid": "5ciy5vb79",
+      "label": "মশার লার্ভা আছে কি না",
+      "options": [
+        {
+          "name": "aedes",
+          "label": "এডিস",
+          "translations": {
+            "Bangla (bn)": "এডিস",
+            "English (en)": "Aedes"
+          }
+        },
+        {
+          "name": "others",
+          "label": "অন্যান্য",
+          "translations": {
+            "Bangla (bn)": "অন্যান্য",
+            "English (en)": "Others"
+          }
+        },
+        {
+          "name": "no",
+          "label": "না",
+          "translations": {
+            "Bangla (bn)": "না",
+            "English (en)": "No"
+          }
+        }
+      ],
+      "relevant": "${presence_of_stagnant_water_mosquito_breeding_sites} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "presence_of_stagnant_water_mosquito_breeding_sites",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "মশার লার্ভা আছে কি না",
+        "English (en)": "Presence of Mosquito Larvae"
+      }
+    },
+    {
+      "id": "end_8a1l8oah",
+      "name": "",
+      "type": "end_group",
+      "_uuid": "oo6wzoor",
+      "label": "",
+      "default": "",
+      "groupId": "8a1l8oah",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "",
+      "isGroupEnd": true,
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {},
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "begin_rm1m9de9",
+      "name": "disaster-related_information",
+      "type": "begin_group",
+      "_uuid": "2mjfodfl",
+      "label": "দুর্যোগ সম্পর্কিত তথ্য",
+      "default": "",
+      "groupId": "rm1m9de9",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "field-list",
+      "parameters": "",
+      "isGroupStart": true,
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "দুর্যোগ সম্পর্কিত তথ্য",
+        "English (en)": "Disaster-related information"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "name": "did_any_disaster_occur_in_last_7_days_",
+      "type": "select_one m9b8dkb",
+      "_uuid": "locftn50a",
+      "label": "বিগত সপ্তাহে কোন দুর্যোগ হয়েছে কিনা",
+      "options": [
+        {
+          "name": "yes",
+          "label": "হ্যাঁ",
+          "translations": {
+            "Bangla (bn)": "হ্যাঁ",
+            "English (en)": "Yes"
+          }
+        },
+        {
+          "name": "no",
+          "label": "না",
+          "translations": {
+            "Bangla (bn)": "না",
+            "English (en)": "No"
+          }
+        }
+      ],
+      "relevant": "",
+      "required": true,
+      "conditions": [],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "বিগত সপ্তাহে কোন দুর্যোগ হয়েছে কিনা",
+        "English (en)": "Any disaster event (Last week)"
+      }
+    },
+    {
+      "name": "what_types",
+      "type": "select_multiple wpjyhay",
+      "_uuid": "ylolu92qh",
+      "label": "দুর্যোগের ধরণ",
+      "options": [
+        {
+          "name": "flood",
+          "label": "বন্যা",
+          "translations": {
+            "Bangla (bn)": "বন্যা",
+            "English (en)": "Flood"
+          }
+        },
+        {
+          "name": "cyclone",
+          "label": "সাইক্লোন",
+          "translations": {
+            "Bangla (bn)": "সাইক্লোন",
+            "English (en)": "Cyclone"
+          }
+        },
+        {
+          "name": "heavy_rainfall",
+          "label": "অতিবৃষ্টি",
+          "translations": {
+            "Bangla (bn)": "অতিবৃষ্টি",
+            "English (en)": "Heavy rainfall"
+          }
+        },
+        {
+          "name": "drought",
+          "label": "খরা",
+          "translations": {
+            "Bangla (bn)": "খরা",
+            "English (en)": "Drought"
+          }
+        },
+        {
+          "name": "landslides",
+          "label": "ভূমিধ্বস",
+          "translations": {
+            "Bangla (bn)": "ভূমিধ্বস",
+            "English (en)": "Landslides"
+          }
+        },
+        {
+          "name": "others",
+          "label": "অন্যান্য",
+          "translations": {
+            "Bangla (bn)": "অন্যান্য",
+            "English (en)": "Others"
+          }
+        }
+      ],
+      "relevant": "${did_any_disaster_occur_in_last_7_days_} = 'yes'",
+      "required": true,
+      "conditions": [
+        {
+          "value": "yes",
+          "question": "did_any_disaster_occur_in_last_7_days_",
+          "condition": "="
+        }
+      ],
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "দুর্যোগের ধরণ",
+        "English (en)": "What Types"
+      }
+    },
+    {
+      "id": "end_rm1m9de9",
+      "name": "",
+      "type": "end_group",
+      "_uuid": "j02wsygf",
+      "label": "",
+      "default": "",
+      "groupId": "rm1m9de9",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "",
+      "isGroupEnd": true,
+      "parameters": "",
+      "subQuestions": [],
+      "translations": {},
+      "guidance_hint": "",
+      "constraint_message": ""
+    },
+    {
+      "id": "3kaa1q2e0",
+      "name": "remarks",
+      "type": "text",
+      "_uuid": "3kaa1q2e0",
+      "label": "মন্তব্য (যদি থাকে)",
+      "default": "",
+      "options": [],
+      "trigger": "",
+      "relevant": "",
+      "required": false,
+      "appearance": "",
+      "parameters": "",
+      "calculation": "",
+      "subQuestions": [],
+      "translations": {
+        "Bangla (bn)": "মন্তব্য (যদি থাকে)",
+        "English (en)": "Remarks"
+      },
+      "guidance_hint": "",
+      "constraint_message": ""
+    }
+  ]
+}

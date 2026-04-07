@@ -1,0 +1,58 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1079" version="20240601">
+          <start>2025-09-14T10:25:56.712+06:00</start>
+          <end>2025-09-14T10:26:47.672+06:00</end>
+          <health_worker_s_information>
+            <date>2025-09-08</date>
+            <name_of_staff>dsd</name_of_staff>
+            <organization>govt</organization>
+            
+            <designation>idk</designation>
+          </health_worker_s_information>
+          <suspected_patient-related_information>
+            <division>khulna</division>
+            <district>satkhira</district>
+            <upazila>shyamnagar</upazila>
+            <union>burigoalini</union>
+            <ward>ward_no_4_5</ward>
+            <area>dsds</area>
+            <location>24.611595 91.613334 0 0</location>
+            <hh_id>323</hh_id>
+            <hh_head_name>sdsd</hh_head_name>
+            <suspected_in_the_disease>no</suspected_in_the_disease>
+            
+            
+            
+            
+            
+            
+            
+            
+          </suspected_patient-related_information>
+          <referral-related_information>
+            
+            
+            
+          </referral-related_information>
+          <health_behaviour>
+            
+            
+            
+          </health_behaviour>
+          <information_of_already_identified_patient_s_>
+            <no._of_already_diagnosed_cases_of_dengue_in_the_hh_1>34234</no._of_already_diagnosed_cases_of_dengue_in_the_hh_1>
+            <no._of_already_diagnosed_cases_of_malaria_in_the_hh>3434</no._of_already_diagnosed_cases_of_malaria_in_the_hh>
+            <no._of_already_diagnosed_cases_of_awd_in_the_hh>23423</no._of_already_diagnosed_cases_of_awd_in_the_hh>
+          </information_of_already_identified_patient_s_>
+          <environmental_related_information_>
+            <presence_of_stagnant_water_mosquito_breeding_sites>yes</presence_of_stagnant_water_mosquito_breeding_sites>
+            <presence_of_mosquito_larvae>aedes</presence_of_mosquito_larvae>
+          </environmental_related_information_>
+          <disaster-related_information>
+            <did_any_disaster_occur_in_last_7_days_>yes</did_any_disaster_occur_in_last_7_days_>
+            <what_types>cyclone heavy_rainfall drought</what_types>
+          </disaster-related_information>
+          <remarks>thanks</remarks>
+          <meta>
+            <instanceID>uuid:9157c4b3-e88f-4efd-b963-44b5a858f93c</instanceID>
+          </meta>
+        </data>

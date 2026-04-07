@@ -1,0 +1,123 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_1880" version="20240601">
+          <start>2025-10-24T18:07:39.335+06:00</start>
+          <end>2025-10-24T19:10:18.984+06:00</end>
+          <malaria_case_record_form>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test_1>rdt</type_of_test_1>
+            <types_of_diseases_for_rdt>positive</types_of_diseases_for_rdt>
+            
+            
+          </malaria_case_record_form>
+          <data_collector_s_information>
+            <employee_name>k</employee_name>
+            <designation_of_data_collector>health_worker__sk_hw___</designation_of_data_collector>
+            
+            
+            
+            
+            
+            <name_of_the_organization>community_clinic</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>A</patient_name>
+            <guardians_name>C</guardians_name>
+            <nationality>bangladeshi</nationality>
+            
+            <phone_number>01922222222</phone_number>
+            <user_identification>nid_id</user_identification>
+            <nid_id>1234567890</nid_id>
+            
+            
+            
+            
+            <age>5-14</age>
+            <weight>30</weight>
+            <gander>male</gander>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>business</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>lama</upazila>
+            <union>aziznagar</union>
+            <ward>ward_no_03</ward>
+            <brac_village>chairman_para_2</brac_village>
+            
+            <village/>
+            
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>india_</patients_country_of_origin>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <state>jharkhand</state>
+            
+            <district_2>west_singhbhum</district_2>
+            
+            <subdistrict>anandpur</subdistrict>
+            
+            
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>yes</have_you_or_any_member_of_your_household_had_malaria_in_the_past_year>
+            <how_many_times>2</how_many_times>
+            <date_of_onset_fever>2025-10-02</date_of_onset_fever>
+            <date_of_first_test>2025-10-16</date_of_first_test>
+            <type_of_species>plasmodium_falciparum__pf_</type_of_species>
+            
+            
+            <treatment1>act___primaquine</treatment1>
+            
+            <treatment2>coartem_24_act</treatment2>
+            <date_of_initiation_of_treatment>2025-10-22</date_of_initiation_of_treatment>
+            <the_patient_is_referred>yes</the_patient_is_referred>
+            <where_is_it_referred_to>medical_college</where_is_it_referred_to>
+            <medical_collage>chittagong_medical_college_hospital</medical_collage>
+            
+            
+            
+            
+            <case_classification>indigenous</case_classification>
+            <case_identification>acd__active_case_detection_</case_identification>
+            <acd_identification>racd</acd_identification>
+            <the_total_number_of_llins_limited_insecticides_in_your_house>4</the_total_number_of_llins_limited_insecticides_in_your_house>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days/>
+            <position_of_the_patient_coordinates_of_the_patient>23.748734 90.36543 0 3226.882714377886</position_of_the_patient_coordinates_of_the_patient>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>outside_bangladesh</if_yes__type_of_travel>
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            <if_international__specify_the_last_country_visited.>myanmar__</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:c073c0d2-32f0-4e8f-836a-1ef69b35ca2b</instanceID>
+          </meta>
+        </data>

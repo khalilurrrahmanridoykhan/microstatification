@@ -1,0 +1,13 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_129" version="20240601">
+          <start>2025-07-23T06:45:38.103+06:00</start>
+          <end>2025-07-23T06:46:27.304+06:00</end>
+          <name_of_para_mahalla_camp>jahidul para</name_of_para_mahalla_camp>
+          <name_of_the_ward>ward_no_09</name_of_the_ward>
+          <latitude_and_longitude_of_the_para_mahalla_camp>22.20171 92.182576 0 0</latitude_and_longitude_of_the_para_mahalla_camp>
+          <waypoint>center_of_the_village</waypoint>
+          
+          <picture_of_the_villages>Shark Week Lol Sticker by hAyDiRoKeT-6_46_25.gif</picture_of_the_villages>
+          <meta>
+            <instanceID>uuid:cbb02b4a-5217-498f-b032-c50ac054913e</instanceID>
+          </meta>
+        </data>

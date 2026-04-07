@@ -1,0 +1,46 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_2288" version="20240601">
+          <start>2025-12-08T14:28:30.187+06:00</start>
+          <end>2025-12-08T14:30:31.498+06:00</end>
+          <basic_information>
+            <name_of_the_assessee>Ridoy Khan</name_of_the_assessee>
+            <national_id_no>9856485126</national_id_no>
+            <utin>test</utin>
+            <etin>test</etin>
+            <circle>test</circle>
+            <taxes_zone>test</taxes_zone>
+            <assessment_year>2023_24</assessment_year>
+            <residential_status>resident</residential_status>
+            <status>individual</status>
+            <business_name>Ridoy Khan</business_name>
+            <wife_husband_name__tin>no</wife_husband_name__tin>
+            <fathers_name>Jashimuddin Khan</fathers_name>
+            <mothers_name>Shakaina Bagum</mothers_name>
+            <date_of_birth>2000-01-03T14:30:00.000+06:00</date_of_birth>
+            <address__present>dhaka</address__present>
+            <address__permanent>dhaka</address__permanent>
+            <telephone_office_residence>test</telephone_office_residence>
+            <vat_registration_number>test</vat_registration_number>
+          </basic_information>
+          <income_statement_section>
+            <income_from_business>10</income_from_business>
+            <income_from_salary>10</income_from_salary>
+            <income_from_house_property>10</income_from_house_property>
+            <capital_gains>10</capital_gains>
+            <agricultural_income>10</agricultural_income>
+            <interest_on_securities>10</interest_on_securities>
+            <foreign_income>10</foreign_income>
+          </income_statement_section>
+          <tax_payment_section>
+            <tax_deducted_at_source>10</tax_deducted_at_source>
+            <advance_tax>10</advance_tax>
+            <tax_paid_us_173>10</tax_paid_us_173>
+            <refund_adjustment>10</refund_adjustment>
+          </tax_payment_section>
+          <verification>
+            <signature>KR-14_30_25.png</signature>
+            <date>2025-12-08T14:30:00.000+06:00</date>
+          </verification>
+          <meta>
+            <instanceID>uuid:8ecda70f-2413-422f-9f39-f444f9c16ce5</instanceID>
+          </meta>
+        </data>

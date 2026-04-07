@@ -1,0 +1,94 @@
+<data xmlns:jr="http://openrosa.org/javarosa" xmlns:orx="http://openrosa.org/xforms" id="form_689" version="20240601">
+          <start>2025-08-31T09:29:53.066+06:00</start>
+          <end>2025-08-31T09:39:51.056+06:00</end>
+          <diagnostic_information>
+            <type_of_test_facility>community</type_of_test_facility>
+            
+            <type_of_test>rdt</type_of_test>
+            <types_of_diseases_for_rdt>nagative</types_of_diseases_for_rdt>
+            
+          </diagnostic_information>
+          <data_collector_s_information>
+            <employee_name>asdfghjkl.</employee_name>
+            <designation_of_data_collector>health_worker__sk_hw___</designation_of_data_collector>
+            
+            
+            
+            <name_of_the_organization>government_health_facility</name_of_the_organization>
+          </data_collector_s_information>
+          <patient_information>
+            <patient_name>asdfghjkl</patient_name>
+            <guardians_name>asdfghjkl</guardians_name>
+            <_nationality>other</_nationality>
+            <other_5/>
+            <phone_number>01989492958</phone_number>
+            <nid_birth_id_number>1478526652254</nid_birth_id_number>
+            <age>1-4</age>
+            <weight>55</weight>
+            <gender>male</gender>
+            
+            <racegroup>bangali</racegroup>
+            
+            <occupation>dependent</occupation>
+            
+          </patient_information>
+          <reporting_site_details>
+            <division>chattogram</division>
+            <district>bandarban</district>
+            <upazila>alikadam</upazila>
+          </reporting_site_details>
+          <patient_s_country_of_origin>
+            <patients_country_of_origin>bangladesh</patients_country_of_origin>
+            
+            <division_1>chattogram_2</division_1>
+            <district_1>bandarban</district_1>
+            <upazila_1>alikadam</upazila_1>
+            
+            
+            
+            
+            
+            
+          </patient_s_country_of_origin>
+          <malaria_case_details>
+            <have_you_or_any_member_of_your_household_had_malaria_within_past_year>yes</have_you_or_any_member_of_your_household_had_malaria_within_past_year>
+            <how_many_times>8</how_many_times>
+            <date_of_onset_fever>2025-08-26</date_of_onset_fever>
+            <date_of_first_test>2025-08-31</date_of_first_test>
+            <type_of_species>plasmodium_malariae__pm_</type_of_species>
+            <severe_malaria/>
+            
+            
+            <date_of_initiation_of_treatment/>
+            
+            <the_patient_is_referred/>
+            
+            
+            
+            
+            
+            
+            <case_classification/>
+            <case_identification>pcd__passive_case_detection_</case_identification>
+            
+            <the_total_number_of_llins_limited_insecticides_in_your_house/>
+            <used_llin_insecticide_mosquito_repellent_in_last_15_days/>
+            <position_of_the_patient_coordinates_of_the_patient/>
+            <lab_district>khagrachari</lab_district>
+            <lab_upazila>sadar</lab_upazila>
+            <lab_organization>brac</lab_organization>
+            <lab_location_list_of_the_lab>vaibonchara_lab</lab_location_list_of_the_lab>
+          </malaria_case_details>
+          <travel_history>
+            <do_the_patient_have_any_travel_history>yes</do_the_patient_have_any_travel_history>
+            <if_yes__type_of_travel>within_bangladesh</if_yes__type_of_travel>
+            <if_within_bangladesh__specify_the_last_travel_location.>chattogram</if_within_bangladesh__specify_the_last_travel_location.>
+            
+            
+            <if_international__specify_the_last_country_visited.>india</if_international__specify_the_last_country_visited.>
+            
+          </travel_history>
+          <meta>
+            <instanceID>uuid:868214e9-a3fe-4fbf-ab50-c55ac2554b00</instanceID>
+          </meta>
+        </data>
