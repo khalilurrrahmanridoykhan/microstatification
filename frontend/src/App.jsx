@@ -39,6 +39,7 @@ import CreateUserUsers from "./Admin/Pages/User/AdminCreateUserUsers";
 import EditUser from "./Admin/Pages/User/EditUser";
 import AssignUser from "./Admin/Pages/User/AdminAssignUser";
 import MicrostatificationDashboard from "./Admin/Components/Malaria/MicrostatificationDashboard";
+import MicrostatificationMonthAccess from "./Admin/Components/Malaria/MicrostatificationMonthAccess";
 import MicrostatificationDownload from "./Admin/Components/Malaria/MicrostatificationDownload";
 import MicrostatificationUpload from "./Admin/Components/Malaria/MicrostatificationUpload";
 import Submissions from "./Submissions";
@@ -271,6 +272,10 @@ const App = () => {
               <Route
                 path="dashboard"
                 element={<MicrostatificationDashboard />}
+              />
+              <Route
+                path="microstatification/month-access"
+                element={<MicrostatificationMonthAccess />}
               />
               <Route path="/404" element={<PageNotFound />} />
               <Route path="*" element={<Navigate to="/404" replace />} />

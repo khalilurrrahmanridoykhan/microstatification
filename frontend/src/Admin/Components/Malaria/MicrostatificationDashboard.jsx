@@ -642,14 +642,24 @@ function MicrostatificationDashboard() {
               </p>
             </div>
             <div className="flex justify-start lg:justify-end">
-              <button
-                type="button"
-                onClick={() => window.location.assign("/malaria/")}
-                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800"
-              >
-                View Data Page
-                <FiExternalLink className="h-4 w-4" />
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => window.location.assign("/malaria/")}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800"
+                >
+                  View Data Page
+                  <FiExternalLink className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.location.assign("/microstatification/month-access")}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
+                >
+                  Month Access
+                  <FiExternalLink className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, MapPin, LayoutDashboard, Users, Database } from "lucide-react";
+import { FileText, MapPin, LayoutDashboard, Users, Database, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 
@@ -8,9 +8,10 @@ import UserManagement from "@/components/UserManagement";
 import VillageAssignment from "@/components/VillageAssignment";
 import AdminRecordReview from "@/components/AdminRecordReview";
 import MasterDataManager from "@/components/MasterDataManager";
+import MonthAccessManager from "@/components/MonthAccessManager";
 import AppHeader from "@/components/AppHeader";
 
-type SectionKey = "overview" | "records" | "assignments" | "users" | "masterData";
+type SectionKey = "overview" | "records" | "assignments" | "users" | "masterData" | "monthAccess";
 
 const Admin = () => {
   const { role } = useAuth();
@@ -31,6 +32,7 @@ const Admin = () => {
     assignments: { title: "Village Assignments",  subtitle: "Assign villages to SKs and manage existing assignments." },
     users:       { title: "User Management",      subtitle: "Add users and view their assigned villages." },
     masterData:  { title: "Master Data",          subtitle: "Manage districts, upazilas, unions, and villages." },
+    monthAccess: { title: "Month Access",         subtitle: "Open or close month-column entry access for all SK and SHW users." },
   }), []);
 
   const SectionCard = ({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) => (
@@ -57,6 +59,7 @@ const Admin = () => {
           { id: "assignments", label: "Assignments", icon: <MapPin className="mr-2 h-4 w-4" />, active: activeSection === "assignments", onClick: () => setActiveSection("assignments") },
           { id: "users", label: "Users", icon: <Users className="mr-2 h-4 w-4" />, active: activeSection === "users", onClick: () => setActiveSection("users") },
           { id: "masterData", label: "Master Data", icon: <Database className="mr-2 h-4 w-4" />, active: activeSection === "masterData", onClick: () => setActiveSection("masterData") },
+          { id: "monthAccess", label: "Month Access", icon: <Lock className="mr-2 h-4 w-4" />, active: activeSection === "monthAccess", onClick: () => setActiveSection("monthAccess") },
         ]}
       />
 
@@ -66,12 +69,13 @@ const Admin = () => {
             <SectionCard title={sectionMeta.overview.title} subtitle={sectionMeta.overview.subtitle}>
               <AdminDashboard />
             </SectionCard>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
               {([
                 { id: "records",     icon: <FileText className="h-5 w-5" />,     label: "Review Records",  color: "text-blue-600 bg-blue-50" },
                 { id: "assignments", icon: <MapPin className="h-5 w-5" />,       label: "Assign Villages", color: "text-violet-600 bg-violet-50" },
                 { id: "users",       icon: <Users className="h-5 w-5" />,        label: "Manage Users",    color: "text-green-600 bg-green-50" },
                 { id: "masterData",  icon: <Database className="h-5 w-5" />,     label: "Master Data",     color: "text-amber-600 bg-amber-50" },
+                { id: "monthAccess", icon: <Lock className="h-5 w-5" />,         label: "Month Access",    color: "text-slate-700 bg-slate-100" },
               ] as { id: SectionKey; icon: React.ReactNode; label: string; color: string }[]).map((item) => (
                 <button key={item.id} onClick={() => setActiveSection(item.id)}
                   className="report-surface flex flex-col items-center gap-2 rounded-[1.5rem] p-4 text-center transition-transform hover:-translate-y-0.5">
@@ -101,6 +105,11 @@ const Admin = () => {
         {activeSection === "masterData" && (
           <SectionCard title={sectionMeta.masterData.title} subtitle={sectionMeta.masterData.subtitle}>
             <MasterDataManager />
+          </SectionCard>
+        )}
+        {activeSection === "monthAccess" && (
+          <SectionCard title={sectionMeta.monthAccess.title} subtitle={sectionMeta.monthAccess.subtitle}>
+            <MonthAccessManager />
           </SectionCard>
         )}
       </main>

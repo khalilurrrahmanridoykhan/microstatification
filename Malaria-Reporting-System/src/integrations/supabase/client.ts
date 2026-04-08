@@ -53,10 +53,12 @@ const TABLE_ENDPOINTS: Record<string, string> = {
   villages: "villages",
   local_records: "local-records",
   non_local_records: "non-local-records",
+  month_access_settings: "month-access-settings",
   monthly_approvals: "monthly-approvals",
 };
 
 const listeners = new Set<(event: AuthEvent, session: MalariaSession | null) => void>();
+const SIMPLE_SELECT_FIELD_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function getToken() {
   return (
@@ -129,6 +131,26 @@ function getPostLoginRedirect(user: any) {
 
 function buildError(message: string) {
   return new Error(message);
+}
+
+function normalizeSimpleSelectColumns(columns?: string) {
+  if (!columns) return null;
+
+  const trimmed = columns.trim();
+  if (!trimmed || trimmed === "*") {
+    return null;
+  }
+
+  const fields = trimmed
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!fields.length || fields.some((field) => !SIMPLE_SELECT_FIELD_PATTERN.test(field))) {
+    return null;
+  }
+
+  return fields.join(",");
 }
 
 function buildSessionFromPayload(payload: any): MalariaSession | null {
@@ -250,11 +272,13 @@ class QueryBuilder {
   private payload: any = null;
   private wantsCount = false;
   private wantsMaybeSingle = false;
+  private selectedColumns: string | null = null;
 
   constructor(private readonly table: string) { }
 
-  select(_columns?: string, options?: { count?: "exact" }) {
+  select(columns?: string, options?: { count?: "exact" }) {
     this.action = "select";
+    this.selectedColumns = normalizeSimpleSelectColumns(columns);
     this.wantsCount = options?.count === "exact";
     return this;
   }
@@ -322,6 +346,9 @@ class QueryBuilder {
     }
     if (this.wantsCount) {
       url.searchParams.set("count", "exact");
+    }
+    if (this.selectedColumns) {
+      url.searchParams.set("_fields", this.selectedColumns);
     }
     return url.toString();
   }

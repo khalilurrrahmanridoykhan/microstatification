@@ -94,13 +94,13 @@ const Dashboard = () => {
           <div className="px-3 pb-3 pt-3 sm:px-4 sm:pb-4 md:px-6 md:pb-5 md:pt-4">
             <TabsContent value="local" className="m-0">
               <div className="data-grid-shell overflow-hidden p-1 sm:p-2 rounded-[1.5rem]">
-                <LocalRecordsGrid />
+                {activeTab === "local" ? <LocalRecordsGrid /> : null}
               </div>
             </TabsContent>
 
             <TabsContent value="non-local" className="m-0">
               <div className="data-grid-shell overflow-hidden p-1 sm:p-2 rounded-[1.5rem]">
-                <NonLocalRecordsGrid />
+                {activeTab === "non-local" ? <NonLocalRecordsGrid /> : null}
               </div>
             </TabsContent>
           </div>

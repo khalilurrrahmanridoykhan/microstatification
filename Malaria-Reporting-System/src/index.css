@@ -189,6 +189,24 @@ All colors MUST be HSL.
   word-break: break-word;
 }
 
+.grid-th-month {
+  @apply px-0.5 py-0 text-center align-middle;
+}
+
+.grid-th-month-content {
+  @apply flex items-center justify-center;
+  min-height: 70px;
+  width: 100%;
+}
+
+.grid-th-month-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-orientation: mixed;
+  white-space: nowrap;
+  line-height: 1;
+}
+
 .grid-td {
   @apply px-1 py-0.5 border-b border-r last:border-r-0 text-[11px] leading-tight whitespace-normal align-top;
   overflow-wrap: anywhere;

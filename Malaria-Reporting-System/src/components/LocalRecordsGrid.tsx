@@ -19,9 +19,16 @@ import {
 } from "@/components/ui/select";
 import {
   MONTH_COLUMNS,
+  getDhakaDateString,
   getDhakaMonth,
   getDhakaYear,
 } from "@/lib/monthUtils";
+import {
+  buildDefaultMonthAccessLookup,
+  buildMonthAccessLookup,
+  type MonthAccessLookup,
+  type MonthAccessRow,
+} from "@/lib/monthAccess";
 import { exportRowsToXlsx } from "@/lib/xlsxExport";
 import { Download, RefreshCw, Save } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -119,12 +126,49 @@ const FULL_MONTH_LABELS: Record<(typeof MONTH_COLUMNS)[number], string> = {
   dec_cases: "December",
 };
 
+const LOCAL_RECORD_SELECT_COLUMNS = [
+  "id",
+  "village_id",
+  "sk_user_id",
+  "sk_user_display_name",
+  "sk_user_designation",
+  "sk_user_ss_name",
+  "reporting_year",
+  "hh",
+  "population",
+  "itn_2023",
+  "itn_2024",
+  "itn_2025",
+  "itn_2026",
+  ...MONTH_COLUMNS,
+  "district_name",
+  "upazila_name",
+  "union_name",
+  "ward_no",
+  "village_name",
+  "village_name_bn",
+  "village_code",
+  "village_latitude",
+  "village_longitude",
+  "village_population",
+  "village_sk_shw_name",
+  "raw_village_sk_shw_name",
+  "village_ss_name",
+  "raw_village_ss_name",
+  "village_mmw_hp_chwc_name",
+  "village_distance_from_upazila_office_km",
+  "village_bordering_country_name",
+  "village_other_activities",
+].join(",");
+
 const DEFAULT_LOCAL_TEXT_COLUMN_WIDTH = 60;
 const DEFAULT_LOCAL_NARROW_COLUMN_WIDTH = 42;
-const DEFAULT_LOCAL_MONTH_COLUMN_WIDTH = 52;
+const DEFAULT_LOCAL_ITN_COLUMN_WIDTH = 52;
+const DEFAULT_LOCAL_MONTH_COLUMN_WIDTH = 28;
 const MIN_LOCAL_TEXT_COLUMN_WIDTH = 40;
 const MIN_LOCAL_NARROW_COLUMN_WIDTH = 30;
-const MIN_LOCAL_MONTH_COLUMN_WIDTH = 40;
+const MIN_LOCAL_ITN_COLUMN_WIDTH = 40;
+const MIN_LOCAL_MONTH_COLUMN_WIDTH = 24;
 
 type LocalGridColumnKey =
   | "sl"
@@ -159,6 +203,7 @@ interface LocalGridColumn {
   minWidth: number;
   defaultWidth?: number;
   sticky?: boolean;
+  verticalHeader?: boolean;
 }
 
 const LOCAL_RECORD_COLUMNS: LocalGridColumn[] = [
@@ -179,14 +224,15 @@ const LOCAL_RECORD_COLUMNS: LocalGridColumn[] = [
   { key: "village_longitude", label: "Longitute", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
   { key: "population", label: "Population", minWidth: MIN_LOCAL_NARROW_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_NARROW_COLUMN_WIDTH },
   { key: "hh", label: "HH Number", minWidth: MIN_LOCAL_NARROW_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_NARROW_COLUMN_WIDTH },
-  { key: "itn_2026", label: "2026 (Active LLINs)", minWidth: MIN_LOCAL_MONTH_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_MONTH_COLUMN_WIDTH },
-  { key: "itn_2025", label: "2025 (Active LLINs)", minWidth: MIN_LOCAL_MONTH_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_MONTH_COLUMN_WIDTH },
-  { key: "itn_2024", label: "2024 (Active LLINs)", minWidth: MIN_LOCAL_MONTH_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_MONTH_COLUMN_WIDTH },
+  { key: "itn_2026", label: "2026 (Active LLINs)", minWidth: MIN_LOCAL_ITN_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_ITN_COLUMN_WIDTH },
+  { key: "itn_2025", label: "2025 (Active LLINs)", minWidth: MIN_LOCAL_ITN_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_ITN_COLUMN_WIDTH },
+  { key: "itn_2024", label: "2024 (Active LLINs)", minWidth: MIN_LOCAL_ITN_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_ITN_COLUMN_WIDTH },
   ...MONTH_COLUMNS.map((column) => ({
     key: column,
     label: FULL_MONTH_LABELS[column],
     minWidth: MIN_LOCAL_MONTH_COLUMN_WIDTH,
     defaultWidth: DEFAULT_LOCAL_MONTH_COLUMN_WIDTH,
+    verticalHeader: true,
   })),
   { key: "village_mmw_hp_chwc_name", label: "Name of MMW, Health post & CHW(C)", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
   { key: "village_distance_from_upazila_office_km", label: "Village Distance from upazila office (KM)", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
@@ -194,7 +240,7 @@ const LOCAL_RECORD_COLUMNS: LocalGridColumn[] = [
   { key: "village_other_activities", label: "Others Activities (TDA/Dev care)", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
 ];
 
-const LOCAL_RECORD_COLUMN_WIDTH_STORAGE_KEY = "malaria-local-record-column-widths-v6";
+const LOCAL_RECORD_COLUMN_WIDTH_STORAGE_KEY = "malaria-local-record-column-widths-v7";
 const LOCAL_RECORD_COLUMN_MIN_WIDTHS = LOCAL_RECORD_COLUMNS.reduce((acc, column) => {
   acc[column.key] = column.minWidth;
   return acc;
@@ -362,6 +408,7 @@ const LocalRecordsGrid = () => {
   const isMicroAdmin = isAdmin && microRole === "micro_admin";
   const currentMonth = getDhakaMonth();
   const currentYear = getDhakaYear();
+  const todayDateString = getDhakaDateString();
   const isMobile = useIsMobile();
 
   const [year, setYear] = useState(currentYear);
@@ -375,19 +422,25 @@ const LocalRecordsGrid = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  const [explicitZeroMonthKeys, setExplicitZeroMonthKeys] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState<10 | 20 | 50 | -1>(10);
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [approvalLookup, setApprovalLookup] = useState<Record<string, ApprovalStatus>>({});
   const [approvalSavingKey, setApprovalSavingKey] = useState<string | null>(null);
+  const [monthAccessLookup, setMonthAccessLookup] = useState<MonthAccessLookup>(() =>
+    buildDefaultMonthAccessLookup(year, todayDateString),
+  );
   const [columnWidths, setColumnWidths] = useState<Record<LocalGridColumnKey, number>>(
     loadColumnWidths,
   );
   const resizeStateRef = useRef<ResizeState | null>(null);
   const canEditVillageMetadata = isAdmin;
+  const canEditScopedVillageFields = isAdmin || role === "sk";
 
   const getApprovalKey = (recordId: string, monthNumber: number) =>
     `${recordId}:${monthNumber}`;
+  const getMonthCellKey = (recordId: string, field: string) => `${recordId}:${field}`;
 
   const getMonthApprovalStatus = (recordId: string, monthNumber: number) =>
     approvalLookup[getApprovalKey(recordId, monthNumber)] || null;
@@ -399,7 +452,7 @@ const LocalRecordsGrid = () => {
     const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
     const isFutureMonth =
       year > currentYear || (year === currentYear && monthNumber > currentMonth);
-    const isCurrentMonth = year === currentYear && monthNumber === currentMonth;
+    const isFieldMonthOpen = Boolean(monthAccessLookup[monthNumber]);
 
     if (hasData) {
       if (approvalStatus === "APPROVED") return "APPROVED";
@@ -409,18 +462,17 @@ const LocalRecordsGrid = () => {
 
     if (approvalStatus === "REJECTED") return "REJECTED";
     if (approvalStatus === "APPROVED") return "APPROVED";
-    if (isCurrentMonth || isFutureMonth) return "NEUTRAL";
+    if (isFieldMonthOpen || isFutureMonth) return "NEUTRAL";
     return "NOT_SUBMITTED";
   };
 
   const isMonthEditable = (row: LocalRow, monthIndex: number) => {
     if (isAdmin) return true;
-    if (year !== currentYear) return false;
 
     const monthNumber = monthIndex + 1;
     const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
     if (approvalStatus === "REJECTED") return true;
-    return monthNumber === currentMonth;
+    return Boolean(monthAccessLookup[monthNumber]);
   };
 
   const getMonthTitle = (status: CellStatus) => {
@@ -458,48 +510,30 @@ const LocalRecordsGrid = () => {
     if (isMicroAdmin && !selectedDistrictId) return;
     setLoading(true);
     try {
-      let query = supabase
+      let recordsQuery = supabase
         .from("local_records")
-        .select(
-          `
-          *,
-          villages!inner (
-            name,
-            name_bn,
-            village_code,
-            latitude,
-            longitude,
-            population,
-            ward_no,
-            sk_shw_name,
-            ss_name,
-            mmw_hp_chwc_name,
-            distance_from_upazila_office_km,
-            bordering_country_name,
-            other_activities,
-            unions!inner (
-              name,
-              upazilas!inner (
-                name,
-                districts!inner ( name )
-              )
-            )
-          )
-        `,
-        )
-        .eq("reporting_year", year)
-        .order("created_at");
+        .select(LOCAL_RECORD_SELECT_COLUMNS)
+        .eq("reporting_year", year);
 
       if (isMicroAdmin && selectedDistrictId !== "all") {
-        query = query.eq("district_id", selectedDistrictId);
+        recordsQuery = recordsQuery.eq("district_id", selectedDistrictId);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const [recordsResult, approvalResult] = await Promise.all([
+        recordsQuery,
+        supabase
+          .from("monthly_approvals")
+          .select("record_id, month, status")
+          .eq("record_type", "local")
+          .eq("reporting_year", year),
+      ]);
 
-      const mapped = (data || []).map((record: any) => {
-        const rawVillageSkShwName = record.villages?.sk_shw_name ?? "";
-        const rawVillageSsName = record.villages?.ss_name ?? "";
+      if (recordsResult.error) throw recordsResult.error;
+      if (approvalResult.error) throw approvalResult.error;
+
+      const mapped = (recordsResult.data || []).map((record: any) => {
+        const rawVillageSkShwName = record.raw_village_sk_shw_name ?? "";
+        const rawVillageSsName = record.raw_village_ss_name ?? "";
         const assignedSkShwName = record.sk_user_display_name ?? "";
         const assignedSsName = record.sk_user_ss_name ?? "";
 
@@ -507,44 +541,41 @@ const LocalRecordsGrid = () => {
           ...record,
           assigned_sk_shw_name: assignedSkShwName,
           assigned_ss_name: assignedSsName,
-          district_name: record.villages?.unions?.upazilas?.districts?.name ?? "",
-          upazila_name: record.villages?.unions?.upazilas?.name ?? "",
-          union_name: record.villages?.unions?.name ?? "",
-          village_name: record.villages?.name ?? "",
-          village_name_bn: record.villages?.name_bn ?? "",
-          village_code: record.villages?.village_code ?? "",
-          village_latitude: record.villages?.latitude ?? "",
-          village_longitude: record.villages?.longitude ?? "",
-          village_population: record.villages?.population ?? null,
+          district_name: record.district_name ?? "",
+          upazila_name: record.upazila_name ?? "",
+          union_name: record.union_name ?? "",
+          village_name: record.village_name ?? "",
+          village_name_bn: record.village_name_bn ?? "",
+          village_code: record.village_code ?? "",
+          village_latitude: record.village_latitude ?? "",
+          village_longitude: record.village_longitude ?? "",
+          village_population: record.village_population ?? null,
           population:
             typeof record.population === "number" && record.population > 0
               ? record.population
-              : (record.villages?.population ?? 0),
-          village_sk_shw_name: assignedSkShwName || rawVillageSkShwName,
-          village_ss_name: assignedSsName || rawVillageSsName,
+              : (record.village_population ?? 0),
+          village_sk_shw_name:
+            record.village_sk_shw_name ?? (assignedSkShwName || rawVillageSkShwName),
+          village_ss_name: record.village_ss_name ?? (assignedSsName || rawVillageSsName),
           raw_village_sk_shw_name: rawVillageSkShwName,
           raw_village_ss_name: rawVillageSsName,
-          village_mmw_hp_chwc_name: record.villages?.mmw_hp_chwc_name ?? "",
+          village_mmw_hp_chwc_name: record.village_mmw_hp_chwc_name ?? "",
           village_distance_from_upazila_office_km:
-            record.villages?.distance_from_upazila_office_km ?? "",
-          village_bordering_country_name: record.villages?.bordering_country_name ?? "",
-          village_other_activities: record.villages?.other_activities ?? "",
+            record.village_distance_from_upazila_office_km ?? "",
+          village_bordering_country_name: record.village_bordering_country_name ?? "",
+          village_other_activities: record.village_other_activities ?? "",
           sk_user_designation: record.sk_user_designation ?? "",
-          ward_no: record.villages?.ward_no ?? "",
+          ward_no: record.ward_no ?? "",
+          itn_2023: typeof record.itn_2023 === "number" ? record.itn_2023 : 0,
+          itn_2024: typeof record.itn_2024 === "number" ? record.itn_2024 : 0,
+          itn_2025: typeof record.itn_2025 === "number" ? record.itn_2025 : 0,
           itn_2026: typeof record.itn_2026 === "number" ? record.itn_2026 : 0,
         };
       });
 
-      const { data: approvalData, error: approvalError } = await supabase
-        .from("monthly_approvals")
-        .select("record_id, month, status")
-        .eq("record_type", "local")
-        .eq("reporting_year", year);
-      if (approvalError) throw approvalError;
-
       const visibleRecordIds = new Set(mapped.map((row) => String(row.id)));
       const nextApprovalLookup = Object.fromEntries(
-        ((approvalData || []) as ApprovalRow[])
+        ((approvalResult.data || []) as ApprovalRow[])
           .filter((approval) => visibleRecordIds.has(String(approval.record_id)))
           .map((approval) => [
             getApprovalKey(String(approval.record_id), Number(approval.month)),
@@ -553,6 +584,24 @@ const LocalRecordsGrid = () => {
       );
 
       setRows(mapped);
+      setExplicitZeroMonthKeys((prev) => {
+        const next = new Set<string>();
+        const rowById = new Map(mapped.map((row) => [String(row.id), row]));
+        prev.forEach((cellKey) => {
+          const separatorIndex = cellKey.indexOf(":");
+          if (separatorIndex === -1) return;
+          const rowId = cellKey.slice(0, separatorIndex);
+          const field = cellKey.slice(separatorIndex + 1);
+          if (!MONTH_COLUMNS.includes(field as (typeof MONTH_COLUMNS)[number])) {
+            return;
+          }
+          const row = rowById.get(rowId);
+          if (row && Number((row as any)[field] || 0) === 0) {
+            next.add(cellKey);
+          }
+        });
+        return next;
+      });
       setApprovalLookup(nextApprovalLookup);
       setDirtyIds(new Set());
       setCurrentPage(1);
@@ -616,6 +665,44 @@ const LocalRecordsGrid = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    let canceled = false;
+
+    const loadMonthAccess = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("month_access_settings")
+          .select("id,reporting_year,month,is_open,close_date")
+          .eq("reporting_year", year);
+
+        if (error) throw error;
+        if (canceled) return;
+
+        setMonthAccessLookup(
+          buildMonthAccessLookup(
+            ((data || []) as MonthAccessRow[]),
+            year,
+            todayDateString,
+          ),
+        );
+      } catch (err: any) {
+        if (canceled) return;
+        setMonthAccessLookup(buildDefaultMonthAccessLookup(year, todayDateString));
+        toast({
+          title: "Month access load error",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
+    };
+
+    void loadMonthAccess();
+
+    return () => {
+      canceled = true;
+    };
+  }, [year, todayDateString, toast]);
 
   useEffect(() => {
     if (loading) {
@@ -706,6 +793,32 @@ const LocalRecordsGrid = () => {
     markRowDirty(rowId);
   };
 
+  const handleMonthCellChange = (
+    rowId: string,
+    field: (typeof MONTH_COLUMNS)[number],
+    value: string,
+  ) => {
+    const num = value === "" ? 0 : parseInt(value, 10);
+    if (isNaN(num) || num < 0) return;
+
+    setRows((prev) =>
+      prev.map((row) => (row.id === rowId ? { ...row, [field]: num } : row)),
+    );
+    setExplicitZeroMonthKeys((prev) => {
+      const next = new Set(prev);
+      const cellKey = getMonthCellKey(rowId, field);
+      if (value === "") {
+        next.delete(cellKey);
+      } else if (num === 0) {
+        next.add(cellKey);
+      } else {
+        next.delete(cellKey);
+      }
+      return next;
+    });
+    markRowDirty(rowId);
+  };
+
   const handleValueChange = (
     rowId: string,
     field: keyof LocalRow,
@@ -773,32 +886,41 @@ const LocalRecordsGrid = () => {
           .eq("id", row.id);
         if (localError) throw localError;
 
-        if (canEditVillageMetadata) {
-          const villagePayload = {
-            name: villageName,
-            name_bn: String(row.village_name_bn || "").trim(),
-            village_code: String(row.village_code || "").trim(),
-            ward_no: String(row.ward_no || "").trim() || null,
-            sk_shw_name: String(
-              row.assigned_sk_shw_name
-                ? row.raw_village_sk_shw_name || ""
-                : row.village_sk_shw_name || "",
-            ).trim(),
-            ss_name: String(
-              row.assigned_ss_name
-                ? row.raw_village_ss_name || ""
-                : row.village_ss_name || "",
-            ).trim(),
-            latitude: normalizeDecimalValue(row.village_latitude),
-            longitude: normalizeDecimalValue(row.village_longitude),
-            population: normalizeIntegerValue(row.village_population),
-            mmw_hp_chwc_name: String(row.village_mmw_hp_chwc_name || "").trim(),
-            distance_from_upazila_office_km: normalizeDecimalValue(
-              row.village_distance_from_upazila_office_km,
-            ),
-            bordering_country_name: String(row.village_bordering_country_name || "").trim(),
-            other_activities: String(row.village_other_activities || "").trim(),
-          };
+        if (canEditScopedVillageFields) {
+          const villagePayload = canEditVillageMetadata
+            ? {
+              name: villageName,
+              name_bn: String(row.village_name_bn || "").trim(),
+              village_code: String(row.village_code || "").trim(),
+              ward_no: String(row.ward_no || "").trim() || null,
+              sk_shw_name: String(
+                row.assigned_sk_shw_name
+                  ? row.raw_village_sk_shw_name || ""
+                  : row.village_sk_shw_name || "",
+              ).trim(),
+              ss_name: String(
+                row.assigned_ss_name
+                  ? row.raw_village_ss_name || ""
+                  : row.village_ss_name || "",
+              ).trim(),
+              latitude: normalizeDecimalValue(row.village_latitude),
+              longitude: normalizeDecimalValue(row.village_longitude),
+              population: normalizeIntegerValue(row.village_population),
+              mmw_hp_chwc_name: String(row.village_mmw_hp_chwc_name || "").trim(),
+              distance_from_upazila_office_km: normalizeDecimalValue(
+                row.village_distance_from_upazila_office_km,
+              ),
+              bordering_country_name: String(row.village_bordering_country_name || "").trim(),
+              other_activities: String(row.village_other_activities || "").trim(),
+            }
+            : {
+              mmw_hp_chwc_name: String(row.village_mmw_hp_chwc_name || "").trim(),
+              distance_from_upazila_office_km: normalizeDecimalValue(
+                row.village_distance_from_upazila_office_km,
+              ),
+              bordering_country_name: String(row.village_bordering_country_name || "").trim(),
+              other_activities: String(row.village_other_activities || "").trim(),
+            };
 
           const { error: villageError } = await supabase
             .from("villages")
@@ -1166,28 +1288,28 @@ const LocalRecordsGrid = () => {
           row,
           column,
           "village_mmw_hp_chwc_name",
-          !canEditVillageMetadata,
+          !canEditScopedVillageFields,
         );
       case "village_distance_from_upazila_office_km":
         return renderTextInputCell(
           row,
           column,
           "village_distance_from_upazila_office_km",
-          !canEditVillageMetadata,
+          !canEditScopedVillageFields,
         );
       case "village_bordering_country_name":
         return renderTextInputCell(
           row,
           column,
           "village_bordering_country_name",
-          !canEditVillageMetadata,
+          !canEditScopedVillageFields,
         );
       case "village_other_activities":
         return renderTextInputCell(
           row,
           column,
           "village_other_activities",
-          !canEditVillageMetadata,
+          !canEditScopedVillageFields,
         );
       default: {
         const monthIndex = MONTH_COLUMNS.indexOf(column.key as (typeof MONTH_COLUMNS)[number]);
@@ -1196,6 +1318,9 @@ const LocalRecordsGrid = () => {
           const monthNumber = monthIndex + 1;
           const status = getMonthStatus(row, monthIndex);
           const editable = isMonthEditable(row, monthIndex);
+          const showExplicitZero = explicitZeroMonthKeys.has(
+            getMonthCellKey(row.id, column.key),
+          );
           const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
           const hasData = value > 0;
           const isApprovalSaving = approvalSavingKey === getApprovalKey(row.id, monthNumber);
@@ -1212,10 +1337,10 @@ const LocalRecordsGrid = () => {
                   type="number"
                   min={0}
                   className={`grid-input bg-transparent text-center ${editable ? "" : "text-muted-foreground"}`}
-                  value={value > 0 ? String(value) : ""}
+                  value={value > 0 || showExplicitZero ? String(value) : ""}
                   placeholder={editable ? "" : undefined}
                   onChange={(event) =>
-                    handleIntegerCellChange(row.id, column.key, event.target.value)
+                    handleMonthCellChange(row.id, column.key, event.target.value)
                   }
                   disabled={!editable}
                 />
@@ -1459,11 +1584,19 @@ const LocalRecordsGrid = () => {
                   {LOCAL_RECORD_COLUMNS.map((column) => (
                     <th
                       key={column.key}
-                      className={`grid-th relative ${column.sticky ? "sticky left-0 z-20 bg-gray-50" : ""}`}
+                      className={`grid-th relative ${column.verticalHeader ? "grid-th-month" : ""} ${column.sticky ? "sticky left-0 z-20 bg-gray-50" : ""}`}
                       style={getColumnStyle(column.key)}
                     >
-                      <div className="pr-3 whitespace-normal break-words leading-tight">
-                        {column.label}
+                      <div
+                        className={
+                          column.verticalHeader
+                            ? "grid-th-month-content pr-2"
+                            : "pr-3 whitespace-normal break-words leading-tight"
+                        }
+                      >
+                        <span className={column.verticalHeader ? "grid-th-month-label" : ""}>
+                          {column.label}
+                        </span>
                       </div>
                       <div
                         className="grid-col-resizer"

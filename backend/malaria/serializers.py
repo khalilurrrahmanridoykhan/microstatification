@@ -6,6 +6,7 @@ from .models import (
     LocalRecord,
     MalariaUserRole,
     MicrostatificationDataUpload,
+    MonthAccessSetting,
     MonthlyApproval,
     NonLocalRecord,
     Union,
@@ -28,6 +29,20 @@ MONTH_COLUMNS = [
     "nov_cases",
     "dec_cases",
 ]
+
+
+class RequestedFieldsMixin:
+    def __init__(self, *args, **kwargs):
+        requested_fields = kwargs.pop("fields", None)
+        super().__init__(*args, **kwargs)
+
+        if not requested_fields:
+            return
+
+        allowed_fields = set(requested_fields)
+        existing_fields = set(self.fields)
+        for field_name in existing_fields - allowed_fields:
+            self.fields.pop(field_name)
 
 
 def build_full_name(user):
@@ -79,6 +94,14 @@ def get_local_record_assigned_user_details(record):
     }
 
 
+def get_cached_local_record_assigned_user_details(record):
+    cached = getattr(record, "_cached_local_record_assigned_user_details", None)
+    if cached is None:
+        cached = get_local_record_assigned_user_details(record)
+        setattr(record, "_cached_local_record_assigned_user_details", cached)
+    return cached
+
+
 def get_local_record_display_details(record, village=None, designation_lookup=None):
     assigned = get_local_record_assigned_user_details(record)
     fallback_name = _clean_assignment_text(getattr(village, "sk_shw_name", ""))
@@ -104,7 +127,7 @@ class ProfileSerializer(serializers.Serializer):
     micro_role = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 
-class MalariaUserRoleSerializer(serializers.ModelSerializer):
+class MalariaUserRoleSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True)
 
     class Meta:
@@ -112,13 +135,13 @@ class MalariaUserRoleSerializer(serializers.ModelSerializer):
         fields = ("user_id", "role", "created_at", "updated_at")
 
 
-class DistrictSerializer(serializers.ModelSerializer):
+class DistrictSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     class Meta:
         model = District
         fields = ("id", "name", "created_at", "updated_at")
 
 
-class UpazilaSerializer(serializers.ModelSerializer):
+class UpazilaSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     district_id = serializers.IntegerField(read_only=True)
     district = serializers.PrimaryKeyRelatedField(
         queryset=District.objects.all(),
@@ -131,7 +154,7 @@ class UpazilaSerializer(serializers.ModelSerializer):
         fields = ("id", "name", "district_id", "district", "created_at", "updated_at")
 
 
-class UnionSerializer(serializers.ModelSerializer):
+class UnionSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     upazila_id = serializers.IntegerField(read_only=True)
     upazila = serializers.PrimaryKeyRelatedField(
         queryset=Upazila.objects.all(),
@@ -144,7 +167,7 @@ class UnionSerializer(serializers.ModelSerializer):
         fields = ("id", "name", "upazila_id", "upazila", "created_at", "updated_at")
 
 
-class VillageSerializer(serializers.ModelSerializer):
+class VillageSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     union_id = serializers.IntegerField(read_only=True)
     union = serializers.PrimaryKeyRelatedField(
         queryset=Union.objects.all(),
@@ -221,25 +244,51 @@ class VillageNestedSerializer(serializers.ModelSerializer):
         )
 
 
-class LocalRecordSerializer(serializers.ModelSerializer):
+class LocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     village_id = serializers.IntegerField(read_only=True)
     sk_user_id = serializers.IntegerField(read_only=True)
     sk_user_username = serializers.CharField(source="sk_user.username", read_only=True)
     sk_user_display_name = serializers.SerializerMethodField()
     sk_user_designation = serializers.SerializerMethodField()
     sk_user_ss_name = serializers.SerializerMethodField()
+    district_name = serializers.ReadOnlyField(source="village.union.upazila.district.name")
+    upazila_name = serializers.ReadOnlyField(source="village.union.upazila.name")
+    union_name = serializers.ReadOnlyField(source="village.union.name")
+    ward_no = serializers.ReadOnlyField(source="village.ward_no")
+    village_name = serializers.ReadOnlyField(source="village.name")
+    village_name_bn = serializers.ReadOnlyField(source="village.name_bn")
+    village_code = serializers.ReadOnlyField(source="village.village_code")
+    village_latitude = serializers.ReadOnlyField(source="village.latitude")
+    village_longitude = serializers.ReadOnlyField(source="village.longitude")
+    village_population = serializers.ReadOnlyField(source="village.population")
+    village_sk_shw_name = serializers.SerializerMethodField()
+    raw_village_sk_shw_name = serializers.ReadOnlyField(source="village.sk_shw_name")
+    village_ss_name = serializers.SerializerMethodField()
+    raw_village_ss_name = serializers.ReadOnlyField(source="village.ss_name")
+    village_mmw_hp_chwc_name = serializers.ReadOnlyField(source="village.mmw_hp_chwc_name")
+    village_distance_from_upazila_office_km = serializers.ReadOnlyField(
+        source="village.distance_from_upazila_office_km"
+    )
+    village_bordering_country_name = serializers.ReadOnlyField(source="village.bordering_country_name")
+    village_other_activities = serializers.ReadOnlyField(source="village.other_activities")
     village = serializers.PrimaryKeyRelatedField(queryset=Village.objects.all(), write_only=True, required=False)
     sk_user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True, required=False)
     villages = VillageNestedSerializer(source="village", read_only=True)
 
     def get_sk_user_display_name(self, obj):
-        return get_local_record_assigned_user_details(obj)["name"]
+        return get_cached_local_record_assigned_user_details(obj)["name"]
 
     def get_sk_user_designation(self, obj):
-        return get_local_record_assigned_user_details(obj)["designation"]
+        return get_cached_local_record_assigned_user_details(obj)["designation"]
 
     def get_sk_user_ss_name(self, obj):
-        return get_local_record_assigned_user_details(obj)["ss_name"]
+        return get_cached_local_record_assigned_user_details(obj)["ss_name"]
+
+    def get_village_sk_shw_name(self, obj):
+        return self.get_sk_user_display_name(obj) or _clean_assignment_text(getattr(obj.village, "sk_shw_name", ""))
+
+    def get_village_ss_name(self, obj):
+        return self.get_sk_user_ss_name(obj) or _clean_assignment_text(getattr(obj.village, "ss_name", ""))
 
     class Meta:
         model = LocalRecord
@@ -251,6 +300,24 @@ class LocalRecordSerializer(serializers.ModelSerializer):
             "sk_user_display_name",
             "sk_user_designation",
             "sk_user_ss_name",
+            "district_name",
+            "upazila_name",
+            "union_name",
+            "ward_no",
+            "village_name",
+            "village_name_bn",
+            "village_code",
+            "village_latitude",
+            "village_longitude",
+            "village_population",
+            "village_sk_shw_name",
+            "raw_village_sk_shw_name",
+            "village_ss_name",
+            "raw_village_ss_name",
+            "village_mmw_hp_chwc_name",
+            "village_distance_from_upazila_office_km",
+            "village_bordering_country_name",
+            "village_other_activities",
             "reporting_year",
             "hh",
             "population",
@@ -267,7 +334,7 @@ class LocalRecordSerializer(serializers.ModelSerializer):
         )
 
 
-class NonLocalRecordSerializer(serializers.ModelSerializer):
+class NonLocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     sk_user_id = serializers.IntegerField(read_only=True)
     sk_user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True, required=False)
 
@@ -289,7 +356,21 @@ class NonLocalRecordSerializer(serializers.ModelSerializer):
         )
 
 
-class MonthlyApprovalSerializer(serializers.ModelSerializer):
+class MonthAccessSettingSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
+    class Meta:
+        model = MonthAccessSetting
+        fields = (
+            "id",
+            "reporting_year",
+            "month",
+            "is_open",
+            "close_date",
+            "created_at",
+            "updated_at",
+        )
+
+
+class MonthlyApprovalSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     record_type = serializers.SerializerMethodField()
     record_id = serializers.SerializerMethodField()
     local_record_id = serializers.IntegerField(read_only=True)

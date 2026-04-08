@@ -5,6 +5,12 @@ import axios from "axios";
 import { BACKEND_URL } from "../../../config";
 import { toast } from "sonner";
 
+const RequiredMark = () => (
+  <span className="ml-1 text-red-500" aria-hidden="true">
+    *
+  </span>
+);
+
 function CreateUsers() {
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
   const isMicroAdminUser = Number(userInfo?.role) === 7;
@@ -81,7 +87,10 @@ function CreateUsers() {
         onSubmit={handleSubmit}
       >
         <div className="form-group">
-          <label htmlFor="first_name">First Name</label>
+          <label htmlFor="first_name">
+            First Name
+            <RequiredMark />
+          </label>
           <input
             type="text"
             id="first_name"
@@ -94,7 +103,10 @@ function CreateUsers() {
           />
         </div>
         <div className="form-group">
-          <label htmlFor="last_name">Last Name</label>
+          <label htmlFor="last_name">
+            Last Name
+            <RequiredMark />
+          </label>
           <input
             type="text"
             id="last_name"
@@ -107,7 +119,10 @@ function CreateUsers() {
           />
         </div>
         <div className="form-group">
-          <label htmlFor="username">Username</label>
+          <label htmlFor="username">
+            Username
+            <RequiredMark />
+          </label>
           <input
             type="text"
             id="username"
@@ -129,12 +144,12 @@ function CreateUsers() {
             onChange={handleChange}
             placeholder="Email"
             className="w-full px-3 py-2 border rounded"
-            required
           />
         </div>
         <div className="relative form-group">
           <label htmlFor="password" className="block mb-1 font-medium">
             Password
+            <RequiredMark />
           </label>
           <input
             type={showPassword ? "text" : "password"}
@@ -160,7 +175,10 @@ function CreateUsers() {
         </div>
         {isMicroAdminUser && (
           <div className="form-group">
-            <label htmlFor="role">Role</label>
+            <label htmlFor="role">
+              Role
+              <RequiredMark />
+            </label>
             <select
               id="role"
               name="role"

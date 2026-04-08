@@ -27,6 +27,21 @@ export function getDhakaYear(): number {
   return parseInt(dhaka, 10);
 }
 
+export function getDhakaDateString(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dhaka",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value || "0000";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
+
+  return `${year}-${month}-${day}`;
+}
+
 export function getMonthTotal(record: Record<string, any>): number {
   return MONTH_COLUMNS.reduce((sum, col) => sum + (Number(record[col]) || 0), 0);
 }

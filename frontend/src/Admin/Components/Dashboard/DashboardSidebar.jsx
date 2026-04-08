@@ -73,6 +73,14 @@ function DashboardSidebar({ setAuthToken, location }) {
             <i className="fas fa-user-check" /> <span>Assign User</span>
           </Link>
 
+          <Link
+            to="/microstatification/month-access"
+            className={`menu-item border-b ${isActive("/microstatification/month-access") ? "active" : "text-black"
+              }`}
+          >
+            <i className="fas fa-calendar-alt" /> <span>Month Access</span>
+          </Link>
+
           <button className="w-full menu-item logout" onClick={handleLogout}>
             <i className="fas fa-sign-out-alt" /> <span>Log Out</span>
           </button>

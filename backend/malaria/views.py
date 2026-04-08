@@ -1,5 +1,7 @@
+from calendar import monthrange
 from collections import defaultdict
 from copy import copy
+from datetime import date, datetime
 from io import BytesIO
 import json
 import math
@@ -28,6 +30,7 @@ from .models import (
     LocalRecord,
     MalariaUserRole,
     MicrostatificationDataUpload,
+    MonthAccessSetting,
     MonthlyApproval,
     NonLocalRecord,
     Union,
@@ -43,6 +46,7 @@ from .serializers import (
     MalariaUserRoleSerializer,
     MicrostatificationDataUploadSerializer,
     MicrostatificationDataUploadFileSerializer,
+    MonthAccessSettingSerializer,
     MonthlyApprovalSerializer,
     NonLocalRecordSerializer,
     ProfileSerializer,
@@ -70,6 +74,7 @@ MONTH_COLUMNS = [
 ]
 ITN_FIELDS = ["itn_2023", "itn_2024", "itn_2025", "itn_2026"]
 COUNT_QUERY_VALUES = {"1", "true", "yes", "on", "exact"}
+REQUESTED_FIELD_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 MICROSTATIFICATION_TEMPLATE_DIR = (
     Path(__file__).resolve().parents[2]
     / "Malaria-Reporting-System"
@@ -111,6 +116,12 @@ MICRO_DASHBOARD_SCOPE_LABELS = (
 )
 MICROSTATIFICATION_DOWNLOAD_TICKET_SALT = "microstatification-download-ticket"
 MICROSTATIFICATION_DOWNLOAD_TICKET_MAX_AGE_SECONDS = 300
+FIELD_USER_VILLAGE_EDITABLE_FIELDS = {
+    "mmw_hp_chwc_name",
+    "distance_from_upazila_office_km",
+    "bordering_country_name",
+    "other_activities",
+}
 
 
 class XLSXBinaryRenderer(renderers.BaseRenderer):
@@ -193,12 +204,61 @@ def _count_requested(request):
     return (request.query_params.get("count") or "").lower() in COUNT_QUERY_VALUES
 
 
+def _get_requested_serializer_fields(request):
+    raw_fields = (request.query_params.get("_fields") or "").strip()
+    if not raw_fields:
+        return None
+
+    fields = []
+    for item in raw_fields.split(","):
+        field_name = item.strip()
+        if field_name and REQUESTED_FIELD_PATTERN.fullmatch(field_name):
+            fields.append(field_name)
+
+    return fields or None
+
+
 def _current_dhaka_month():
     return timezone.now().astimezone(ZoneInfo("Asia/Dhaka")).month
 
 
 def _current_dhaka_year():
     return timezone.now().astimezone(ZoneInfo("Asia/Dhaka")).year
+
+
+def _current_dhaka_date():
+    return timezone.now().astimezone(ZoneInfo("Asia/Dhaka")).date()
+
+
+def _month_start_date(reporting_year, month_number):
+    return date(reporting_year, month_number, 1)
+
+
+def _default_month_close_date(reporting_year, month_number):
+    return date(reporting_year, month_number, monthrange(reporting_year, month_number)[1])
+
+
+def _normalize_month_access_close_date(raw_value, reporting_year, month_number):
+    if isinstance(raw_value, date):
+        return raw_value
+
+    if raw_value in (None, ""):
+        return _default_month_close_date(reporting_year, month_number)
+
+    value = str(raw_value).strip()
+    if not value:
+        return _default_month_close_date(reporting_year, month_number)
+
+    if "T" in value:
+        value = value.split("T", 1)[0]
+
+    for pattern in ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(value, pattern).date()
+        except ValueError:
+            continue
+
+    return _default_month_close_date(reporting_year, month_number)
 
 
 def _month_field_to_number(field_name):
@@ -250,6 +310,53 @@ def _get_rejected_month_fields(record_type, instance):
         for month_number in rejected_months
         if 1 <= month_number <= len(MONTH_COLUMNS)
     }
+
+
+def _get_month_access_lookup(reporting_year):
+    today = _current_dhaka_date()
+    settings_by_month = {
+        setting.month: setting
+        for setting in MonthAccessSetting.objects.filter(reporting_year=reporting_year).only(
+            "month",
+            "close_date",
+        )
+    }
+    lookup = {}
+
+    for month_number in range(1, len(MONTH_COLUMNS) + 1):
+        month_start = _month_start_date(reporting_year, month_number)
+        setting = settings_by_month.get(month_number)
+        close_date = setting.close_date if setting and setting.close_date else _default_month_close_date(
+            reporting_year,
+            month_number,
+        )
+        lookup[month_number] = month_start <= today <= close_date
+
+    return lookup
+
+
+def _get_open_month_fields(reporting_year):
+    access_lookup = _get_month_access_lookup(reporting_year)
+    return {
+        MONTH_COLUMNS[month_number - 1]
+        for month_number, is_open in access_lookup.items()
+        if is_open and 1 <= month_number <= len(MONTH_COLUMNS)
+    }
+
+
+def _ensure_field_user_month_create_editable(user, reporting_year, validated_data):
+    if is_malaria_admin(user):
+        return
+
+    open_month_fields = _get_open_month_fields(reporting_year)
+    changed_month_fields = [
+        field
+        for field in MONTH_COLUMNS
+        if field in validated_data and (validated_data[field] or 0) > 0
+    ]
+    disallowed = [field for field in changed_month_fields if field not in open_month_fields]
+    if disallowed:
+        raise ValueError("You can only submit data for months that are still open.")
 
 
 def _sync_monthly_approvals_for_user_submission(record_type, instance, changed_month_fields):
@@ -1141,6 +1248,36 @@ def _record_within_profile_scope(profile, instance):
     return False
 
 
+def _village_within_profile_scope(profile, instance):
+    if not profile or not instance:
+        return False
+
+    if hasattr(profile, "micro_villages") and profile.micro_villages.filter(id=instance.id).exists():
+        return True
+
+    if getattr(profile, "micro_village_id", None):
+        return instance.id == profile.micro_village_id
+
+    if getattr(profile, "micro_union_id", None):
+        if getattr(instance, "union_id", None) != profile.micro_union_id:
+            return False
+        ward_no = (getattr(profile, "micro_ward_no", "") or "").strip()
+        if ward_no:
+            instance_ward = (getattr(instance, "ward_no", "") or "").strip()
+            return instance_ward.lower() == ward_no.lower()
+        return True
+
+    if getattr(profile, "micro_upazila_id", None):
+        upazila_id = getattr(getattr(instance, "union", None), "upazila_id", None)
+        return upazila_id == profile.micro_upazila_id
+
+    if getattr(profile, "micro_district_id", None):
+        district_id = getattr(getattr(getattr(instance, "union", None), "upazila", None), "district_id", None)
+        return district_id == profile.micro_district_id
+
+    return False
+
+
 def _ensure_local_record_editable(user, instance, validated_data):
     if is_malaria_admin(user):
         return
@@ -1156,21 +1293,16 @@ def _ensure_local_record_editable(user, instance, validated_data):
     ):
         raise ValueError("Only malaria admins can edit household, population, or ITN fields.")
 
-    if instance.reporting_year != _current_dhaka_year():
-        raise ValueError("You can only edit records for the current reporting year.")
-
-    editable_month = _current_dhaka_month()
-    allowed_month_field = MONTH_COLUMNS[editable_month - 1]
     rejected_month_fields = _get_rejected_month_fields(MonthlyApproval.RECORD_TYPE_LOCAL, instance)
     changed_month_fields = [
         field
         for field in MONTH_COLUMNS
         if field in validated_data and validated_data[field] != getattr(instance, field)
     ]
-    allowed_month_fields = {allowed_month_field, *rejected_month_fields}
+    allowed_month_fields = _get_open_month_fields(instance.reporting_year) | rejected_month_fields
     disallowed = [field for field in changed_month_fields if field not in allowed_month_fields]
     if disallowed:
-        raise ValueError("You can only edit the current month or months returned as not approved.")
+        raise ValueError("You can only edit months that are still open or months returned as not approved.")
 
 
 def _ensure_non_local_record_editable(user, instance, validated_data):
@@ -1180,11 +1312,6 @@ def _ensure_non_local_record_editable(user, instance, validated_data):
     if instance.sk_user_id != user.id:
         raise PermissionError("You can only edit your own non-local records.")
 
-    if instance.reporting_year != _current_dhaka_year():
-        raise ValueError("You can only edit records for the current reporting year.")
-
-    editable_month = _current_dhaka_month()
-    allowed_month_field = MONTH_COLUMNS[editable_month - 1]
     rejected_month_fields = _get_rejected_month_fields(MonthlyApproval.RECORD_TYPE_NON_LOCAL, instance)
     changed_month_fields = [
         field
@@ -1194,10 +1321,10 @@ def _ensure_non_local_record_editable(user, instance, validated_data):
     disallowed = [
         field
         for field in changed_month_fields
-        if field not in {allowed_month_field, *rejected_month_fields}
+        if field not in (_get_open_month_fields(instance.reporting_year) | rejected_month_fields)
     ]
     if disallowed:
-        raise ValueError("You can only edit the current month or months returned as not approved.")
+        raise ValueError("You can only edit months that are still open or months returned as not approved.")
 
 
 class MalariaSessionView(APIView):
@@ -1407,7 +1534,6 @@ class MalariaUsersView(APIView):
         user.set_password(validated["password"])
         user.save()
         role_obj, _ = MalariaUserRole.objects.update_or_create(user=user, defaults={"role": validated["role"]})
-
         return Response(
             {
                 "id": user.id,
@@ -1442,7 +1568,15 @@ class MalariaAdminWriteMixin:
         return [IsAuthenticated(), HasMalariaAccess()]
 
 
-class DistrictViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
+class RequestedFieldsViewMixin:
+    def get_serializer(self, *args, **kwargs):
+        requested_fields = _get_requested_serializer_fields(self.request)
+        if requested_fields and "fields" not in kwargs:
+            kwargs["fields"] = requested_fields
+        return super().get_serializer(*args, **kwargs)
+
+
+class DistrictViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.ModelViewSet):
     queryset = District.objects.all()
     serializer_class = DistrictSerializer
     pagination_class = None
@@ -1452,7 +1586,7 @@ class DistrictViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
         return _apply_filters(queryset, self.request, exact_fields=["id", "name"], in_fields=["id"])
 
 
-class UpazilaViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
+class UpazilaViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.ModelViewSet):
     queryset = Upazila.objects.select_related("district").all()
     serializer_class = UpazilaSerializer
     pagination_class = None
@@ -1462,7 +1596,7 @@ class UpazilaViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
         return _apply_filters(queryset, self.request, exact_fields=["id", "district_id"], in_fields=["id"])
 
 
-class UnionViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
+class UnionViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.ModelViewSet):
     queryset = Union.objects.select_related("upazila", "upazila__district").all()
     serializer_class = UnionSerializer
     pagination_class = None
@@ -1472,10 +1606,15 @@ class UnionViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
         return _apply_filters(queryset, self.request, exact_fields=["id", "upazila_id"], in_fields=["id"])
 
 
-class VillageViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
+class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.ModelViewSet):
     queryset = Village.objects.select_related("union", "union__upazila", "union__upazila__district").all()
     serializer_class = VillageSerializer
     pagination_class = None
+
+    def get_permissions(self):
+        if self.action in {"create", "destroy"}:
+            return [IsAuthenticated(), IsMalariaAdmin()]
+        return [IsAuthenticated(), HasMalariaAccess()]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -1504,8 +1643,41 @@ class VillageViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
 
         return queryset
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
 
-class LocalRecordViewSet(viewsets.ModelViewSet):
+        if not is_malaria_admin(request.user):
+            profile = getattr(request.user, "profile", None)
+            can_access = instance.local_records.filter(sk_user=request.user).exists() or _village_within_profile_scope(profile, instance)
+            if not can_access:
+                return Response(
+                    {"detail": "You can only edit villages within your assigned scope."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            disallowed_fields = sorted(
+                set(serializer.validated_data.keys()) - FIELD_USER_VILLAGE_EDITABLE_FIELDS,
+            )
+            if disallowed_fields:
+                return Response(
+                    {
+                        "detail": (
+                            "You can only edit Name of MMW, Health post & CHW(C), "
+                            "Village Distance from upazila office (KM), Name of Border with others country, "
+                            "and Others Activities (TDA/Dev care)."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+
+class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
     serializer_class = LocalRecordSerializer
     permission_classes = [IsAuthenticated, HasMalariaAccess]
     pagination_class = None
@@ -1553,9 +1725,14 @@ class LocalRecordViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
+        reporting_year = validated.get("reporting_year", timezone.now().year)
+
+        try:
+            _ensure_field_user_month_create_editable(request.user, reporting_year, validated)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         village = validated["village"]
-        reporting_year = validated.get("reporting_year", timezone.now().year)
         defaults = validated.copy()
         defaults.setdefault("sk_user", request.user)
         record, created = LocalRecord.objects.update_or_create(
@@ -1594,7 +1771,7 @@ class LocalRecordViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class NonLocalRecordViewSet(viewsets.ModelViewSet):
+class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
     serializer_class = NonLocalRecordSerializer
     permission_classes = [IsAuthenticated, HasMalariaAccess]
     pagination_class = None
@@ -1616,6 +1793,16 @@ class NonLocalRecordViewSet(viewsets.ModelViewSet):
             payload["sk_user"] = request.user.id
         serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
+
+        try:
+            _ensure_field_user_month_create_editable(
+                request.user,
+                serializer.validated_data.get("reporting_year", timezone.now().year),
+                serializer.validated_data,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -1647,7 +1834,57 @@ class NonLocalRecordViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class MonthlyApprovalViewSet(viewsets.ModelViewSet):
+class MonthAccessSettingViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
+    serializer_class = MonthAccessSettingSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in {"list", "retrieve"}:
+            return [IsAuthenticated(), HasMalariaAccess()]
+        return [IsAuthenticated(), IsMalariaAdmin()]
+
+    def get_queryset(self):
+        queryset = MonthAccessSetting.objects.all()
+        return _apply_filters(
+            queryset,
+            self.request,
+            exact_fields=["id", "reporting_year", "month"],
+            in_fields=["id", "month"],
+        )
+
+    def create(self, request, *args, **kwargs):
+        payload = request.data.copy()
+
+        try:
+            reporting_year = int(payload.get("reporting_year"))
+            month_number = int(payload.get("month"))
+            payload["close_date"] = _normalize_month_access_close_date(
+                payload.get("close_date"),
+                reporting_year,
+                month_number,
+            ).isoformat()
+            payload["is_open"] = True
+        except (TypeError, ValueError):
+            pass
+
+        existing_instance = None
+        if "reporting_year" in payload and "month" in payload:
+            existing_instance = MonthAccessSetting.objects.filter(
+                reporting_year=payload.get("reporting_year"),
+                month=payload.get("month"),
+            ).first()
+
+        serializer = self.get_serializer(existing_instance, data=payload)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        response_serializer = self.get_serializer(instance)
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_200_OK if existing_instance else status.HTTP_201_CREATED,
+        )
+
+
+class MonthlyApprovalViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
     serializer_class = MonthlyApprovalSerializer
     pagination_class = None
 

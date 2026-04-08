@@ -159,6 +159,25 @@ class NonLocalRecord(TimestampedModel, MonthlyCasesMixin):
         return f"{self.country} - {self.village_name or self.district_or_state} - {self.reporting_year}"
 
 
+class MonthAccessSetting(TimestampedModel):
+    reporting_year = models.PositiveIntegerField(default=current_year)
+    month = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(12)])
+    is_open = models.BooleanField(default=False)
+    close_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("reporting_year", "month")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("reporting_year", "month"),
+                name="malaria_unique_month_access_per_year_month",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.reporting_year} month={self.month} close={self.close_date or 'default'}"
+
+
 class MonthlyApproval(TimestampedModel):
     RECORD_TYPE_LOCAL = "local"
     RECORD_TYPE_NON_LOCAL = "non_local"

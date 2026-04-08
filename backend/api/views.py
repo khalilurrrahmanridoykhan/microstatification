@@ -6530,7 +6530,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
         sanitized_data = {
             'username': request.data.get('username'),
-            'email': request.data.get('email'),
+            'email': (request.data.get('email') or '').strip(),
             'password': request.data.get('password'),
             'first_name': request.data.get('first_name', ''),
             'last_name': request.data.get('last_name', ''),

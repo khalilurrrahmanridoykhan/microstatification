@@ -17,6 +17,7 @@ from .views import (
     MicrostatificationDataDownloadView,
     MicrostatificationDataDownloadLinkView,
     MicrostatificationDataUploadView,
+    MonthAccessSettingViewSet,
     MonthlyApprovalViewSet,
     NonLocalRecordViewSet,
     ProfilesView,
@@ -34,6 +35,7 @@ router.register(r"unions", UnionViewSet, basename="malaria-union")
 router.register(r"villages", VillageViewSet, basename="malaria-village")
 router.register(r"local-records", LocalRecordViewSet, basename="malaria-local-record")
 router.register(r"non-local-records", NonLocalRecordViewSet, basename="malaria-non-local-record")
+router.register(r"month-access-settings", MonthAccessSettingViewSet, basename="malaria-month-access-setting")
 router.register(r"monthly-approvals", MonthlyApprovalViewSet, basename="malaria-monthly-approval")
 router.register(r"approvals", MonthlyApprovalViewSet, basename="malaria-approval")
 

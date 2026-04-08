@@ -289,6 +289,7 @@ class UserListViewSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
     profile = UserProfileWriteSerializer(required=False)  # Use write serializer for create/update
 
     class Meta:
@@ -334,7 +335,7 @@ class UserSerializer(serializers.ModelSerializer):
 
         user = User(
             username=validated_data['username'],
-            email=validated_data['email'],
+            email=validated_data.get('email', ''),
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', '')
         )

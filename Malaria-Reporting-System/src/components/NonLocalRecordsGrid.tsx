@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -13,10 +13,17 @@ import {
 import {
   MONTH_COLUMNS,
   MONTH_LABELS,
+  getDhakaDateString,
   getDhakaMonth,
   getDhakaYear,
   getMonthTotal,
 } from "@/lib/monthUtils";
+import {
+  buildDefaultMonthAccessLookup,
+  buildMonthAccessLookup,
+  type MonthAccessLookup,
+  type MonthAccessRow,
+} from "@/lib/monthAccess";
 import { exportRowsToXlsx } from "@/lib/xlsxExport";
 import { Download, Plus, Trash2, RefreshCw, Save } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -52,6 +59,32 @@ interface DistrictOption {
   name: string;
 }
 
+interface UpazilaOption {
+  id: string;
+  name: string;
+  district_id: string;
+}
+
+interface UnionOption {
+  id: string;
+  name: string;
+  upazila_id: string;
+}
+
+interface VillageOption {
+  id: string;
+  name: string;
+  ward_no: string | null;
+  union_id: string;
+}
+
+type LocationField =
+  | "country"
+  | "district_or_state"
+  | "upazila_or_township"
+  | "union_name"
+  | "village_name";
+
 type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 type MonthCellStatus = "NEUTRAL" | "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
 
@@ -62,7 +95,21 @@ interface ApprovalRow {
 }
 
 const COUNTRIES = ["Bangladesh", "India", "Myanmar"];
+const COUNTRY_OPTIONS = COUNTRIES.map((name) => ({ name }));
 const DEFAULT_DISTRICT_NAME = "Bandarban";
+const BANGLADESH_COUNTRY = "Bangladesh";
+const OTHER_LOCATION_OPTION_VALUE = "__other__";
+const NON_LOCAL_RECORD_SELECT_COLUMNS = [
+  "id",
+  "sk_user_id",
+  "reporting_year",
+  "country",
+  "district_or_state",
+  "upazila_or_township",
+  "union_name",
+  "village_name",
+  ...MONTH_COLUMNS,
+].join(",");
 
 const createRowId = () => {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -77,6 +124,22 @@ const getNonLocalExportMonthValue = (row: NonLocalRow, monthColumn: (typeof MONT
   return value > 0 ? value : "";
 };
 
+const normalizeName = (value: unknown) => String(value ?? "").trim();
+
+const isBangladeshCountry = (country: string) =>
+  normalizeName(country).toLowerCase() === BANGLADESH_COUNTRY.toLowerCase();
+
+const hasMatchingNamedOption = (
+  options: Array<{ name: string }>,
+  value: string,
+) => {
+  const normalizedValue = normalizeName(value).toLowerCase();
+  if (!normalizedValue) return false;
+  return options.some(
+    (option) => normalizeName(option.name).toLowerCase() === normalizedValue,
+  );
+};
+
 const NonLocalRecordsGrid = () => {
   const { user, role, microRole } = useAuth();
   const { toast } = useToast();
@@ -84,25 +147,35 @@ const NonLocalRecordsGrid = () => {
   const isMicroAdmin = isAdmin && microRole === "micro_admin";
   const currentMonth = getDhakaMonth();
   const currentYear = getDhakaYear();
+  const todayDateString = getDhakaDateString();
   const isMobile = useIsMobile();
 
   const [year, setYear] = useState(currentYear);
   const [rows, setRows] = useState<NonLocalRow[]>([]);
   const [districts, setDistricts] = useState<DistrictOption[]>([]);
+  const [upazilas, setUpazilas] = useState<UpazilaOption[]>([]);
+  const [unions, setUnions] = useState<UnionOption[]>([]);
+  const [villages, setVillages] = useState<VillageOption[]>([]);
   const [selectedDistrictName, setSelectedDistrictName] = useState(DEFAULT_DISTRICT_NAME);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  const [explicitZeroMonthKeys, setExplicitZeroMonthKeys] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState<10 | 20 | 50 | -1>(10);
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [approvalLookup, setApprovalLookup] = useState<Record<string, ApprovalStatus>>({});
   const [approvalSavingKey, setApprovalSavingKey] = useState<string | null>(null);
+  const [customLocationFields, setCustomLocationFields] = useState<Record<string, boolean>>({});
+  const [monthAccessLookup, setMonthAccessLookup] = useState<MonthAccessLookup>(() =>
+    buildDefaultMonthAccessLookup(year, todayDateString),
+  );
 
   // -------- Color Logic (No DB Change) --------
   const getApprovalKey = (recordId: string, monthNumber: number) =>
     `${recordId}:${monthNumber}`;
+  const getMonthCellKey = (recordId: string, field: string) => `${recordId}:${field}`;
 
   const getMonthApprovalStatus = (recordId: string, monthNumber: number) =>
     approvalLookup[getApprovalKey(recordId, monthNumber)] || null;
@@ -114,7 +187,7 @@ const NonLocalRecordsGrid = () => {
     const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
     const isFutureMonth =
       year > currentYear || (year === currentYear && monthNumber > currentMonth);
-    const isCurrentMonth = year === currentYear && monthNumber === currentMonth;
+    const isFieldMonthOpen = Boolean(monthAccessLookup[monthNumber]);
 
     if (hasData) {
       if (approvalStatus === "APPROVED") return "APPROVED";
@@ -124,18 +197,17 @@ const NonLocalRecordsGrid = () => {
 
     if (approvalStatus === "REJECTED") return "REJECTED";
     if (approvalStatus === "APPROVED") return "APPROVED";
-    if (isCurrentMonth || isFutureMonth) return "NEUTRAL";
+    if (isFieldMonthOpen || isFutureMonth) return "NEUTRAL";
     return "NOT_SUBMITTED";
   };
 
   const isMonthEditable = (row: NonLocalRow, monthIndex: number) => {
     if (isAdmin) return true;
-    if (year !== currentYear) return false;
 
     const monthNumber = monthIndex + 1;
     const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
     if (approvalStatus === "REJECTED") return true;
-    return monthNumber === currentMonth;
+    return Boolean(monthAccessLookup[monthNumber]);
   };
 
   const getMonthTitle = (status: MonthCellStatus) => {
@@ -172,34 +244,36 @@ const NonLocalRecordsGrid = () => {
     if (!user) return;
     setLoading(true);
     try {
-      let query = supabase
+      let recordsQuery = supabase
         .from("non_local_records")
-        .select("*")
-        .eq("reporting_year", year)
-        .order("created_at");
+        .select(NON_LOCAL_RECORD_SELECT_COLUMNS)
+        .eq("reporting_year", year);
 
       if (!isAdmin) {
-        query = query.eq("sk_user_id", user.id);
+        recordsQuery = recordsQuery.eq("sk_user_id", user.id);
       }
 
       if (isMicroAdmin && selectedDistrictName !== "all") {
-        query = query.eq("district_or_state", selectedDistrictName);
+        recordsQuery = recordsQuery.eq("district_or_state", selectedDistrictName);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const [recordsResult, approvalResult] = await Promise.all([
+        recordsQuery,
+        supabase
+          .from("monthly_approvals")
+          .select("record_id, month, status")
+          .eq("record_type", "non_local")
+          .eq("reporting_year", year),
+      ]);
 
-      const nextRows = data || [];
-      const { data: approvalData, error: approvalError } = await supabase
-        .from("monthly_approvals")
-        .select("record_id, month, status")
-        .eq("record_type", "non_local")
-        .eq("reporting_year", year);
-      if (approvalError) throw approvalError;
+      if (recordsResult.error) throw recordsResult.error;
+      if (approvalResult.error) throw approvalResult.error;
+
+      const nextRows = (recordsResult.data || []) as NonLocalRow[];
 
       const visibleRecordIds = new Set(nextRows.map((row: NonLocalRow) => String(row.id)));
       const nextApprovalLookup = Object.fromEntries(
-        ((approvalData || []) as ApprovalRow[])
+        ((approvalResult.data || []) as ApprovalRow[])
           .filter((approval) => visibleRecordIds.has(String(approval.record_id)))
           .map((approval) => [
             getApprovalKey(String(approval.record_id), Number(approval.month)),
@@ -208,7 +282,26 @@ const NonLocalRecordsGrid = () => {
       );
 
       setRows(nextRows);
+      setExplicitZeroMonthKeys((prev) => {
+        const next = new Set<string>();
+        const rowById = new Map(nextRows.map((row) => [String(row.id), row]));
+        prev.forEach((cellKey) => {
+          const separatorIndex = cellKey.indexOf(":");
+          if (separatorIndex === -1) return;
+          const rowId = cellKey.slice(0, separatorIndex);
+          const field = cellKey.slice(separatorIndex + 1);
+          if (!MONTH_COLUMNS.includes(field as (typeof MONTH_COLUMNS)[number])) {
+            return;
+          }
+          const row = rowById.get(rowId);
+          if (row && Number((row as any)[field] || 0) === 0) {
+            next.add(cellKey);
+          }
+        });
+        return next;
+      });
       setApprovalLookup(nextApprovalLookup);
+      setCustomLocationFields({});
       setDirtyIds(new Set());
       setDeletedIds([]);
       setCurrentPage(1);
@@ -222,27 +315,59 @@ const NonLocalRecordsGrid = () => {
   useEffect(() => {
     let canceled = false;
 
-    const loadDistricts = async () => {
+    const loadMasterData = async () => {
       try {
-        const { data, error } = await supabase.from("districts").select("id,name").order("name");
-        if (error) throw error;
+        const [districtResult, upazilaResult, unionResult, villageResult] = await Promise.all([
+          supabase.from("districts").select("id,name").order("name"),
+          supabase.from("upazilas").select("id,name,district_id").order("name"),
+          supabase.from("unions").select("id,name,upazila_id").order("name"),
+          supabase.from("villages").select("id,name,ward_no,union_id").order("name"),
+        ]);
+
+        if (districtResult.error) throw districtResult.error;
+        if (upazilaResult.error) throw upazilaResult.error;
+        if (unionResult.error) throw unionResult.error;
+        if (villageResult.error) throw villageResult.error;
         if (canceled) return;
-        const options = (data || []).map((item: any) => ({
+
+        const districtOptions = (districtResult.data || []).map((item: any) => ({
           id: String(item.id),
           name: item.name,
         }));
-        setDistricts(options);
-        setSelectedDistrictName((currentValue) => {
-          if (currentValue && currentValue !== "all") {
-            return currentValue;
-          }
 
-          const hasBandarban = options.some(
-            (district) => district.name === DEFAULT_DISTRICT_NAME,
-          );
+        setDistricts(districtOptions);
+        setUpazilas((upazilaResult.data || []).map((item: any) => ({
+          id: String(item.id),
+          name: item.name,
+          district_id: String(item.district_id),
+        })));
+        setUnions((unionResult.data || []).map((item: any) => ({
+          id: String(item.id),
+          name: item.name,
+          upazila_id: String(item.upazila_id),
+        })));
+        setVillages((villageResult.data || []).map((item: any) => ({
+          id: String(item.id),
+          name: item.name,
+          ward_no: item.ward_no ?? null,
+          union_id: String(item.union_id),
+        })));
 
-          return hasBandarban ? DEFAULT_DISTRICT_NAME : "all";
-        });
+        if (isMicroAdmin) {
+          setSelectedDistrictName((currentValue) => {
+            if (currentValue && currentValue !== "all") {
+              return currentValue;
+            }
+
+            const hasBandarban = districtOptions.some(
+              (district) => district.name === DEFAULT_DISTRICT_NAME,
+            );
+
+            return hasBandarban ? DEFAULT_DISTRICT_NAME : "all";
+          });
+        } else {
+          setSelectedDistrictName("all");
+        }
       } catch (err: any) {
         if (canceled) return;
         toast({
@@ -253,12 +378,7 @@ const NonLocalRecordsGrid = () => {
       }
     };
 
-    if (isMicroAdmin) {
-      void loadDistricts();
-    } else {
-      setDistricts([]);
-      setSelectedDistrictName("all");
-    }
+    void loadMasterData();
 
     return () => {
       canceled = true;
@@ -270,10 +390,184 @@ const NonLocalRecordsGrid = () => {
   }, [fetchData]);
 
   useEffect(() => {
+    let canceled = false;
+
+    const loadMonthAccess = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("month_access_settings")
+          .select("id,reporting_year,month,is_open,close_date")
+          .eq("reporting_year", year);
+
+        if (error) throw error;
+        if (canceled) return;
+
+        setMonthAccessLookup(
+          buildMonthAccessLookup(
+            ((data || []) as MonthAccessRow[]),
+            year,
+            todayDateString,
+          ),
+        );
+      } catch (err: any) {
+        if (canceled) return;
+        setMonthAccessLookup(buildDefaultMonthAccessLookup(year, todayDateString));
+        toast({
+          title: "Month access load error",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
+    };
+
+    void loadMonthAccess();
+
+    return () => {
+      canceled = true;
+    };
+  }, [year, todayDateString, toast]);
+
+  useEffect(() => {
     if (loading) {
       setShowLoadingScreen(true);
     }
   }, [loading]);
+
+  const districtIdByName = useMemo(
+    () =>
+      Object.fromEntries(
+        districts.map((district) => [normalizeName(district.name), district.id]),
+      ) as Record<string, string>,
+    [districts],
+  );
+
+  const upazilasByDistrictId = useMemo(() => {
+    const grouped: Record<string, UpazilaOption[]> = {};
+    upazilas.forEach((upazila) => {
+      if (!grouped[upazila.district_id]) {
+        grouped[upazila.district_id] = [];
+      }
+      grouped[upazila.district_id].push(upazila);
+    });
+    return grouped;
+  }, [upazilas]);
+
+  const unionsByUpazilaId = useMemo(() => {
+    const grouped: Record<string, UnionOption[]> = {};
+    unions.forEach((union) => {
+      if (!grouped[union.upazila_id]) {
+        grouped[union.upazila_id] = [];
+      }
+      grouped[union.upazila_id].push(union);
+    });
+    return grouped;
+  }, [unions]);
+
+  const villagesByUnionId = useMemo(() => {
+    const grouped: Record<string, VillageOption[]> = {};
+    villages.forEach((village) => {
+      if (!grouped[village.union_id]) {
+        grouped[village.union_id] = [];
+      }
+      grouped[village.union_id].push(village);
+    });
+    return grouped;
+  }, [villages]);
+
+  const getUpazilaOptionsForRow = useCallback(
+    (row: NonLocalRow) => {
+      const districtId = districtIdByName[normalizeName(row.district_or_state)];
+      return districtId ? upazilasByDistrictId[districtId] || [] : [];
+    },
+    [districtIdByName, upazilasByDistrictId],
+  );
+
+  const getUnionOptionsForRow = useCallback(
+    (row: NonLocalRow) => {
+      const matchingUpazila = getUpazilaOptionsForRow(row).find(
+        (option) => normalizeName(option.name) === normalizeName(row.upazila_or_township),
+      );
+      return matchingUpazila ? unionsByUpazilaId[matchingUpazila.id] || [] : [];
+    },
+    [getUpazilaOptionsForRow, unionsByUpazilaId],
+  );
+
+  const getVillageOptionsForRow = useCallback(
+    (row: NonLocalRow) => {
+      const matchingUnion = getUnionOptionsForRow(row).find(
+        (option) => normalizeName(option.name) === normalizeName(row.union_name),
+      );
+      return matchingUnion ? villagesByUnionId[matchingUnion.id] || [] : [];
+    },
+    [getUnionOptionsForRow, villagesByUnionId],
+  );
+
+  const updateRow = useCallback(
+    (rowId: string, updater: (row: NonLocalRow) => NonLocalRow) => {
+      setRows((prev) => prev.map((row) => (row.id === rowId ? updater(row) : row)));
+      setDirtyIds((prev) => new Set(prev).add(rowId));
+    },
+    [],
+  );
+
+  const getLocationFieldModeKey = useCallback(
+    (rowId: string, field: LocationField) => `${rowId}:${field}`,
+    [],
+  );
+
+  const setLocationFieldOtherMode = useCallback(
+    (rowId: string, field: LocationField, enabled: boolean) => {
+      const key = getLocationFieldModeKey(rowId, field);
+      setCustomLocationFields((prev) => {
+        if (enabled) {
+          return prev[key] ? prev : { ...prev, [key]: true };
+        }
+
+        if (!(key in prev)) {
+          return prev;
+        }
+
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    },
+    [getLocationFieldModeKey],
+  );
+
+  const clearLocationFieldOtherModes = useCallback(
+    (rowId: string, fields: LocationField[]) => {
+      setCustomLocationFields((prev) => {
+        let changed = false;
+        const next = { ...prev };
+
+        fields.forEach((field) => {
+          const key = getLocationFieldModeKey(rowId, field);
+          if (key in next) {
+            delete next[key];
+            changed = true;
+          }
+        });
+
+        return changed ? next : prev;
+      });
+    },
+    [getLocationFieldModeKey],
+  );
+
+  const isLocationFieldOtherMode = useCallback(
+    (
+      rowId: string,
+      field: LocationField,
+      value: string,
+      options: Array<{ name: string }>,
+    ) => {
+      const key = getLocationFieldModeKey(rowId, field);
+      return Boolean(customLocationFields[key])
+        || (Boolean(normalizeName(value)) && !hasMatchingNamedOption(options, value));
+    },
+    [customLocationFields, getLocationFieldModeKey],
+  );
 
   const addRow = () => {
     if (!user) return;
@@ -281,7 +575,7 @@ const NonLocalRecordsGrid = () => {
       id: createRowId(),
       sk_user_id: user.id,
       reporting_year: year,
-      country: "Bangladesh",
+      country: BANGLADESH_COUNTRY,
       district_or_state: isMicroAdmin && selectedDistrictName !== "all" ? selectedDistrictName : "",
       upazila_or_township: "",
       union_name: "",
@@ -323,6 +617,22 @@ const NonLocalRecordsGrid = () => {
       next.delete(id);
       return next;
     });
+    setExplicitZeroMonthKeys((prev) => {
+      const next = new Set<string>();
+      prev.forEach((cellKey) => {
+        if (!cellKey.startsWith(`${id}:`)) {
+          next.add(cellKey);
+        }
+      });
+      return next;
+    });
+    clearLocationFieldOtherModes(id, [
+      "country",
+      "district_or_state",
+      "upazila_or_township",
+      "union_name",
+      "village_name",
+    ]);
   };
 
   const handleCellChange = (rowId: string, field: string, value: string) => {
@@ -333,6 +643,18 @@ const NonLocalRecordsGrid = () => {
       setRows((prev) =>
         prev.map((r) => (r.id === rowId ? { ...r, [field]: num } : r)),
       );
+      setExplicitZeroMonthKeys((prev) => {
+        const next = new Set(prev);
+        const cellKey = getMonthCellKey(rowId, field);
+        if (value === "") {
+          next.delete(cellKey);
+        } else if (num === 0) {
+          next.add(cellKey);
+        } else {
+          next.delete(cellKey);
+        }
+        return next;
+      });
     } else {
       setRows((prev) =>
         prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r)),
@@ -340,6 +662,133 @@ const NonLocalRecordsGrid = () => {
     }
 
     setDirtyIds((prev) => new Set(prev).add(rowId));
+  };
+
+  const handleCountryChange = (rowId: string, country: string) => {
+    clearLocationFieldOtherModes(rowId, [
+      "district_or_state",
+      "upazila_or_township",
+      "union_name",
+      "village_name",
+    ]);
+    updateRow(rowId, (row) => {
+      if (!isBangladeshCountry(country)) {
+        return { ...row, country };
+      }
+
+      const currentDistrictName = normalizeName(row.district_or_state);
+      const hasCurrentDistrict = districts.some(
+        (district) => normalizeName(district.name) === currentDistrictName,
+      );
+      const nextDistrictName =
+        hasCurrentDistrict
+          ? row.district_or_state
+          : (isMicroAdmin && selectedDistrictName !== "all" ? selectedDistrictName : "");
+
+      return {
+        ...row,
+        country,
+        district_or_state: nextDistrictName,
+        upazila_or_township: hasCurrentDistrict ? row.upazila_or_township : "",
+        union_name: hasCurrentDistrict ? row.union_name : "",
+        village_name: hasCurrentDistrict ? row.village_name : "",
+      };
+    });
+  };
+
+  const handleDistrictChange = (rowId: string, districtName: string) => {
+    clearLocationFieldOtherModes(rowId, [
+      "upazila_or_township",
+      "union_name",
+      "village_name",
+    ]);
+    updateRow(rowId, (row) => ({
+      ...row,
+      district_or_state: districtName,
+      upazila_or_township: "",
+      union_name: "",
+      village_name: "",
+    }));
+  };
+
+  const handleUpazilaChange = (rowId: string, upazilaName: string) => {
+    clearLocationFieldOtherModes(rowId, ["union_name", "village_name"]);
+    updateRow(rowId, (row) => ({
+      ...row,
+      upazila_or_township: upazilaName,
+      union_name: "",
+      village_name: "",
+    }));
+  };
+
+  const handleUnionChange = (rowId: string, unionName: string) => {
+    clearLocationFieldOtherModes(rowId, ["village_name"]);
+    updateRow(rowId, (row) => ({
+      ...row,
+      union_name: unionName,
+      village_name: "",
+    }));
+  };
+
+  const handleVillageChange = (rowId: string, villageName: string) => {
+    updateRow(rowId, (row) => ({
+      ...row,
+      village_name: villageName,
+    }));
+  };
+
+  const renderBangladeshLocationCell = (
+    row: NonLocalRow,
+    field: LocationField,
+    options: Array<{ id?: string; name: string; ward_no?: string | null }>,
+    placeholder: string,
+    onSelectValueChange: (rowId: string, value: string) => void,
+    disabled = false,
+  ) => {
+    const value = String(row[field] || "");
+    const otherMode = isLocationFieldOtherMode(row.id, field, value, options);
+
+    return (
+      <td className="grid-td p-0">
+        <div className="flex h-full flex-col">
+          <select
+            className="grid-input bg-transparent"
+            value={otherMode ? OTHER_LOCATION_OPTION_VALUE : value}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+
+              if (nextValue === OTHER_LOCATION_OPTION_VALUE) {
+                setLocationFieldOtherMode(row.id, field, true);
+                onSelectValueChange(row.id, "");
+                return;
+              }
+
+              setLocationFieldOtherMode(row.id, field, false);
+              onSelectValueChange(row.id, nextValue);
+            }}
+            disabled={disabled}
+          >
+            <option value="">{placeholder}</option>
+            {options.map((option) => (
+              <option key={option.id ?? option.name} value={option.name}>
+                {option.name}
+                {"ward_no" in option && option.ward_no ? ` (Ward ${option.ward_no})` : ""}
+              </option>
+            ))}
+            <option value={OTHER_LOCATION_OPTION_VALUE}>Other</option>
+          </select>
+
+          {otherMode && (
+            <input
+              className="grid-input border-t border-black/5"
+              value={value}
+              onChange={(event) => handleCellChange(row.id, field, event.target.value)}
+              placeholder="Type here"
+            />
+          )}
+        </div>
+      </td>
+    );
   };
 
   const handleSave = async () => {
@@ -601,8 +1050,10 @@ const NonLocalRecordsGrid = () => {
                 <th className="grid-th min-w-[120px]">Union</th>
                 <th className="grid-th min-w-[120px]">Village</th>
                 {MONTH_LABELS.map((m) => (
-                  <th key={m} className="grid-th min-w-[64px]">
-                    {m}
+                  <th key={m} className="grid-th grid-th-month min-w-[28px] w-[28px]">
+                    <div className="grid-th-month-content">
+                      <span className="grid-th-month-label">{m}</span>
+                    </div>
                   </th>
                 ))}
                 <th className="grid-th min-w-[72px] font-bold">Total</th>
@@ -631,56 +1082,139 @@ const NonLocalRecordsGrid = () => {
                     </td>
 
                     <td className="grid-td p-0">
-                      <select
-                        className="grid-input bg-transparent"
-                        value={row.country}
-                        onChange={(e) => handleCellChange(row.id, "country", e.target.value)}
-                      >
-                        {COUNTRIES.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex h-full flex-col">
+                        <select
+                          className="grid-input bg-transparent"
+                          value={
+                            isLocationFieldOtherMode(
+                              row.id,
+                              "country",
+                              row.country,
+                              COUNTRY_OPTIONS,
+                            )
+                              ? OTHER_LOCATION_OPTION_VALUE
+                              : row.country
+                          }
+                          onChange={(e) => {
+                            const nextValue = e.target.value;
+
+                            if (nextValue === OTHER_LOCATION_OPTION_VALUE) {
+                              setLocationFieldOtherMode(row.id, "country", true);
+                              handleCountryChange(row.id, "");
+                              return;
+                            }
+
+                            setLocationFieldOtherMode(row.id, "country", false);
+                            handleCountryChange(row.id, nextValue);
+                          }}
+                        >
+                          {COUNTRIES.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                          <option value={OTHER_LOCATION_OPTION_VALUE}>Other</option>
+                        </select>
+
+                        {isLocationFieldOtherMode(
+                          row.id,
+                          "country",
+                          row.country,
+                          COUNTRY_OPTIONS,
+                        ) && (
+                          <input
+                            className="grid-input border-t border-black/5"
+                            value={row.country}
+                            onChange={(e) => handleCellChange(row.id, "country", e.target.value)}
+                            placeholder="Type country"
+                          />
+                        )}
+                      </div>
                     </td>
 
-                    <td className="grid-td p-0">
-                      <input
-                        className="grid-input"
-                        value={row.district_or_state}
-                        onChange={(e) => handleCellChange(row.id, "district_or_state", e.target.value)}
-                      />
-                    </td>
+                    {isBangladeshCountry(row.country) ? (
+                      renderBangladeshLocationCell(
+                        row,
+                        "district_or_state",
+                        districts,
+                        "Select district",
+                        handleDistrictChange,
+                      )
+                    ) : (
+                      <td className="grid-td p-0">
+                        <input
+                          className="grid-input"
+                          value={row.district_or_state}
+                          onChange={(e) => handleCellChange(row.id, "district_or_state", e.target.value)}
+                        />
+                      </td>
+                    )}
 
-                    <td className="grid-td p-0">
-                      <input
-                        className="grid-input"
-                        value={row.upazila_or_township}
-                        onChange={(e) => handleCellChange(row.id, "upazila_or_township", e.target.value)}
-                      />
-                    </td>
+                    {isBangladeshCountry(row.country) ? (
+                      renderBangladeshLocationCell(
+                        row,
+                        "upazila_or_township",
+                        getUpazilaOptionsForRow(row),
+                        "Select upazila",
+                        handleUpazilaChange,
+                        !normalizeName(row.district_or_state),
+                      )
+                    ) : (
+                      <td className="grid-td p-0">
+                        <input
+                          className="grid-input"
+                          value={row.upazila_or_township}
+                          onChange={(e) => handleCellChange(row.id, "upazila_or_township", e.target.value)}
+                        />
+                      </td>
+                    )}
 
-                    <td className="grid-td p-0">
-                      <input
-                        className="grid-input"
-                        value={row.union_name}
-                        onChange={(e) => handleCellChange(row.id, "union_name", e.target.value)}
-                      />
-                    </td>
+                    {isBangladeshCountry(row.country) ? (
+                      renderBangladeshLocationCell(
+                        row,
+                        "union_name",
+                        getUnionOptionsForRow(row),
+                        "Select union",
+                        handleUnionChange,
+                        !normalizeName(row.upazila_or_township),
+                      )
+                    ) : (
+                      <td className="grid-td p-0">
+                        <input
+                          className="grid-input"
+                          value={row.union_name}
+                          onChange={(e) => handleCellChange(row.id, "union_name", e.target.value)}
+                        />
+                      </td>
+                    )}
 
-                    <td className="grid-td p-0">
-                      <input
-                        className="grid-input"
-                        value={row.village_name}
-                        onChange={(e) => handleCellChange(row.id, "village_name", e.target.value)}
-                      />
-                    </td>
+                    {isBangladeshCountry(row.country) ? (
+                      renderBangladeshLocationCell(
+                        row,
+                        "village_name",
+                        getVillageOptionsForRow(row),
+                        "Select village",
+                        handleVillageChange,
+                        !normalizeName(row.union_name),
+                      )
+                    ) : (
+                      <td className="grid-td p-0">
+                        <input
+                          className="grid-input"
+                          value={row.village_name}
+                          onChange={(e) => handleCellChange(row.id, "village_name", e.target.value)}
+                        />
+                      </td>
+                    )}
 
                     {MONTH_COLUMNS.map((col, idx) => {
                       const value = (row as any)[col] as number;
                       const monthNumber = idx + 1;
                       const status = getMonthStatus(row, idx);
                       const editable = isMonthEditable(row, idx);
+                      const showExplicitZero = explicitZeroMonthKeys.has(
+                        getMonthCellKey(row.id, col),
+                      );
                       const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
                       const hasData = value > 0;
                       const isApprovalSaving = approvalSavingKey === getApprovalKey(row.id, monthNumber);
@@ -699,7 +1233,7 @@ const NonLocalRecordsGrid = () => {
                               min={0}
                               className={`grid-input bg-transparent text-center ${editable ? "" : "text-muted-foreground"
                                 }`}
-                              value={value > 0 ? String(value) : ""}
+                              value={value > 0 || showExplicitZero ? String(value) : ""}
                               onChange={(e) => handleCellChange(row.id, col, e.target.value)}
                               disabled={!editable}
                             />

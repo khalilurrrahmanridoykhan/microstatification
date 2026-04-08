@@ -4,6 +4,7 @@ from .models import (
     District,
     LocalRecord,
     MalariaUserRole,
+    MonthAccessSetting,
     MonthlyApproval,
     NonLocalRecord,
     Union,
@@ -74,3 +75,10 @@ class MonthlyApprovalAdmin(admin.ModelAdmin):
     list_display = ("record_type", "record_pk", "month", "status", "reporting_year", "approved_by", "approved_at")
     list_filter = ("status", "reporting_year", "month")
     search_fields = ("approved_by__username", "approved_by__email")
+
+
+@admin.register(MonthAccessSetting)
+class MonthAccessSettingAdmin(admin.ModelAdmin):
+    list_display = ("reporting_year", "month", "close_date", "is_open", "updated_at")
+    list_filter = ("reporting_year", "is_open", "month")
+    search_fields = ("=reporting_year",)
