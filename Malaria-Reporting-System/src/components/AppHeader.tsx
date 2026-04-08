@@ -28,7 +28,7 @@ const AppHeader = ({
   navItems,
 }: AppHeaderProps) => {
   return (
-    <header className="sticky top-0 z-20 border-b border-border/70 bg-[hsl(var(--background)/0.8)] shadow-[0_10px_30px_hsl(200_32%_13%_/_0.06)] backdrop-blur-xl supports-[backdrop-filter]:bg-[hsl(var(--background)/0.68)]">
+    <header className="border-b border-border/70 bg-background">
       <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-3 py-4 sm:px-4 md:px-6">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
@@ -46,7 +46,6 @@ const AppHeader = ({
             )}
 
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">National Program Interface</p>
               <h1 className="font-display text-2xl text-foreground md:text-[2rem]">{title}</h1>
               {subtitle && <p className="mt-1 max-w-3xl text-sm text-muted-foreground md:block">{subtitle}</p>}
             </div>

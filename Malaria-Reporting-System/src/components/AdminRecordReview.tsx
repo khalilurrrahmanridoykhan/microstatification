@@ -23,7 +23,7 @@ interface ReviewRow {
 interface ApprovalRow {
   record_id: string;
   month: number;
-  status: "PENDING" | "APPROVED";
+  status: "PENDING" | "APPROVED" | "REJECTED";
 }
 
 interface SKOption { user_id: string; name: string; }
@@ -145,6 +145,7 @@ const AdminRecordReview = () => {
     const status = getStatus(recordId, month);
     if (status === "APPROVED") return "bg-green-50 border border-green-200 text-green-800 cursor-pointer hover:bg-green-100";
     if (status === "PENDING")  return "bg-yellow-50 border border-yellow-200 text-yellow-800 cursor-pointer hover:bg-yellow-100";
+    if (status === "REJECTED") return "bg-orange-50 border border-orange-200 text-orange-800 cursor-pointer hover:bg-orange-100";
     return "bg-red-50 border border-red-200 text-red-700 cursor-pointer hover:bg-red-100";
   };
 
@@ -194,6 +195,7 @@ const AdminRecordReview = () => {
       <div className="flex items-center gap-3 text-[11px] text-gray-500">
         <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-red-100 border border-red-200" />Needs approval</span>
         <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-yellow-100 border border-yellow-200" />Pending</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-orange-100 border border-orange-200" />Not approved</span>
         <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-green-100 border border-green-200" />Approved</span>
         <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-gray-100 border border-gray-200" />No data</span>
       </div>

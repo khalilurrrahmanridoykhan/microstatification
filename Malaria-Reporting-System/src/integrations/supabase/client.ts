@@ -25,6 +25,11 @@ interface QueryResult<T = any> {
   count?: number | null;
 }
 
+interface LoginResultData {
+  token: string;
+  user: any;
+}
+
 const FALLBACK_ORIGIN =
   typeof window !== "undefined" && window.location?.origin
     ? window.location.origin
@@ -34,6 +39,10 @@ const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || FALLBACK_ORIGIN).replac
 const MALARIA_API_BASE = `${BACKEND_URL}/api/malaria`;
 const LOGIN_URL = `${BACKEND_URL}/api/auth/login/`;
 const TOKEN_KEY = "malaria_auth_token";
+const SHARED_TOKEN_KEY = "authToken";
+const SHARED_USER_INFO_KEY = "userInfo";
+const BRAC_DOWNLOAD_USERNAME =
+  import.meta.env.VITE_BRAC_DOWNLOAD_USERNAME || "brac_data_download_user";
 
 const TABLE_ENDPOINTS: Record<string, string> = {
   profiles: "profiles",
@@ -50,15 +59,72 @@ const TABLE_ENDPOINTS: Record<string, string> = {
 const listeners = new Set<(event: AuthEvent, session: MalariaSession | null) => void>();
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return (
+    localStorage.getItem(TOKEN_KEY)
+    || sessionStorage.getItem(SHARED_TOKEN_KEY)
+    || localStorage.getItem(SHARED_TOKEN_KEY)
+  );
 }
 
 function setToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
 }
 
-function clearToken() {
+function clearMalariaToken() {
   localStorage.removeItem(TOKEN_KEY);
+}
+
+function setSharedAuthSession(token: string, user: any) {
+  const serializedUser = JSON.stringify(user || {});
+  sessionStorage.setItem(SHARED_TOKEN_KEY, token);
+  localStorage.setItem(SHARED_TOKEN_KEY, token);
+  sessionStorage.setItem(SHARED_USER_INFO_KEY, serializedUser);
+  localStorage.setItem(SHARED_USER_INFO_KEY, serializedUser);
+}
+
+function clearSharedAuthSession() {
+  sessionStorage.removeItem(SHARED_TOKEN_KEY);
+  localStorage.removeItem(SHARED_TOKEN_KEY);
+  sessionStorage.removeItem(SHARED_USER_INFO_KEY);
+  localStorage.removeItem(SHARED_USER_INFO_KEY);
+}
+
+function getNumericUserRole(user: any) {
+  return Number(user?.role || 0);
+}
+
+function getMicroRole(user: any) {
+  return String(user?.profile?.micro_role || "").toLowerCase();
+}
+
+function isMalariaFieldUser(user: any) {
+  const role = getNumericUserRole(user);
+  const microRole = getMicroRole(user);
+  return role === 8 || role === 9 || microRole === "sk" || microRole === "shw";
+}
+
+function hasMalariaWorkspaceAccess(user: any) {
+  const role = getNumericUserRole(user);
+  const microRole = getMicroRole(user);
+  return (
+    role === 1
+    || role === 7
+    || role === 8
+    || role === 9
+    || microRole === "micro_admin"
+    || microRole === "sk"
+    || microRole === "shw"
+  );
+}
+
+function getPostLoginRedirect(user: any) {
+  if (isMalariaFieldUser(user)) {
+    return "/malaria/";
+  }
+  if (user?.username === BRAC_DOWNLOAD_USERNAME) {
+    return "/projects/55/all-rows";
+  }
+  return "/dashboard";
 }
 
 function buildError(message: string) {
@@ -343,8 +409,8 @@ export const supabase = {
 
       const result = await fetchSession();
       if (result.error || !result.data) {
-        clearToken();
-        return { data: { session: null as MalariaSession | null }, error: result.error };
+        clearMalariaToken();
+        return { data: { session: null as MalariaSession | null }, error: null };
       }
 
       return {
@@ -370,7 +436,7 @@ export const supabase = {
 
     async signInWithPassword({ email, password }: { email: string; password: string }) {
       const loginId = email.trim();
-      const loginResult = await requestJson<{ token: string }>(
+      const loginResult = await requestJson<LoginResultData>(
         LOGIN_URL,
         {
           method: "POST",
@@ -383,19 +449,20 @@ export const supabase = {
         return { data: null, error: loginResult.error || buildError("Login failed") };
       }
 
-      setToken(loginResult.data.token);
-      const sessionResult = await fetchSession();
-      if (sessionResult.error || !sessionResult.data) {
-        clearToken();
-        return {
-          data: null,
-          error: sessionResult.error || buildError("This account does not have malaria access."),
-        };
+      const { token, user } = loginResult.data;
+      setSharedAuthSession(token, user);
+      if (hasMalariaWorkspaceAccess(user)) {
+        setToken(token);
+      } else {
+        clearMalariaToken();
       }
 
-      const session = buildSessionFromPayload(sessionResult.data);
-      emit("SIGNED_IN", session);
-      return { data: { session }, error: null };
+      return {
+        data: {
+          redirectTo: getPostLoginRedirect(user),
+        },
+        error: null,
+      };
     },
 
     async signOut() {
@@ -403,7 +470,8 @@ export const supabase = {
       if (token) {
         await requestJson(`${MALARIA_API_BASE}/auth/logout/`, { method: "POST" });
       }
-      clearToken();
+      clearMalariaToken();
+      clearSharedAuthSession();
       emit("SIGNED_OUT", null);
       return { error: null };
     },

@@ -61,6 +61,11 @@ function MultiSelectDropdown({
     );
   };
 
+  const allOptionValues = options.map((option) => String(option.value));
+  const allSelected =
+    allOptionValues.length > 0 &&
+    allOptionValues.every((value) => values.includes(value));
+
   return (
     <div className="relative" ref={containerRef}>
       <button
@@ -78,6 +83,27 @@ function MultiSelectDropdown({
 
       {isOpen && !disabled && (
         <div className="absolute z-20 w-full mt-1 bg-white border rounded shadow-lg">
+          {options.length > 0 && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
+              <button
+                type="button"
+                className="text-sm font-medium text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                onClick={() => onChange(allOptionValues)}
+                disabled={allSelected}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="text-sm font-medium text-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                onClick={() => onChange([])}
+                disabled={values.length === 0}
+              >
+                Deselect all
+              </button>
+            </div>
+          )}
+
           <div className="overflow-y-auto max-h-60">
             {options.length === 0 ? (
               <div className="px-3 py-2 text-sm text-gray-500">{emptyMessage}</div>
@@ -101,16 +127,6 @@ function MultiSelectDropdown({
               })
             )}
           </div>
-
-          {values.length > 0 && (
-            <button
-              type="button"
-              className="w-full px-3 py-2 text-sm text-left border-t hover:bg-gray-50"
-              onClick={() => onChange([])}
-            >
-              Clear selection
-            </button>
-          )}
         </div>
       )}
     </div>
@@ -579,7 +595,7 @@ function AssignUserCard() {
         updatedProfile.micro_ward_no = needsMicroDetails ? legacyWardNo : "";
         updatedProfile.micro_sk_shw_name = needsMicroDetails ? selectedUser : "";
         updatedProfile.micro_designation = needsMicroDetails ? microRole.toUpperCase() : "";
-        updatedProfile.micro_ss_name = needsMicroDetails ? microSsName.trim() : "";
+        updatedProfile.micro_ss_name = "";
 
         const microRoleMap = {
           micro_admin: 7,
@@ -1088,78 +1104,6 @@ function AssignUserCard() {
                       />
                     </div>
 
-                    <div className="col-span-1 form-group">
-                      <label htmlFor="microSkShwName">Name of SK/SHW</label>
-                      <input
-                        id="microSkShwName"
-                        type="text"
-                        className="w-full px-3 py-2 border rounded"
-                        value={selectedUser || ""}
-                        disabled
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        This value is auto-filled from selected user.
-                      </p>
-                    </div>
-
-                    <div className="col-span-1 form-group">
-                      <label htmlFor="microSsName">Name of SS</label>
-                      {ssNameOptions.length > 0 && !customSsNameMode ? (
-                        <div className="flex gap-2">
-                          <select
-                            id="microSsName"
-                            className="w-full px-3 py-2 border rounded"
-                            value={microSsName}
-                            onChange={(e) => setMicroSsName(e.target.value)}
-                            disabled={!hasSelectedUnion}
-                          >
-                            <option value="">Keep blank</option>
-                            {ssNameOptions.map((name) => (
-                              <option key={name} value={name}>
-                                {name}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            className="px-3 py-2 text-sm text-white bg-green-600 rounded disabled:opacity-50"
-                            disabled={!hasSelectedUnion}
-                            onClick={() => {
-                              setCustomSsNameMode(true);
-                              setMicroSsName("");
-                            }}
-                          >
-                            Add New
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <input
-                            id="microSsName"
-                            type="text"
-                            className="w-full px-3 py-2 border rounded"
-                            value={microSsName}
-                            onChange={(e) => setMicroSsName(e.target.value)}
-                            placeholder="Enter SS name"
-                            disabled={!hasSelectedUnion}
-                          />
-                          {ssNameOptions.length > 0 && (
-                            <button
-                              type="button"
-                              className="px-3 py-2 text-sm border rounded disabled:opacity-50"
-                              disabled={!hasSelectedUnion}
-                              onClick={() => {
-                                setCustomSsNameMode(false);
-                                setMicroSsName("");
-                              }}
-                            >
-                              Existing
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
                     <div className="col-span-2 form-group" ref={villageSearchRef}>
                       <label htmlFor="villageSearch">Village Search</label>
                       <div className="flex gap-2 mb-2">
@@ -1230,8 +1174,6 @@ function AssignUserCard() {
                                   village.name_bn,
                                   village.village_code ? `Code ${village.village_code}` : "",
                                   village.ward_no ? `Ward ${village.ward_no}` : "",
-                                  village.sk_shw_name ? `SK/SHW ${village.sk_shw_name}` : "",
-                                  village.ss_name ? `SS ${village.ss_name}` : "",
                                 ]
                                   .filter(Boolean)
                                   .join(" | ")}

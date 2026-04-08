@@ -292,8 +292,8 @@ class NonLocalRecordSerializer(serializers.ModelSerializer):
 class MonthlyApprovalSerializer(serializers.ModelSerializer):
     record_type = serializers.SerializerMethodField()
     record_id = serializers.SerializerMethodField()
-    local_record_id = serializers.IntegerField(source="local_record_id", read_only=True)
-    non_local_record_id = serializers.IntegerField(source="non_local_record_id", read_only=True)
+    local_record_id = serializers.IntegerField(read_only=True)
+    non_local_record_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = MonthlyApproval

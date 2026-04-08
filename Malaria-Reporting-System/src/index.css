@@ -184,15 +184,19 @@ All colors MUST be HSL.
 
 /* Grid styles for Excel-like tables */
 .grid-th {
-  @apply px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground border-b border-r last:border-r-0 select-none whitespace-nowrap;
+  @apply px-1 py-0.5 text-left text-[10px] font-semibold leading-tight text-muted-foreground border-b border-r last:border-r-0 select-none whitespace-normal align-top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .grid-td {
-  @apply px-2 py-1 border-b border-r last:border-r-0 text-xs whitespace-nowrap;
+  @apply px-1 py-0.5 border-b border-r last:border-r-0 text-[11px] leading-tight whitespace-normal align-top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .grid-input {
-  @apply w-full min-w-[64px] h-full px-2 py-1.5 text-xs border-0 bg-transparent outline-none focus:ring-1 focus:ring-ring rounded-none;
+  @apply w-full min-w-0 h-full px-0.5 py-0.5 text-[11px] border-0 bg-transparent outline-none focus:ring-1 focus:ring-ring rounded-none;
 }
 
 .grid-input:disabled {

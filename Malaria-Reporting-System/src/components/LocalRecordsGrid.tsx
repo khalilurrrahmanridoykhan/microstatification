@@ -2,6 +2,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   useRef,
   type ReactNode,
 } from "react";
@@ -21,7 +22,8 @@ import {
   getDhakaMonth,
   getDhakaYear,
 } from "@/lib/monthUtils";
-import { RefreshCw, Save } from "lucide-react";
+import { exportRowsToXlsx } from "@/lib/xlsxExport";
+import { Download, RefreshCw, Save } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Pagination,
@@ -83,9 +85,17 @@ interface DistrictOption {
   name: string;
 }
 
-type CellStatus = "RED" | "YELLOW" | "GREEN";
+type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+type CellStatus = "NEUTRAL" | "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
+
+interface ApprovalRow {
+  record_id: string;
+  month: number;
+  status: ApprovalStatus;
+}
 
 const COUNTRY_NAME = "Bangladesh";
+const DEFAULT_DISTRICT_NAME = "Bandarban";
 const DIVISION_BY_DISTRICT: Record<string, string> = {
   Bandarban: "Chattogram",
   Khagrachhari: "Chattogram",
@@ -108,6 +118,13 @@ const FULL_MONTH_LABELS: Record<(typeof MONTH_COLUMNS)[number], string> = {
   nov_cases: "November",
   dec_cases: "December",
 };
+
+const DEFAULT_LOCAL_TEXT_COLUMN_WIDTH = 60;
+const DEFAULT_LOCAL_NARROW_COLUMN_WIDTH = 42;
+const DEFAULT_LOCAL_MONTH_COLUMN_WIDTH = 52;
+const MIN_LOCAL_TEXT_COLUMN_WIDTH = 40;
+const MIN_LOCAL_NARROW_COLUMN_WIDTH = 30;
+const MIN_LOCAL_MONTH_COLUMN_WIDTH = 40;
 
 type LocalGridColumnKey =
   | "sl"
@@ -140,50 +157,166 @@ interface LocalGridColumn {
   key: LocalGridColumnKey;
   label: string;
   minWidth: number;
+  defaultWidth?: number;
   sticky?: boolean;
 }
 
 const LOCAL_RECORD_COLUMNS: LocalGridColumn[] = [
-  { key: "sl", label: "SL", minWidth: 72, sticky: true },
-  { key: "country", label: "Country", minWidth: 120 },
-  { key: "division", label: "Division", minWidth: 140 },
-  { key: "district_name", label: "District", minWidth: 140 },
-  { key: "upazila_name", label: "Upazila", minWidth: 140 },
-  { key: "union_name", label: "Union", minWidth: 140 },
-  { key: "ward_no", label: "Ward No", minWidth: 100 },
-  { key: "village_sk_shw_name", label: "Name of SK/SHW", minWidth: 160 },
-  { key: "sk_user_designation", label: "Desig.", minWidth: 96 },
-  { key: "village_ss_name", label: "Name of SS", minWidth: 150 },
-  { key: "village_name", label: "Village Name (English)", minWidth: 190 },
-  { key: "village_name_bn", label: "Village Name (Bangla)", minWidth: 190 },
-  { key: "village_code", label: "Village Code", minWidth: 130 },
-  { key: "village_latitude", label: "Latitude", minWidth: 110 },
-  { key: "village_longitude", label: "Longitute", minWidth: 110 },
-  { key: "population", label: "Population", minWidth: 110 },
-  { key: "hh", label: "HH Number", minWidth: 110 },
-  { key: "itn_2026", label: "2026 (Active LLINs)", minWidth: 140 },
-  { key: "itn_2025", label: "2025 (Active LLINs)", minWidth: 140 },
-  { key: "itn_2024", label: "2024 (Active LLINs)", minWidth: 140 },
+  { key: "sl", label: "SL", minWidth: 30, defaultWidth: 38, sticky: true },
+  { key: "country", label: "Country", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "division", label: "Division", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "district_name", label: "District", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "upazila_name", label: "Upazila", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "union_name", label: "Union", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "ward_no", label: "Ward No", minWidth: MIN_LOCAL_NARROW_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_NARROW_COLUMN_WIDTH },
+  { key: "village_sk_shw_name", label: "Name of SK/SHW", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "sk_user_designation", label: "Desig.", minWidth: MIN_LOCAL_NARROW_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_NARROW_COLUMN_WIDTH },
+  { key: "village_ss_name", label: "Name of SS", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "village_name", label: "Village Name (English)", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "village_name_bn", label: "Village Name (Bangla)", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "village_code", label: "Village Code", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "village_latitude", label: "Latitude", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "village_longitude", label: "Longitute", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "population", label: "Population", minWidth: MIN_LOCAL_NARROW_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_NARROW_COLUMN_WIDTH },
+  { key: "hh", label: "HH Number", minWidth: MIN_LOCAL_NARROW_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_NARROW_COLUMN_WIDTH },
+  { key: "itn_2026", label: "2026 (Active LLINs)", minWidth: MIN_LOCAL_MONTH_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_MONTH_COLUMN_WIDTH },
+  { key: "itn_2025", label: "2025 (Active LLINs)", minWidth: MIN_LOCAL_MONTH_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_MONTH_COLUMN_WIDTH },
+  { key: "itn_2024", label: "2024 (Active LLINs)", minWidth: MIN_LOCAL_MONTH_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_MONTH_COLUMN_WIDTH },
   ...MONTH_COLUMNS.map((column) => ({
     key: column,
     label: FULL_MONTH_LABELS[column],
-    minWidth: 110,
+    minWidth: MIN_LOCAL_MONTH_COLUMN_WIDTH,
+    defaultWidth: DEFAULT_LOCAL_MONTH_COLUMN_WIDTH,
   })),
-  { key: "village_mmw_hp_chwc_name", label: "Name of MMW, Health post & CHW(C)", minWidth: 210 },
-  { key: "village_distance_from_upazila_office_km", label: "Village Distance from upazila office (KM)", minWidth: 220 },
-  { key: "village_bordering_country_name", label: "Name of Border with others country", minWidth: 220 },
-  { key: "village_other_activities", label: "Others Activities (TDA/Dev care)", minWidth: 220 },
+  { key: "village_mmw_hp_chwc_name", label: "Name of MMW, Health post & CHW(C)", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "village_distance_from_upazila_office_km", label: "Village Distance from upazila office (KM)", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "village_bordering_country_name", label: "Name of Border with others country", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
+  { key: "village_other_activities", label: "Others Activities (TDA/Dev care)", minWidth: MIN_LOCAL_TEXT_COLUMN_WIDTH, defaultWidth: DEFAULT_LOCAL_TEXT_COLUMN_WIDTH },
 ];
 
-const LOCAL_RECORD_COLUMN_WIDTH_STORAGE_KEY = "malaria-local-record-column-widths-v2";
+const LOCAL_RECORD_COLUMN_WIDTH_STORAGE_KEY = "malaria-local-record-column-widths-v6";
 const LOCAL_RECORD_COLUMN_MIN_WIDTHS = LOCAL_RECORD_COLUMNS.reduce((acc, column) => {
   acc[column.key] = column.minWidth;
   return acc;
 }, {} as Record<LocalGridColumnKey, number>);
 
+const naturalTextCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
+
+const normalizeSortText = (value: unknown) => String(value ?? "").trim();
+
+const compareNaturalText = (left: unknown, right: unknown) =>
+  naturalTextCollator.compare(normalizeSortText(left), normalizeSortText(right));
+
+const compareWardValues = (left: unknown, right: unknown) => {
+  const leftText = normalizeSortText(left);
+  const rightText = normalizeSortText(right);
+
+  if (!leftText && !rightText) return 0;
+  if (!leftText) return 1;
+  if (!rightText) return -1;
+
+  const leftPrimaryText = leftText.split(",")[0]?.trim() || leftText;
+  const rightPrimaryText = rightText.split(",")[0]?.trim() || rightText;
+
+  const leftNumber = Number(leftPrimaryText);
+  const rightNumber = Number(rightPrimaryText);
+  const leftIsNumber = Number.isFinite(leftNumber);
+  const rightIsNumber = Number.isFinite(rightNumber);
+
+  if (leftIsNumber && rightIsNumber && leftNumber !== rightNumber) {
+    return leftNumber - rightNumber;
+  }
+
+  return naturalTextCollator.compare(leftText, rightText);
+};
+
+const sortLocalRows = (input: LocalRow[]) =>
+  [...input].sort((left, right) => {
+    const districtComparison = compareNaturalText(left.district_name, right.district_name);
+    if (districtComparison !== 0) return districtComparison;
+
+    const upazilaComparison = compareNaturalText(left.upazila_name, right.upazila_name);
+    if (upazilaComparison !== 0) return upazilaComparison;
+
+    const unionComparison = compareNaturalText(left.union_name, right.union_name);
+    if (unionComparison !== 0) return unionComparison;
+
+    const wardComparison = compareWardValues(left.ward_no, right.ward_no);
+    if (wardComparison !== 0) return wardComparison;
+
+    const villageComparison = compareNaturalText(left.village_name, right.village_name);
+    if (villageComparison !== 0) return villageComparison;
+
+    return compareNaturalText(left.id, right.id);
+  });
+
+const getLocalExportValue = (
+  row: LocalRow,
+  rowIndex: number,
+  column: LocalGridColumn,
+) => {
+  switch (column.key) {
+    case "sl":
+      return rowIndex + 1;
+    case "country":
+      return COUNTRY_NAME;
+    case "division":
+      return DIVISION_BY_DISTRICT[String(row.district_name || "")] || "";
+    case "district_name":
+      return row.district_name || "";
+    case "upazila_name":
+      return row.upazila_name || "";
+    case "union_name":
+      return row.union_name || "";
+    case "ward_no":
+      return row.ward_no || "";
+    case "village_sk_shw_name":
+      return row.village_sk_shw_name || "";
+    case "sk_user_designation":
+      return row.sk_user_designation || "";
+    case "village_ss_name":
+      return row.village_ss_name || "";
+    case "village_name":
+      return row.village_name || "";
+    case "village_name_bn":
+      return row.village_name_bn || "";
+    case "village_code":
+      return row.village_code || "";
+    case "village_latitude":
+      return row.village_latitude ?? "";
+    case "village_longitude":
+      return row.village_longitude ?? "";
+    case "population":
+      return row.population ?? "";
+    case "hh":
+      return row.hh ?? "";
+    case "itn_2026":
+      return row.itn_2026 ?? "";
+    case "itn_2025":
+      return row.itn_2025 ?? "";
+    case "itn_2024":
+      return row.itn_2024 ?? "";
+    case "village_mmw_hp_chwc_name":
+      return row.village_mmw_hp_chwc_name || "";
+    case "village_distance_from_upazila_office_km":
+      return row.village_distance_from_upazila_office_km ?? "";
+    case "village_bordering_country_name":
+      return row.village_bordering_country_name || "";
+    case "village_other_activities":
+      return row.village_other_activities || "";
+    default: {
+      const value = Number((row as any)[column.key] || 0);
+      return value > 0 ? value : "";
+    }
+  }
+};
+
 const buildDefaultColumnWidths = (): Record<LocalGridColumnKey, number> =>
   LOCAL_RECORD_COLUMNS.reduce((acc, column) => {
-    acc[column.key] = column.minWidth;
+    acc[column.key] = column.defaultWidth ?? column.minWidth;
     return acc;
   }, {} as Record<LocalGridColumnKey, number>);
 
@@ -234,42 +367,95 @@ const LocalRecordsGrid = () => {
   const [year, setYear] = useState(currentYear);
   const [rows, setRows] = useState<LocalRow[]>([]);
   const [districts, setDistricts] = useState<DistrictOption[]>([]);
-  const [selectedDistrictId, setSelectedDistrictId] = useState("all");
+  const [selectedDistrictId, setSelectedDistrictId] = useState("");
+  const [selectedUpazilaFilter, setSelectedUpazilaFilter] = useState("all");
+  const [selectedUnionFilter, setSelectedUnionFilter] = useState("all");
+  const [selectedWardFilter, setSelectedWardFilter] = useState("all");
+  const [approvalFilter, setApprovalFilter] = useState<"all" | "pending">("all");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState<10 | 20 | 50 | -1>(10);
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
+  const [approvalLookup, setApprovalLookup] = useState<Record<string, ApprovalStatus>>({});
+  const [approvalSavingKey, setApprovalSavingKey] = useState<string | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<LocalGridColumnKey, number>>(
     loadColumnWidths,
   );
   const resizeStateRef = useRef<ResizeState | null>(null);
   const canEditVillageMetadata = isAdmin;
 
-  const getMonthStatus = (value: number, monthIndex: number): CellStatus => {
-    if (!value || value === 0) return "RED";
-    const monthNumber = monthIndex + 1;
+  const getApprovalKey = (recordId: string, monthNumber: number) =>
+    `${recordId}:${monthNumber}`;
 
-    if (!isAdmin && year === currentYear && monthNumber === currentMonth) {
-      return "YELLOW";
+  const getMonthApprovalStatus = (recordId: string, monthNumber: number) =>
+    approvalLookup[getApprovalKey(recordId, monthNumber)] || null;
+
+  const getMonthStatus = (row: LocalRow, monthIndex: number): CellStatus => {
+    const monthNumber = monthIndex + 1;
+    const value = Number((row as any)[MONTH_COLUMNS[monthIndex]] || 0);
+    const hasData = value > 0;
+    const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
+    const isFutureMonth =
+      year > currentYear || (year === currentYear && monthNumber > currentMonth);
+    const isCurrentMonth = year === currentYear && monthNumber === currentMonth;
+
+    if (hasData) {
+      if (approvalStatus === "APPROVED") return "APPROVED";
+      if (approvalStatus === "REJECTED") return "REJECTED";
+      return "PENDING";
     }
-    return "GREEN";
+
+    if (approvalStatus === "REJECTED") return "REJECTED";
+    if (approvalStatus === "APPROVED") return "APPROVED";
+    if (isCurrentMonth || isFutureMonth) return "NEUTRAL";
+    return "NOT_SUBMITTED";
+  };
+
+  const isMonthEditable = (row: LocalRow, monthIndex: number) => {
+    if (isAdmin) return true;
+    if (year !== currentYear) return false;
+
+    const monthNumber = monthIndex + 1;
+    const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
+    if (approvalStatus === "REJECTED") return true;
+    return monthNumber === currentMonth;
+  };
+
+  const getMonthTitle = (status: CellStatus) => {
+    switch (status) {
+      case "APPROVED":
+        return "Approved";
+      case "PENDING":
+        return "Pending approval";
+      case "REJECTED":
+        return "Not approved";
+      case "NOT_SUBMITTED":
+        return "Not submitted";
+      default:
+        return "";
+    }
   };
 
   const getMonthBg = (status: CellStatus) => {
     switch (status) {
-      case "GREEN":
+      case "APPROVED":
         return "bg-green-50 border-green-200";
-      case "YELLOW":
+      case "PENDING":
         return "bg-yellow-50 border-yellow-200";
-      default:
+      case "REJECTED":
+        return "bg-orange-50 border-orange-200";
+      case "NOT_SUBMITTED":
         return "bg-red-50 border-red-200";
+      default:
+        return "bg-white border-border/60";
     }
   };
 
   const fetchData = useCallback(async () => {
     if (!user) return;
+    if (isMicroAdmin && !selectedDistrictId) return;
     setLoading(true);
     try {
       let query = supabase
@@ -349,7 +535,25 @@ const LocalRecordsGrid = () => {
         };
       });
 
+      const { data: approvalData, error: approvalError } = await supabase
+        .from("monthly_approvals")
+        .select("record_id, month, status")
+        .eq("record_type", "local")
+        .eq("reporting_year", year);
+      if (approvalError) throw approvalError;
+
+      const visibleRecordIds = new Set(mapped.map((row) => String(row.id)));
+      const nextApprovalLookup = Object.fromEntries(
+        ((approvalData || []) as ApprovalRow[])
+          .filter((approval) => visibleRecordIds.has(String(approval.record_id)))
+          .map((approval) => [
+            getApprovalKey(String(approval.record_id), Number(approval.month)),
+            approval.status,
+          ]),
+      );
+
       setRows(mapped);
+      setApprovalLookup(nextApprovalLookup);
       setDirtyIds(new Set());
       setCurrentPage(1);
     } catch (err: any) {
@@ -376,6 +580,17 @@ const LocalRecordsGrid = () => {
           name: item.name,
         }));
         setDistricts(options);
+        setSelectedDistrictId((currentValue) => {
+          if (currentValue && currentValue !== "all") {
+            return currentValue;
+          }
+
+          const bandarbanDistrict = options.find(
+            (district) => district.name === DEFAULT_DISTRICT_NAME,
+          );
+
+          return bandarbanDistrict?.id ?? currentValue ?? "all";
+        });
       } catch (err: any) {
         if (canceled) return;
         toast({
@@ -407,6 +622,25 @@ const LocalRecordsGrid = () => {
       setShowLoadingScreen(true);
     }
   }, [loading]);
+
+  useEffect(() => {
+    setSelectedUpazilaFilter("all");
+    setSelectedUnionFilter("all");
+    setSelectedWardFilter("all");
+  }, [selectedDistrictId, year]);
+
+  useEffect(() => {
+    setSelectedUnionFilter("all");
+    setSelectedWardFilter("all");
+  }, [selectedUpazilaFilter]);
+
+  useEffect(() => {
+    setSelectedWardFilter("all");
+  }, [selectedUnionFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedUpazilaFilter, selectedUnionFilter, selectedWardFilter, approvalFilter]);
 
   useEffect(() => {
     try {
@@ -574,7 +808,7 @@ const LocalRecordsGrid = () => {
         }
       }
 
-      setDirtyIds(new Set());
+      await fetchData();
       toast({ title: "Saved successfully" });
     } catch (err: any) {
       toast({
@@ -587,30 +821,148 @@ const LocalRecordsGrid = () => {
     }
   };
 
-  const isMonthEditable = (monthIndex: number) => {
-    if (isAdmin) return true;
-    if (year !== currentYear) return false;
-    return monthIndex + 1 === currentMonth;
+  const handleApprovalChange = async (
+    row: LocalRow,
+    monthNumber: number,
+    nextStatus: Extract<ApprovalStatus, "APPROVED" | "REJECTED">,
+  ) => {
+    const monthField = MONTH_COLUMNS[monthNumber - 1];
+    const monthValue = Number((row as any)[monthField] || 0);
+    if (!isAdmin || monthValue <= 0) return;
+
+    const approvalKey = getApprovalKey(row.id, monthNumber);
+    setApprovalSavingKey(approvalKey);
+    try {
+      const { error } = await supabase.from("monthly_approvals").upsert({
+        record_type: "local",
+        record_id: row.id,
+        reporting_year: year,
+        month: monthNumber,
+        status: nextStatus,
+      });
+      if (error) throw error;
+
+      setApprovalLookup((prev) => ({
+        ...prev,
+        [approvalKey]: nextStatus,
+      }));
+      toast({ title: nextStatus === "APPROVED" ? "Month approved" : "Month marked not approved" });
+    } catch (err: any) {
+      toast({
+        title: "Approval update failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setApprovalSavingKey(null);
+    }
   };
 
   const years = Array.from({ length: 5 }, (_, index) => currentYear - 2 + index);
   const selectedDistrictName =
-    selectedDistrictId === "all"
+    !selectedDistrictId || selectedDistrictId === "all"
       ? ""
       : districts.find((district) => district.id === selectedDistrictId)?.name ||
         "selected district";
-  const effectiveRowsPerPage = rowsPerPage === -1 ? rows.length || 1 : rowsPerPage;
+  const sortedRows = useMemo(() => sortLocalRows(rows), [rows]);
+  const upazilaOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sortedRows
+            .map((row) => String(row.upazila_name || "").trim())
+            .filter(Boolean),
+        ),
+      ).sort(compareNaturalText),
+    [sortedRows],
+  );
+  const unionOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sortedRows
+            .filter((row) =>
+              selectedUpazilaFilter === "all"
+                ? true
+                : String(row.upazila_name || "").trim() === selectedUpazilaFilter,
+            )
+            .map((row) => String(row.union_name || "").trim())
+            .filter(Boolean),
+        ),
+      ).sort(compareNaturalText),
+    [sortedRows, selectedUpazilaFilter],
+  );
+  const wardOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sortedRows
+            .filter((row) =>
+              (selectedUpazilaFilter === "all"
+                ? true
+                : String(row.upazila_name || "").trim() === selectedUpazilaFilter)
+              && (selectedUnionFilter === "all"
+                ? true
+                : String(row.union_name || "").trim() === selectedUnionFilter),
+            )
+            .map((row) => normalizeSortText(row.ward_no))
+            .filter(Boolean),
+        ),
+      ).sort(compareWardValues),
+    [sortedRows, selectedUpazilaFilter, selectedUnionFilter],
+  );
+  const filteredSortedRows = useMemo(
+    () =>
+      sortedRows.filter((row) => {
+        if (
+          selectedUpazilaFilter !== "all"
+          && String(row.upazila_name || "").trim() !== selectedUpazilaFilter
+        ) {
+          return false;
+        }
+
+        if (
+          selectedUnionFilter !== "all"
+          && String(row.union_name || "").trim() !== selectedUnionFilter
+        ) {
+          return false;
+        }
+
+        if (
+          selectedWardFilter !== "all"
+          && normalizeSortText(row.ward_no) !== selectedWardFilter
+        ) {
+          return false;
+        }
+
+        if (approvalFilter === "pending") {
+          return MONTH_COLUMNS.some(
+            (_column, monthIndex) => getMonthStatus(row, monthIndex) === "PENDING",
+          );
+        }
+
+        return true;
+      }),
+    [
+      sortedRows,
+      selectedUpazilaFilter,
+      selectedUnionFilter,
+      selectedWardFilter,
+      approvalFilter,
+    ],
+  );
+  const effectiveRowsPerPage = rowsPerPage === -1 ? filteredSortedRows.length || 1 : rowsPerPage;
   const totalPages = isMobile
     ? 1
-    : Math.max(1, Math.ceil(rows.length / effectiveRowsPerPage));
+    : Math.max(1, Math.ceil(filteredSortedRows.length / effectiveRowsPerPage));
   const pagedRows = isMobile
-    ? rows
-    : rows.slice(
+    ? filteredSortedRows
+    : filteredSortedRows.slice(
         (currentPage - 1) * effectiveRowsPerPage,
         currentPage * effectiveRowsPerPage,
       );
   const visibleRows =
-    rows.length === 0
+    filteredSortedRows.length === 0
       ? []
       : isMobile
         ? pagedRows
@@ -621,6 +973,28 @@ const LocalRecordsGrid = () => {
               () => null,
             ),
           ];
+
+  const handleDownloadData = useCallback(() => {
+    if (!isAdmin) return;
+
+    if (filteredSortedRows.length === 0) {
+      toast({
+        title: "No data to download",
+        description: "There are no rows in the current local table view.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    exportRowsToXlsx({
+      filename: `malaria-local-records-${year}.xlsx`,
+      sheetName: `Local ${year}`,
+      headers: LOCAL_RECORD_COLUMNS.map((column) => column.label),
+      rows: filteredSortedRows.map((row, rowIndex) =>
+        LOCAL_RECORD_COLUMNS.map((column) => getLocalExportValue(row, rowIndex, column)),
+      ),
+    });
+  }, [filteredSortedRows, isAdmin, toast, year]);
 
   const getColumnWidth = (key: LocalGridColumnKey) =>
     columnWidths[key] ?? LOCAL_RECORD_COLUMN_MIN_WIDTHS[key];
@@ -819,31 +1193,66 @@ const LocalRecordsGrid = () => {
         const monthIndex = MONTH_COLUMNS.indexOf(column.key as (typeof MONTH_COLUMNS)[number]);
         if (monthIndex !== -1) {
           const value = Number((row as any)[column.key] || 0);
-          const status = getMonthStatus(value, monthIndex);
-          const editable = isMonthEditable(monthIndex);
+          const monthNumber = monthIndex + 1;
+          const status = getMonthStatus(row, monthIndex);
+          const editable = isMonthEditable(row, monthIndex);
+          const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
+          const hasData = value > 0;
+          const isApprovalSaving = approvalSavingKey === getApprovalKey(row.id, monthNumber);
+          const approvalDisabled = !hasData || isApprovalSaving || dirtyIds.has(row.id);
 
           return (
             <td
               className={`grid-td p-0 border ${getMonthBg(status)} ${editable ? "" : "opacity-80"} ${column.sticky ? "sticky left-0 bg-white z-[5]" : ""}`}
               style={getColumnStyle(column.key)}
-              title={
-                status === "GREEN"
-                  ? "Approved"
-                  : status === "YELLOW"
-                    ? "Waiting for approval"
-                    : "Not submitted"
-              }
+              title={getMonthTitle(status)}
             >
-              <input
-                type="number"
-                min={0}
-                className={`grid-input bg-transparent ${editable ? "" : "text-muted-foreground"}`}
-                value={value}
-                onChange={(event) =>
-                  handleIntegerCellChange(row.id, column.key, event.target.value)
-                }
-                disabled={!editable}
-              />
+              <div className="flex h-full flex-col">
+                <input
+                  type="number"
+                  min={0}
+                  className={`grid-input bg-transparent text-center ${editable ? "" : "text-muted-foreground"}`}
+                  value={value > 0 ? String(value) : ""}
+                  placeholder={editable ? "" : undefined}
+                  onChange={(event) =>
+                    handleIntegerCellChange(row.id, column.key, event.target.value)
+                  }
+                  disabled={!editable}
+                />
+
+                {isAdmin && hasData && (
+                  <div className="flex items-center justify-center gap-2 border-t border-black/5 px-1 py-1 text-[9px]">
+                    <button
+                      type="button"
+                      className={`inline-flex min-w-[28px] items-center justify-center rounded border px-1.5 py-0.5 font-semibold transition-colors ${
+                        approvalStatus === "APPROVED"
+                          ? "border-green-700 bg-green-700 text-white"
+                          : "border-green-300 bg-white text-green-700"
+                      } ${approvalDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-green-50"}`}
+                      title="Approve"
+                      aria-pressed={approvalStatus === "APPROVED"}
+                      disabled={approvalDisabled}
+                      onClick={() => void handleApprovalChange(row, monthNumber, "APPROVED")}
+                    >
+                      A
+                    </button>
+                    <button
+                      type="button"
+                      className={`inline-flex min-w-[28px] items-center justify-center rounded border px-1.5 py-0.5 font-semibold transition-colors ${
+                        approvalStatus === "REJECTED"
+                          ? "border-orange-700 bg-orange-700 text-white"
+                          : "border-orange-300 bg-white text-orange-700"
+                      } ${approvalDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-orange-50"}`}
+                      title="Not approve"
+                      aria-pressed={approvalStatus === "REJECTED"}
+                      disabled={approvalDisabled}
+                      onClick={() => void handleApprovalChange(row, monthNumber, "REJECTED")}
+                    >
+                      N
+                    </button>
+                  </div>
+                )}
+              </div>
             </td>
           );
         }
@@ -892,6 +1301,72 @@ const LocalRecordsGrid = () => {
             </Select>
           )}
 
+          <Select
+            value={selectedUpazilaFilter}
+            onValueChange={(value) => setSelectedUpazilaFilter(value)}
+          >
+            <SelectTrigger className="h-9 w-full min-w-[160px] sm:w-[190px]">
+              <SelectValue placeholder="All Upazilas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Upazilas</SelectItem>
+              {upazilaOptions.map((upazila) => (
+                <SelectItem key={upazila} value={upazila}>
+                  {upazila}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={selectedUnionFilter}
+            onValueChange={(value) => setSelectedUnionFilter(value)}
+            disabled={selectedUpazilaFilter === "all"}
+          >
+            <SelectTrigger className="h-9 w-full min-w-[160px] sm:w-[190px]">
+              <SelectValue placeholder="All Unions" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Unions</SelectItem>
+              {unionOptions.map((union) => (
+                <SelectItem key={union} value={union}>
+                  {union}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={selectedWardFilter}
+            onValueChange={(value) => setSelectedWardFilter(value)}
+            disabled={selectedUnionFilter === "all"}
+          >
+            <SelectTrigger className="h-9 w-full min-w-[140px] sm:w-[160px]">
+              <SelectValue placeholder="All Wards" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Wards</SelectItem>
+              {wardOptions.map((ward) => (
+                <SelectItem key={ward} value={ward}>
+                  {ward}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={approvalFilter}
+            onValueChange={(value: "all" | "pending") => setApprovalFilter(value)}
+          >
+            <SelectTrigger className="h-9 w-full min-w-[170px] sm:w-[210px]">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Records</SelectItem>
+              <SelectItem value="pending">Waiting For Approval</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Button
             variant="outline"
             size="sm"
@@ -931,6 +1406,18 @@ const LocalRecordsGrid = () => {
               </SelectContent>
             </Select>
           )}
+
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadData}
+              disabled={filteredSortedRows.length === 0}
+              className="h-9"
+            >
+              <Download className="mr-1 h-4 w-4" /> Download Data
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-600">
@@ -941,6 +1428,10 @@ const LocalRecordsGrid = () => {
           <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2 py-1">
             <span className="h-2.5 w-2.5 rounded-sm border border-yellow-300 bg-yellow-200" />
             Pending approval
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1">
+            <span className="h-2.5 w-2.5 rounded-sm border border-orange-300 bg-orange-200" />
+            Not approved
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1">
             <span className="h-2.5 w-2.5 rounded-sm border border-green-300 bg-green-200" />
@@ -971,7 +1462,9 @@ const LocalRecordsGrid = () => {
                       className={`grid-th relative ${column.sticky ? "sticky left-0 z-20 bg-gray-50" : ""}`}
                       style={getColumnStyle(column.key)}
                     >
-                      <div className="pr-3">{column.label}</div>
+                      <div className="pr-3 whitespace-normal break-words leading-tight">
+                        {column.label}
+                      </div>
                       <div
                         className="grid-col-resizer"
                         onPointerDown={(event) => handleResizeStart(event, column.key)}
@@ -985,15 +1478,17 @@ const LocalRecordsGrid = () => {
               </thead>
 
               <tbody>
-                {rows.length === 0 && !loading && (
+                {filteredSortedRows.length === 0 && !loading && (
                   <tr>
                     <td
                       colSpan={LOCAL_RECORD_COLUMNS.length}
                       className="py-8 text-center text-muted-foreground"
                     >
-                      {isAdmin
-                        ? `No local records for ${year}${selectedDistrictName ? ` in ${selectedDistrictName}` : ""}. Configure district, upazila, union, and village first, then assign SK users and reload.`
-                        : `No local records for ${year}. Ask a malaria admin to assign villages to your account.`}
+                      {sortedRows.length > 0
+                        ? "No local records match the selected filters."
+                        : isAdmin
+                          ? `No local records for ${year}${selectedDistrictName ? ` in ${selectedDistrictName}` : ""}. Configure district, upazila, union, and village first, then assign SK users and reload.`
+                          : `No local records for ${year}. Ask a malaria admin to assign villages to your account.`}
                     </td>
                   </tr>
                 )}
@@ -1025,10 +1520,10 @@ const LocalRecordsGrid = () => {
         </div>
       </div>
 
-      {!isMobile && rows.length > 0 && (
+      {!isMobile && filteredSortedRows.length > 0 && (
         <div className="flex flex-col gap-2 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
           <p>
-            Showing page {currentPage} of {totalPages}. Total rows: {rows.length}.
+            Showing page {currentPage} of {totalPages}. Total rows: {filteredSortedRows.length}.
           </p>
           <Pagination className="justify-end">
             <PaginationContent>

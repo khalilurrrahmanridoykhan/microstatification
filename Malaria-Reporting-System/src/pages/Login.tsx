@@ -17,7 +17,8 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await signIn(loginId, password);
+      const redirectTo = await signIn(loginId, password);
+      window.location.replace(redirectTo);
     } catch (err: unknown) {
       toast({
         title: "Login failed",

@@ -60,11 +60,16 @@ function EditUser() {
   const user = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
   const [formSearch, setFormSearch] = useState("");
   const isUserAdmin = user.role === 1;
+  const isMicroAdmin = user.role === 7;
   const isOrganizer = user.role === 2;
   const isProjectmanager = user.role === 3;
 
   useEffect(() => {
     const fetchForms = async () => {
+      if (isMicroAdmin) {
+        setForms([]);
+        return;
+      }
       try {
         const token = sessionStorage.getItem("authToken");
         const response = await axios.get(`${BACKEND_URL}/api/forms/`, {
@@ -78,9 +83,15 @@ function EditUser() {
       }
     };
     fetchForms();
-  }, []);
+  }, [isMicroAdmin]);
 
   useEffect(() => {
+    if (isMicroAdmin) {
+      setOrganizations([]);
+      setProjects([]);
+      return;
+    }
+
     const token = sessionStorage.getItem("authToken");
 
     const fetchOrgsAndProjects = async () => {
@@ -101,7 +112,7 @@ function EditUser() {
     };
 
     fetchOrgsAndProjects();
-  }, []);
+  }, [isMicroAdmin]);
 
 
   console.log("form :", form);
@@ -172,6 +183,10 @@ function EditUser() {
     isUserAdmin || user.role === 2 || (user.username === id && user.role === 3);
 
   const visibleRoleOptions = roleOptions.filter((option) => {
+    if (isMicroAdmin) {
+      return [4, 8, 9].includes(option.value);
+    }
+
     if (
       option.value === 1 ||
       option.value === 2 ||
@@ -231,15 +246,18 @@ function EditUser() {
       first_name: form.first_name,
       last_name: form.last_name,
       role: normalizedRoleValue,
-      is_staff: form.is_staff,
       // Don't send password if unchanged
       ...(form.password && form.password !== "********" && { password: form.password }),
-      profile: {
+    };
+
+    if (!isMicroAdmin) {
+      data.is_staff = form.is_staff;
+      data.profile = {
         organizations: form.profile.organizations || [],
         projects: form.profile.projects || [],
         forms: form.profile.forms || [],
-      },
-    };
+      };
+    }
 
     try {
       await axios.patch(`${BACKEND_URL}/api/users/${id}/`, data, {
@@ -368,102 +386,103 @@ function EditUser() {
             ))}
           </select>
         </div>
-        {/* Assigned Organizations */}
-        <div className="col-span-2 form-group">
-          <label className="block mb-1 font-medium">Assigned Organizations</label>
-          <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 border rounded max-h-48 overflow-y-auto">
-            {organizations.length === 0 && (
-              <div className="col-span-2 text-sm text-gray-500">
-                No organizations available.
+        {!isMicroAdmin && (
+          <>
+            <div className="col-span-2 form-group">
+              <label className="block mb-1 font-medium">Assigned Organizations</label>
+              <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 border rounded max-h-48 overflow-y-auto">
+                {organizations.length === 0 && (
+                  <div className="col-span-2 text-sm text-gray-500">
+                    No organizations available.
+                  </div>
+                )}
+                {organizations.map((organization) => (
+                  <label key={organization.id} className="disabled:cursor-not-allowed">
+                    <input
+                      type="checkbox"
+                      checked={hasId(form.profile?.organizations, organization.id)}
+                      onChange={(e) =>
+                        toggleProfileSelection(
+                          "organizations",
+                          organization.id,
+                          e.target.checked
+                        )
+                      }
+                      disabled={!isUserAdmin}
+                      className="disabled:cursor-not-allowed disabled:bg-gray-500"
+                    />
+                    <span>{organization.name}</span>
+                  </label>
+                ))}
               </div>
-            )}
-            {organizations.map((organization) => (
-              <label key={organization.id} className="disabled:cursor-not-allowed">
-                <input
-                  type="checkbox"
-                  checked={hasId(form.profile?.organizations, organization.id)}
-                  onChange={(e) =>
-                    toggleProfileSelection(
-                      "organizations",
-                      organization.id,
-                      e.target.checked
-                    )
-                  }
-                  disabled={!isUserAdmin}
-                  className="disabled:cursor-not-allowed disabled:bg-gray-500"
-                />
-                <span>{organization.name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Assign Projects */}
-        <div className="col-span-2 form-group">
-          <label className="block mb-1 font-medium">Assigned Projects</label>
-          <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 border rounded max-h-48 overflow-y-auto">
-            {projects.length === 0 && (
-              <div className="col-span-2 text-sm text-gray-500">
-                No projects available.
+            <div className="col-span-2 form-group">
+              <label className="block mb-1 font-medium">Assigned Projects</label>
+              <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 border rounded max-h-48 overflow-y-auto">
+                {projects.length === 0 && (
+                  <div className="col-span-2 text-sm text-gray-500">
+                    No projects available.
+                  </div>
+                )}
+                {projects.map((project) => (
+                  <label key={project.id} className="disabled:cursor-not-allowed">
+                    <input
+                      type="checkbox"
+                      checked={hasId(form.profile?.projects, project.id)}
+                      onChange={(e) =>
+                        toggleProfileSelection("projects", project.id, e.target.checked)
+                      }
+                      disabled={!isUserAdmin && !isOrganizer}
+                      className="disabled:cursor-not-allowed disabled:bg-gray-500"
+                    />
+                    <span>{project.name}</span>
+                  </label>
+                ))}
               </div>
-            )}
-            {projects.map((project) => (
-              <label key={project.id} className="disabled:cursor-not-allowed">
-                <input
-                  type="checkbox"
-                  checked={hasId(form.profile?.projects, project.id)}
-                  onChange={(e) =>
-                    toggleProfileSelection("projects", project.id, e.target.checked)
-                  }
-                  disabled={!isUserAdmin && !isOrganizer}
-                  className="disabled:cursor-not-allowed disabled:bg-gray-500"
-                />
-                <span>{project.name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Assign Forms */}
-        <div className="col-span-2 form-group">
-          <label className="block mb-1 font-medium">Assigned Forms</label>
-          <input
-            type="text"
-            placeholder="Search forms by name, project, or ID"
-            className="w-full px-3 py-2 mb-2 border rounded"
-            value={formSearch}
-            onChange={(e) => setFormSearch(e.target.value)}
-          />
-          <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 border rounded max-h-48 overflow-y-auto">
-            {filteredForms.length === 0 && (
-              <div className="col-span-2 text-sm text-gray-500">
-                No forms found.
+            <div className="col-span-2 form-group">
+              <label className="block mb-1 font-medium">Assigned Forms</label>
+              <input
+                type="text"
+                placeholder="Search forms by name, project, or ID"
+                className="w-full px-3 py-2 mb-2 border rounded"
+                value={formSearch}
+                onChange={(e) => setFormSearch(e.target.value)}
+              />
+              <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 border rounded max-h-48 overflow-y-auto">
+                {filteredForms.length === 0 && (
+                  <div className="col-span-2 text-sm text-gray-500">
+                    No forms found.
+                  </div>
+                )}
+                {filteredForms.map((availableForm) => (
+                  <label
+                    key={availableForm.id}
+                    className="disabled:cursor-not-allowed flex items-start gap-2"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={hasId(form.profile?.forms, availableForm.id)}
+                      onChange={(e) =>
+                        toggleProfileSelection("forms", availableForm.id, e.target.checked)
+                      }
+                      disabled={!isUserAdmin && !isOrganizer && !isProjectmanager}
+                      className="disabled:cursor-not-allowed disabled:bg-gray-500 mt-1"
+                    />
+                    <span>
+                      <span className="block">{availableForm.name}</span>
+                      <span className="block text-xs text-gray-500">
+                        Project: {projectNameById.get(toNumericId(availableForm.project)) || "N/A"}
+                      </span>
+                    </span>
+                  </label>
+                ))}
               </div>
-            )}
-            {filteredForms.map((availableForm) => (
-              <label
-                key={availableForm.id}
-                className="disabled:cursor-not-allowed flex items-start gap-2"
-              >
-                <input
-                  type="checkbox"
-                  checked={hasId(form.profile?.forms, availableForm.id)}
-                  onChange={(e) =>
-                    toggleProfileSelection("forms", availableForm.id, e.target.checked)
-                  }
-                  disabled={!isUserAdmin && !isOrganizer && !isProjectmanager}
-                  className="disabled:cursor-not-allowed disabled:bg-gray-500 mt-1"
-                />
-                <span>
-                  <span className="block">{availableForm.name}</span>
-                  <span className="block text-xs text-gray-500">
-                    Project: {projectNameById.get(toNumericId(availableForm.project)) || "N/A"}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
+            </div>
+          </>
+        )}
 
         <div className="col-span-2 mt-6 button-container">
           <button type="submit" className="save-button">

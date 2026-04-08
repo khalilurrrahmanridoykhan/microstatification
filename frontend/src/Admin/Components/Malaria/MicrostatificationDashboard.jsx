@@ -3,6 +3,7 @@ import axios from "axios";
 import {
   FiActivity,
   FiBarChart2,
+  FiExternalLink,
   FiMap,
   FiMapPin,
   FiTrendingUp,
@@ -626,6 +627,33 @@ function MicrostatificationDashboard() {
   return (
     <div className="bg-slate-50/70 px-4 py-6">
       <div className="mx-auto max-w-7xl space-y-6">
+        <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+          <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Data View
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold text-slate-900">
+                Open the malaria reporting data workspace
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                Review the local and non-local reporting tables in the malaria
+                data view without leaving your microstatification admin flow.
+              </p>
+            </div>
+            <div className="flex justify-start lg:justify-end">
+              <button
+                type="button"
+                onClick={() => window.location.assign("/malaria/")}
+                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800"
+              >
+                View Data Page
+                <FiExternalLink className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
             title="Managed Users"

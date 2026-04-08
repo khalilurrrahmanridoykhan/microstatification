@@ -16,7 +16,7 @@ interface AuthContextType {
   role: AppRole | null;
   microRole: string | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<string>;
   signOut: () => Promise<void>;
 }
 
@@ -103,13 +103,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    return data?.redirectTo || "/malaria/";
   };
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    clearUserData();
+    if (typeof window !== "undefined") {
+      window.location.replace("/login");
+    }
   };
 
   return (

@@ -260,6 +260,12 @@ MICROSTATIFICATION_ADMIN_ROLE = 7
 MICROSTATIFICATION_MANAGED_ROLES = {4, 8, 9}
 MICROSTATIFICATION_GLOBAL_VISIBLE_ROLES = {8, 9}
 MICROSTATIFICATION_CREATOR_SCOPED_ROLE = 4
+MICROSTATIFICATION_ALLOWED_USER_UPDATE_FIELDS = {
+    'email',
+    'first_name',
+    'last_name',
+    'password',
+}
 MICROSTATIFICATION_ALLOWED_PROFILE_FIELDS = {
     'data_collection_type',
     'micro_role',
@@ -6449,7 +6455,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
         sanitized_data = {}
 
-        if 'role' in request.data:
+        for field in MICROSTATIFICATION_ALLOWED_USER_UPDATE_FIELDS:
+            if field in request.data:
+                sanitized_data[field] = request.data.get(field)
+
+        requested_role = getattr(instance, 'role', None)
+        role_was_supplied = 'role' in request.data
+
+        if role_was_supplied:
             try:
                 requested_role = int(request.data.get('role'))
             except (TypeError, ValueError):
@@ -6465,6 +6478,35 @@ class UserViewSet(viewsets.ModelViewSet):
             for key, value in raw_profile.items()
             if key in MICROSTATIFICATION_ALLOWED_PROFILE_FIELDS
         }
+
+        if role_was_supplied:
+            username = (getattr(instance, 'username', '') or '').strip()
+            if requested_role == 8:
+                sanitized_profile.setdefault('data_collection_type', 'microstatification')
+                sanitized_profile.setdefault('micro_role', 'sk')
+                sanitized_profile.setdefault('micro_designation', 'SK')
+                sanitized_profile.setdefault('micro_sk_shw_name', username)
+            elif requested_role == 9:
+                sanitized_profile.setdefault('data_collection_type', 'microstatification')
+                sanitized_profile.setdefault('micro_role', 'shw')
+                sanitized_profile.setdefault('micro_designation', 'SHW')
+                sanitized_profile.setdefault('micro_sk_shw_name', username)
+            elif requested_role == 4:
+                sanitized_profile.update({
+                    'data_collection_type': 'normal',
+                    'micro_role': '',
+                    'micro_division': '',
+                    'micro_district': None,
+                    'micro_upazila': None,
+                    'micro_union': None,
+                    'micro_village': None,
+                    'micro_villages': [],
+                    'micro_ward_no': '',
+                    'micro_sk_shw_name': '',
+                    'micro_designation': '',
+                    'micro_ss_name': '',
+                })
+
         if sanitized_profile:
             sanitized_data['profile'] = sanitized_profile
 

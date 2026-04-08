@@ -9,6 +9,7 @@ import { Toaster } from "sonner";
 
 if (typeof window !== "undefined") {
   const mirroredKeys = ["authToken", "userInfo"];
+  const malariaTokenKey = "malaria_auth_token";
 
   try {
     mirroredKeys.forEach((key) => {
@@ -38,6 +39,9 @@ if (typeof window !== "undefined") {
       originalRemoveItem(key);
       if (mirroredKeys.includes(key)) {
         window.localStorage.removeItem(key);
+        if (key === "authToken") {
+          window.localStorage.removeItem(malariaTokenKey);
+        }
       }
     };
   } catch (err) {
@@ -69,6 +73,7 @@ axios.interceptors.response.use(
       window.sessionStorage.removeItem("userInfo");
       window.localStorage.removeItem("authToken");
       window.localStorage.removeItem("userInfo");
+      window.localStorage.removeItem("malaria_auth_token");
 
       // Redirect to login page
       window.location.href = "/login";

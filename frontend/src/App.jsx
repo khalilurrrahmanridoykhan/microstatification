@@ -143,14 +143,33 @@ const IdleTimeoutWrapper = ({ children }) => {
   return <>{children}</>;
 };
 
+const MalariaRedirect = () => {
+  useEffect(() => {
+    window.location.replace("/malaria/");
+  }, []);
+
+  return null;
+};
+
 const App = () => {
+  const storedUserInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
   const [authToken, setAuthToken] = useState(
     sessionStorage.getItem("authToken")
   );
-  const [userRole, setUserRole] = useState(null);
-  const [userDetails, setUserDetails] = useState(null);
+  const [userRole, setUserRole] = useState(storedUserInfo.role || null);
+  const [userDetails, setUserDetails] = useState(
+    Object.keys(storedUserInfo).length ? storedUserInfo : null
+  );
   const isBracDownloadUser =
     userDetails?.username === BRAC_DOWNLOAD_USERNAME;
+  const microRole = String(userDetails?.profile?.micro_role || "").toLowerCase();
+  const isMalariaFieldUser =
+    userRole === 8 || userRole === 9 || microRole === "sk" || microRole === "shw";
+  const defaultAuthenticatedPath = isBracDownloadUser
+    ? "/projects/55/all-rows"
+    : isMalariaFieldUser
+      ? "/malaria-redirect"
+      : "/dashboard";
 
   useEffect(() => {
     setAuthToken(sessionStorage.getItem("authToken"));
@@ -183,12 +202,13 @@ const App = () => {
             path="/login"
             element={
               authToken ? (
-                <Navigate to="/dashboard" />
+                <Navigate to={defaultAuthenticatedPath} replace />
               ) : (
                 <Login setAuthToken={setAuthToken} />
               )
             }
           />
+          <Route path="/malaria-redirect" element={<MalariaRedirect />} />
           <Route path="/register" element={<Register />} />
 
           {isBracDownloadUser && (
@@ -258,6 +278,7 @@ const App = () => {
               <Route path="user/all" element={<Alluser />} />
               <Route path="user/create" element={<CreateUserUsers />} />
               <Route path="user/assign-user" element={<AssignUser />} />
+              <Route path="user/edit/:id" element={<EditUser />} />
               <Route
                 path="microstatification/download"
                 element={<MicrostatificationDownload />}
@@ -716,16 +737,24 @@ const App = () => {
           )}
 
           {/* Global catch-all: if not matched above, redirect to login or dashboard */}
+          {isMalariaFieldUser && (
+            <Route
+              path="*"
+              element={
+                authToken ? (
+                  <MalariaRedirect />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+          )}
           <Route
             path="/"
             element={
               <Navigate
                 to={
-                  authToken
-                    ? isBracDownloadUser
-                      ? "/projects/55/all-rows"
-                      : "/dashboard"
-                    : "/login"
+                  authToken ? defaultAuthenticatedPath : "/login"
                 }
               />
             }

@@ -169,9 +169,11 @@ class MonthlyApproval(TimestampedModel):
 
     STATUS_PENDING = "PENDING"
     STATUS_APPROVED = "APPROVED"
+    STATUS_REJECTED = "REJECTED"
     STATUS_CHOICES = (
         (STATUS_PENDING, "Pending"),
         (STATUS_APPROVED, "Approved"),
+        (STATUS_REJECTED, "Rejected"),
     )
 
     local_record = models.ForeignKey(
@@ -190,7 +192,7 @@ class MonthlyApproval(TimestampedModel):
     )
     reporting_year = models.PositiveIntegerField(default=current_year)
     month = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(12)])
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_APPROVED)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
     approved_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

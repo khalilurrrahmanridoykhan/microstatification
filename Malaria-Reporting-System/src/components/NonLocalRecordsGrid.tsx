@@ -17,7 +17,8 @@ import {
   getDhakaYear,
   getMonthTotal,
 } from "@/lib/monthUtils";
-import { Plus, Trash2, RefreshCw, Save } from "lucide-react";
+import { exportRowsToXlsx } from "@/lib/xlsxExport";
+import { Download, Plus, Trash2, RefreshCw, Save } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import DataGridLoadingScreen from "@/components/DataGridLoadingScreen";
@@ -51,9 +52,17 @@ interface DistrictOption {
   name: string;
 }
 
-type CellStatus = "RED" | "YELLOW" | "GREEN";
+type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+type MonthCellStatus = "NEUTRAL" | "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
+
+interface ApprovalRow {
+  record_id: string;
+  month: number;
+  status: ApprovalStatus;
+}
 
 const COUNTRIES = ["Bangladesh", "India", "Myanmar"];
+const DEFAULT_DISTRICT_NAME = "Bandarban";
 
 const createRowId = () => {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -61,6 +70,11 @@ const createRowId = () => {
   }
 
   return `nonlocal-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const getNonLocalExportMonthValue = (row: NonLocalRow, monthColumn: (typeof MONTH_COLUMNS)[number]) => {
+  const value = Number((row as any)[monthColumn] || 0);
+  return value > 0 ? value : "";
 };
 
 const NonLocalRecordsGrid = () => {
@@ -75,7 +89,7 @@ const NonLocalRecordsGrid = () => {
   const [year, setYear] = useState(currentYear);
   const [rows, setRows] = useState<NonLocalRow[]>([]);
   const [districts, setDistricts] = useState<DistrictOption[]>([]);
-  const [selectedDistrictName, setSelectedDistrictName] = useState("all");
+  const [selectedDistrictName, setSelectedDistrictName] = useState(DEFAULT_DISTRICT_NAME);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
@@ -83,26 +97,74 @@ const NonLocalRecordsGrid = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState<10 | 20 | 50 | -1>(10);
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
+  const [approvalLookup, setApprovalLookup] = useState<Record<string, ApprovalStatus>>({});
+  const [approvalSavingKey, setApprovalSavingKey] = useState<string | null>(null);
 
   // -------- Color Logic (No DB Change) --------
-  const getMonthStatus = (value: number, monthIndex: number): CellStatus => {
-    if (!value || value === 0) return "RED";
-    const monthNumber = monthIndex + 1;
+  const getApprovalKey = (recordId: string, monthNumber: number) =>
+    `${recordId}:${monthNumber}`;
 
-    if (!isAdmin && year === currentYear && monthNumber === currentMonth) {
-      return "YELLOW";
+  const getMonthApprovalStatus = (recordId: string, monthNumber: number) =>
+    approvalLookup[getApprovalKey(recordId, monthNumber)] || null;
+
+  const getMonthStatus = (row: NonLocalRow, monthIndex: number): MonthCellStatus => {
+    const monthNumber = monthIndex + 1;
+    const value = Number((row as any)[MONTH_COLUMNS[monthIndex]] || 0);
+    const hasData = value > 0;
+    const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
+    const isFutureMonth =
+      year > currentYear || (year === currentYear && monthNumber > currentMonth);
+    const isCurrentMonth = year === currentYear && monthNumber === currentMonth;
+
+    if (hasData) {
+      if (approvalStatus === "APPROVED") return "APPROVED";
+      if (approvalStatus === "REJECTED") return "REJECTED";
+      return "PENDING";
     }
-    return "GREEN";
+
+    if (approvalStatus === "REJECTED") return "REJECTED";
+    if (approvalStatus === "APPROVED") return "APPROVED";
+    if (isCurrentMonth || isFutureMonth) return "NEUTRAL";
+    return "NOT_SUBMITTED";
   };
 
-  const getMonthBg = (status: CellStatus) => {
+  const isMonthEditable = (row: NonLocalRow, monthIndex: number) => {
+    if (isAdmin) return true;
+    if (year !== currentYear) return false;
+
+    const monthNumber = monthIndex + 1;
+    const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
+    if (approvalStatus === "REJECTED") return true;
+    return monthNumber === currentMonth;
+  };
+
+  const getMonthTitle = (status: MonthCellStatus) => {
     switch (status) {
-      case "GREEN":
-        return "bg-green-50 border-green-200";
-      case "YELLOW":
-        return "bg-yellow-50 border-yellow-200";
+      case "APPROVED":
+        return "Approved";
+      case "PENDING":
+        return "Pending approval";
+      case "REJECTED":
+        return "Not approved";
+      case "NOT_SUBMITTED":
+        return "Not submitted";
       default:
+        return "";
+    }
+  };
+
+  const getMonthBg = (status: MonthCellStatus) => {
+    switch (status) {
+      case "APPROVED":
+        return "bg-green-50 border-green-200";
+      case "PENDING":
+        return "bg-yellow-50 border-yellow-200";
+      case "REJECTED":
+        return "bg-orange-50 border-orange-200";
+      case "NOT_SUBMITTED":
         return "bg-red-50 border-red-200";
+      default:
+        return "bg-white border-border/60";
     }
   };
 
@@ -127,7 +189,26 @@ const NonLocalRecordsGrid = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      setRows(data || []);
+      const nextRows = data || [];
+      const { data: approvalData, error: approvalError } = await supabase
+        .from("monthly_approvals")
+        .select("record_id, month, status")
+        .eq("record_type", "non_local")
+        .eq("reporting_year", year);
+      if (approvalError) throw approvalError;
+
+      const visibleRecordIds = new Set(nextRows.map((row: NonLocalRow) => String(row.id)));
+      const nextApprovalLookup = Object.fromEntries(
+        ((approvalData || []) as ApprovalRow[])
+          .filter((approval) => visibleRecordIds.has(String(approval.record_id)))
+          .map((approval) => [
+            getApprovalKey(String(approval.record_id), Number(approval.month)),
+            approval.status,
+          ]),
+      );
+
+      setRows(nextRows);
+      setApprovalLookup(nextApprovalLookup);
       setDirtyIds(new Set());
       setDeletedIds([]);
       setCurrentPage(1);
@@ -151,6 +232,17 @@ const NonLocalRecordsGrid = () => {
           name: item.name,
         }));
         setDistricts(options);
+        setSelectedDistrictName((currentValue) => {
+          if (currentValue && currentValue !== "all") {
+            return currentValue;
+          }
+
+          const hasBandarban = options.some(
+            (district) => district.name === DEFAULT_DISTRICT_NAME,
+          );
+
+          return hasBandarban ? DEFAULT_DISTRICT_NAME : "all";
+        });
       } catch (err: any) {
         if (canceled) return;
         toast({
@@ -286,10 +378,7 @@ const NonLocalRecordsGrid = () => {
         }
       }
 
-      setDirtyIds(new Set());
-      setDeletedIds([]);
-      setRows((prev) => prev.map((r) => ({ ...r, _isNew: false })));
-
+      await fetchData();
       toast({ title: "Saved successfully" });
     } catch (err: any) {
       toast({ title: "Save error", description: err.message, variant: "destructive" });
@@ -298,11 +387,78 @@ const NonLocalRecordsGrid = () => {
     }
   };
 
-  const isMonthEditable = (monthIndex: number) => {
-    if (isAdmin) return true;
-    if (year !== currentYear) return false;
-    return monthIndex + 1 === currentMonth;
+  const handleApprovalChange = async (
+    row: NonLocalRow,
+    monthNumber: number,
+    nextStatus: Extract<ApprovalStatus, "APPROVED" | "REJECTED">,
+  ) => {
+    const monthField = MONTH_COLUMNS[monthNumber - 1];
+    const monthValue = Number((row as any)[monthField] || 0);
+    if (!isAdmin || row._isNew || monthValue <= 0) return;
+
+    const approvalKey = getApprovalKey(row.id, monthNumber);
+    setApprovalSavingKey(approvalKey);
+    try {
+      const { error } = await supabase.from("monthly_approvals").upsert({
+        record_type: "non_local",
+        record_id: row.id,
+        reporting_year: year,
+        month: monthNumber,
+        status: nextStatus,
+      });
+      if (error) throw error;
+
+      setApprovalLookup((prev) => ({
+        ...prev,
+        [approvalKey]: nextStatus,
+      }));
+      toast({ title: nextStatus === "APPROVED" ? "Month approved" : "Month marked not approved" });
+    } catch (err: any) {
+      toast({
+        title: "Approval update failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setApprovalSavingKey(null);
+    }
   };
+
+  const handleDownloadData = useCallback(() => {
+    if (!isAdmin) return;
+
+    if (rows.length === 0) {
+      toast({
+        title: "No data to download",
+        description: "There are no rows in the current non-local table view.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    exportRowsToXlsx({
+      filename: `malaria-non-local-records-${year}.xlsx`,
+      sheetName: `Non-Local ${year}`,
+      headers: [
+        "Country",
+        "District/State",
+        "Upazila/Township",
+        "Union",
+        "Village",
+        ...MONTH_LABELS,
+        "Total",
+      ],
+      rows: rows.map((row) => [
+        row.country || "",
+        row.district_or_state || "",
+        row.upazila_or_township || "",
+        row.union_name || "",
+        row.village_name || "",
+        ...MONTH_COLUMNS.map((column) => getNonLocalExportMonthValue(row, column)),
+        getMonthTotal(row),
+      ]),
+    });
+  }, [isAdmin, rows, toast, year]);
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
   const selectedDistrictLabel = selectedDistrictName === "all" ? "" : selectedDistrictName;
@@ -388,7 +544,38 @@ const NonLocalRecordsGrid = () => {
               </SelectContent>
             </Select>
           )}
+
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadData}
+              disabled={rows.length === 0}
+              className="h-9"
+            >
+              <Download className="h-4 w-4 mr-1" /> Download Data
+            </Button>
+          )}
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-600">
+        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1">
+          <span className="h-2.5 w-2.5 rounded-sm border border-red-300 bg-red-200" />
+          Not submitted
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2 py-1">
+          <span className="h-2.5 w-2.5 rounded-sm border border-yellow-300 bg-yellow-200" />
+          Pending approval
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1">
+          <span className="h-2.5 w-2.5 rounded-sm border border-orange-300 bg-orange-200" />
+          Not approved
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1">
+          <span className="h-2.5 w-2.5 rounded-sm border border-green-300 bg-green-200" />
+          Approved
+        </span>
       </div>
 
       <div>
@@ -491,31 +678,64 @@ const NonLocalRecordsGrid = () => {
 
                     {MONTH_COLUMNS.map((col, idx) => {
                       const value = (row as any)[col] as number;
-                      const status = getMonthStatus(value, idx);
-                      const editable = isMonthEditable(idx);
+                      const monthNumber = idx + 1;
+                      const status = getMonthStatus(row, idx);
+                      const editable = isMonthEditable(row, idx);
+                      const approvalStatus = getMonthApprovalStatus(row.id, monthNumber);
+                      const hasData = value > 0;
+                      const isApprovalSaving = approvalSavingKey === getApprovalKey(row.id, monthNumber);
+                      const approvalDisabled = !hasData || isApprovalSaving || row._isNew || dirtyIds.has(row.id);
 
                       return (
                         <td
                           key={col}
                           className={`grid-td p-0 border ${getMonthBg(status)} ${editable ? "" : "opacity-80"
                             }`}
-                          title={
-                            status === "GREEN"
-                              ? "Approved"
-                              : status === "YELLOW"
-                                ? "Waiting for approval"
-                                : "Not submitted"
-                          }
+                          title={getMonthTitle(status)}
                         >
-                          <input
-                            type="number"
-                            min={0}
-                            className={`grid-input bg-transparent ${editable ? "" : "text-muted-foreground"
-                              }`}
-                            value={value}
-                            onChange={(e) => handleCellChange(row.id, col, e.target.value)}
-                            disabled={!editable}
-                          />
+                          <div className="flex h-full flex-col">
+                            <input
+                              type="number"
+                              min={0}
+                              className={`grid-input bg-transparent text-center ${editable ? "" : "text-muted-foreground"
+                                }`}
+                              value={value > 0 ? String(value) : ""}
+                              onChange={(e) => handleCellChange(row.id, col, e.target.value)}
+                              disabled={!editable}
+                            />
+                          {isAdmin && hasData && (
+                            <div className="flex items-center justify-center gap-2 border-t border-black/5 px-1 py-1 text-[9px]">
+                              <button
+                                type="button"
+                                className={`inline-flex min-w-[28px] items-center justify-center rounded border px-1.5 py-0.5 font-semibold transition-colors ${
+                                  approvalStatus === "APPROVED"
+                                    ? "border-green-700 bg-green-700 text-white"
+                                    : "border-green-300 bg-white text-green-700"
+                                } ${approvalDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-green-50"}`}
+                                title="Approve"
+                                aria-pressed={approvalStatus === "APPROVED"}
+                                disabled={approvalDisabled}
+                                onClick={() => void handleApprovalChange(row, monthNumber, "APPROVED")}
+                              >
+                                A
+                              </button>
+                              <button
+                                type="button"
+                                className={`inline-flex min-w-[28px] items-center justify-center rounded border px-1.5 py-0.5 font-semibold transition-colors ${
+                                  approvalStatus === "REJECTED"
+                                    ? "border-orange-700 bg-orange-700 text-white"
+                                    : "border-orange-300 bg-white text-orange-700"
+                                } ${approvalDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-orange-50"}`}
+                                title="Not approve"
+                                aria-pressed={approvalStatus === "REJECTED"}
+                                disabled={approvalDisabled}
+                                onClick={() => void handleApprovalChange(row, monthNumber, "REJECTED")}
+                              >
+                                N
+                              </button>
+                            </div>
+                          )}
+                          </div>
                         </td>
                       );
                     })}

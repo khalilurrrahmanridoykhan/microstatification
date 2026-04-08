@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./UserList.css";
 import { Link, useNavigate } from "react-router-dom";
-import { FaEdit, FaTrash } from "react-icons/fa";
+import { FaEdit, FaKey, FaTrash } from "react-icons/fa";
 import axios from "axios";
 import { BACKEND_URL } from "../../../config";
 import { toast } from "sonner";
@@ -28,7 +28,7 @@ function UserList() {
   const [createdTo, setCreatedTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const showActionColumn = !isMicroAdminUser;
+  const showActionColumn = true;
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -237,6 +237,52 @@ function UserList() {
     } catch (error) {
       console.error("Error deleting user:", error);
       toast.error("Failed to delete user");
+    }
+  };
+
+  const handleResetPassword = async (username) => {
+    const result = await Swal.fire({
+      title: `Reset password for ${username}?`,
+      input: "password",
+      inputLabel: "New password",
+      inputPlaceholder: "Enter new password",
+      inputAttributes: {
+        autocapitalize: "off",
+        autocorrect: "off",
+      },
+      showCancelButton: true,
+      confirmButtonText: "Reset Password",
+      confirmButtonColor: "#2563eb",
+      cancelButtonColor: "#6b7280",
+      preConfirm: (value) => {
+        const trimmed = String(value || "").trim();
+        if (trimmed.length < 6) {
+          Swal.showValidationMessage("Password must be at least 6 characters.");
+          return false;
+        }
+        return trimmed;
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) {
+      return;
+    }
+
+    try {
+      const token = sessionStorage.getItem("authToken");
+      await axios.patch(
+        `${BACKEND_URL}/api/users/${username}/`,
+        { password: result.value },
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+      toast.success("Password reset successfully");
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast.error("Failed to reset password");
     }
   };
 
@@ -462,42 +508,52 @@ function UserList() {
                             onClick={() =>
                               navigate(`/user/edit/${user.username}`)
                             }
+                            title="Edit user"
                           >
                             <FaEdit />
                           </button>
                           <button
-                            onClick={async () => {
-                              const result = await Swal.fire({
-                                title: "Are you sure?",
-                                text: "This will delete the user permanently.",
-                                icon: "warning",
-                                showCancelButton: true,
-                                confirmButtonColor: "#d33",
-                                cancelButtonColor: "#3085d6",
-                                confirmButtonText: "Yes, delete it!",
-                              });
-
-                              if (result.isConfirmed) {
-                                try {
-                                  await handleConfirmDelete(user.username);
-                                  Swal.fire(
-                                    "Deleted!",
-                                    "The user has been deleted.",
-                                    "success"
-                                  );
-                                } catch (error) {
-                                  Swal.fire(
-                                    "Error!",
-                                    "Failed to delete the user.",
-                                    "error"
-                                  );
-                                  console.error(error);
-                                }
-                              }
-                            }}
+                            onClick={() => handleResetPassword(user.username)}
+                            title="Reset password"
                           >
-                            <FaTrash />
+                            <FaKey />
                           </button>
+                          {!isMicroAdminUser && (
+                            <button
+                              onClick={async () => {
+                                const result = await Swal.fire({
+                                  title: "Are you sure?",
+                                  text: "This will delete the user permanently.",
+                                  icon: "warning",
+                                  showCancelButton: true,
+                                  confirmButtonColor: "#d33",
+                                  cancelButtonColor: "#3085d6",
+                                  confirmButtonText: "Yes, delete it!",
+                                });
+
+                                if (result.isConfirmed) {
+                                  try {
+                                    await handleConfirmDelete(user.username);
+                                    Swal.fire(
+                                      "Deleted!",
+                                      "The user has been deleted.",
+                                      "success"
+                                    );
+                                  } catch (error) {
+                                    Swal.fire(
+                                      "Error!",
+                                      "Failed to delete the user.",
+                                      "error"
+                                    );
+                                    console.error(error);
+                                  }
+                                }
+                              }}
+                              title="Delete user"
+                            >
+                              <FaTrash />
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}

@@ -8,6 +8,31 @@ import { CiLock } from "react-icons/ci";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { BACKEND_URL, BRAC_DOWNLOAD_USERNAME } from "../config";
 
+const MALARIA_TOKEN_KEY = "malaria_auth_token";
+
+const getMicroRole = (user) =>
+  String(user?.profile?.micro_role || "").toLowerCase();
+
+const isMalariaFieldUser = (user) => {
+  const role = Number(user?.role || 0);
+  const microRole = getMicroRole(user);
+  return role === 8 || role === 9 || microRole === "sk" || microRole === "shw";
+};
+
+const hasMalariaWorkspaceAccess = (user) => {
+  const role = Number(user?.role || 0);
+  const microRole = getMicroRole(user);
+  return (
+    role === 1 ||
+    role === 7 ||
+    role === 8 ||
+    role === 9 ||
+    microRole === "micro_admin" ||
+    microRole === "sk" ||
+    microRole === "shw"
+  );
+};
+
 const Login = ({ setAuthToken }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -64,13 +89,25 @@ const Login = ({ setAuthToken }) => {
         setAuthToken(token);
 
         const nextPath =
-          user?.username === BRAC_DOWNLOAD_USERNAME
+          isMalariaFieldUser(user)
+            ? "/malaria/"
+            : user?.username === BRAC_DOWNLOAD_USERNAME
             ? "/projects/55/all-rows"
             : "/dashboard";
 
+        if (hasMalariaWorkspaceAccess(user)) {
+          localStorage.setItem(MALARIA_TOKEN_KEY, token);
+        } else {
+          localStorage.removeItem(MALARIA_TOKEN_KEY);
+        }
+
         // Navigate first, then reload to avoid any race conditions
-        navigate(nextPath);
-        setTimeout(() => window.location.reload(), 100);
+        if (nextPath === "/malaria/") {
+          window.location.replace(nextPath);
+        } else {
+          navigate(nextPath);
+          setTimeout(() => window.location.reload(), 100);
+        }
       } catch (loginErr) {
         console.error("❌ Login error details:", loginErr);
         handleError(loginErr);

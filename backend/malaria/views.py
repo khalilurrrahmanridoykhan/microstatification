@@ -201,6 +201,86 @@ def _current_dhaka_year():
     return timezone.now().astimezone(ZoneInfo("Asia/Dhaka")).year
 
 
+def _month_field_to_number(field_name):
+    try:
+        return MONTH_COLUMNS.index(field_name) + 1
+    except ValueError:
+        return None
+
+
+def _profile_local_approval_scope_q(profile):
+    if not profile:
+        return None
+
+    multi_village_ids = list(profile.micro_villages.values_list("id", flat=True)) if hasattr(profile, "micro_villages") else []
+    if multi_village_ids:
+        return Q(local_record__village_id__in=multi_village_ids)
+
+    if getattr(profile, "micro_village_id", None):
+        return Q(local_record__village_id=profile.micro_village_id)
+    if getattr(profile, "micro_union_id", None):
+        ward_no = (getattr(profile, "micro_ward_no", "") or "").strip()
+        if ward_no:
+            return Q(
+                local_record__village__union_id=profile.micro_union_id,
+                local_record__village__ward_no__iexact=ward_no,
+            )
+        return Q(local_record__village__union_id=profile.micro_union_id)
+    if getattr(profile, "micro_upazila_id", None):
+        return Q(local_record__village__union__upazila_id=profile.micro_upazila_id)
+    if getattr(profile, "micro_district_id", None):
+        return Q(local_record__village__union__upazila__district_id=profile.micro_district_id)
+
+    return None
+
+
+def _get_rejected_month_fields(record_type, instance):
+    filters = {
+        "reporting_year": instance.reporting_year,
+        "status": MonthlyApproval.STATUS_REJECTED,
+    }
+    if record_type == MonthlyApproval.RECORD_TYPE_NON_LOCAL:
+        filters["non_local_record"] = instance
+    else:
+        filters["local_record"] = instance
+
+    rejected_months = MonthlyApproval.objects.filter(**filters).values_list("month", flat=True)
+    return {
+        MONTH_COLUMNS[month_number - 1]
+        for month_number in rejected_months
+        if 1 <= month_number <= len(MONTH_COLUMNS)
+    }
+
+
+def _sync_monthly_approvals_for_user_submission(record_type, instance, changed_month_fields):
+    for field in changed_month_fields:
+        month_number = _month_field_to_number(field)
+        if month_number is None:
+            continue
+
+        month_value = getattr(instance, field, 0) or 0
+        filters = {
+            "reporting_year": instance.reporting_year,
+            "month": month_number,
+        }
+        if record_type == MonthlyApproval.RECORD_TYPE_NON_LOCAL:
+            filters["non_local_record"] = instance
+        else:
+            filters["local_record"] = instance
+
+        if month_value > 0:
+            MonthlyApproval.objects.update_or_create(
+                defaults={
+                    "status": MonthlyApproval.STATUS_PENDING,
+                    "approved_by": None,
+                    "approved_at": None,
+                },
+                **filters,
+            )
+        else:
+            MonthlyApproval.objects.filter(**filters).delete()
+
+
 def _build_dashboard_payload():
     role_rows = MalariaUserRole.objects.filter(role=MalariaUserRole.ROLE_SK).count()
     village_count = Village.objects.count()
@@ -1081,14 +1161,43 @@ def _ensure_local_record_editable(user, instance, validated_data):
 
     editable_month = _current_dhaka_month()
     allowed_month_field = MONTH_COLUMNS[editable_month - 1]
+    rejected_month_fields = _get_rejected_month_fields(MonthlyApproval.RECORD_TYPE_LOCAL, instance)
     changed_month_fields = [
         field
         for field in MONTH_COLUMNS
         if field in validated_data and validated_data[field] != getattr(instance, field)
     ]
-    disallowed = [field for field in changed_month_fields if field != allowed_month_field]
+    allowed_month_fields = {allowed_month_field, *rejected_month_fields}
+    disallowed = [field for field in changed_month_fields if field not in allowed_month_fields]
     if disallowed:
-        raise ValueError("You can only edit the current month.")
+        raise ValueError("You can only edit the current month or months returned as not approved.")
+
+
+def _ensure_non_local_record_editable(user, instance, validated_data):
+    if is_malaria_admin(user):
+        return
+
+    if instance.sk_user_id != user.id:
+        raise PermissionError("You can only edit your own non-local records.")
+
+    if instance.reporting_year != _current_dhaka_year():
+        raise ValueError("You can only edit records for the current reporting year.")
+
+    editable_month = _current_dhaka_month()
+    allowed_month_field = MONTH_COLUMNS[editable_month - 1]
+    rejected_month_fields = _get_rejected_month_fields(MonthlyApproval.RECORD_TYPE_NON_LOCAL, instance)
+    changed_month_fields = [
+        field
+        for field in MONTH_COLUMNS
+        if field in validated_data and validated_data[field] != getattr(instance, field)
+    ]
+    disallowed = [
+        field
+        for field in changed_month_fields
+        if field not in {allowed_month_field, *rejected_month_fields}
+    ]
+    if disallowed:
+        raise ValueError("You can only edit the current month or months returned as not approved.")
 
 
 class MalariaSessionView(APIView):
@@ -1370,7 +1479,7 @@ class VillageViewSet(MalariaAdminWriteMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        queryset = _apply_filters(
+        queryset = _apply_filters( 
             queryset,
             self.request,
             exact_fields=["id", "union_id", "ward_no"],
@@ -1462,6 +1571,11 @@ class LocalRecordViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+        changed_month_fields = [
+            field
+            for field in MONTH_COLUMNS
+            if field in serializer.validated_data and serializer.validated_data[field] != getattr(instance, field)
+        ]
 
         try:
             _ensure_local_record_editable(request.user, instance, serializer.validated_data)
@@ -1471,6 +1585,12 @@ class LocalRecordViewSet(viewsets.ModelViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         self.perform_update(serializer)
+        if not is_malaria_admin(request.user) and changed_month_fields:
+            _sync_monthly_approvals_for_user_submission(
+                MonthlyApproval.RECORD_TYPE_LOCAL,
+                serializer.instance,
+                changed_month_fields,
+            )
         return Response(serializer.data)
 
 
@@ -1501,18 +1621,51 @@ class NonLocalRecordViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        if not is_malaria_admin(request.user) and instance.sk_user_id != request.user.id:
-            return Response({"detail": "You can only edit your own non-local records."}, status=status.HTTP_403_FORBIDDEN)
-        return super().update(request, *args, **kwargs)
+        partial = kwargs.pop("partial", False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        changed_month_fields = [
+            field
+            for field in MONTH_COLUMNS
+            if field in serializer.validated_data and serializer.validated_data[field] != getattr(instance, field)
+        ]
+
+        try:
+            _ensure_non_local_record_editable(request.user, instance, serializer.validated_data)
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_update(serializer)
+        if not is_malaria_admin(request.user) and changed_month_fields:
+            _sync_monthly_approvals_for_user_submission(
+                MonthlyApproval.RECORD_TYPE_NON_LOCAL,
+                serializer.instance,
+                changed_month_fields,
+            )
+        return Response(serializer.data)
 
 
 class MonthlyApprovalViewSet(viewsets.ModelViewSet):
     serializer_class = MonthlyApprovalSerializer
-    permission_classes = [IsAuthenticated, IsMalariaAdmin]
     pagination_class = None
+
+    def get_permissions(self):
+        if self.action in {"list", "retrieve"}:
+            return [IsAuthenticated(), HasMalariaAccess()]
+        return [IsAuthenticated(), IsMalariaAdmin()]
 
     def get_queryset(self):
         queryset = MonthlyApproval.objects.select_related("approved_by", "local_record", "non_local_record").all()
+        if not is_malaria_admin(self.request.user):
+            profile = getattr(self.request.user, "profile", None)
+            local_scope_q = _profile_local_approval_scope_q(profile)
+            visible_local_q = Q(local_record__sk_user=self.request.user)
+            if local_scope_q is not None:
+                visible_local_q |= local_scope_q
+            queryset = queryset.filter(visible_local_q | Q(non_local_record__sk_user=self.request.user))
+
         record_type = self.request.query_params.get("record_type")
         if record_type == MonthlyApproval.RECORD_TYPE_LOCAL:
             queryset = queryset.filter(local_record__isnull=False)
@@ -1548,8 +1701,12 @@ class MonthlyApprovalViewSet(viewsets.ModelViewSet):
             }
             defaults = {
                 "status": status_value,
-                "approved_by": request.user,
-                "approved_at": item.get("approved_at") or timezone.now(),
+                "approved_by": request.user if status_value != MonthlyApproval.STATUS_PENDING else None,
+                "approved_at": (
+                    item.get("approved_at") or timezone.now()
+                    if status_value != MonthlyApproval.STATUS_PENDING
+                    else None
+                ),
             }
 
             if record_type == MonthlyApproval.RECORD_TYPE_NON_LOCAL:
