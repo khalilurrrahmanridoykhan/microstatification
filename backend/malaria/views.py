@@ -37,6 +37,7 @@ from .models import (
     Upazila,
     Village,
 )
+from .microstatification_sync import sync_microstatification_workbook
 from .permissions import HasMalariaAccess, IsMalariaAdmin, get_malaria_role, has_malaria_access, is_malaria_admin
 from .serializers import (
     DistrictSerializer,
@@ -1170,6 +1171,17 @@ def _build_microstatification_dashboard_payload(request_user):
     districts_with_users = sum(1 for item in district_stats if item["assigned_users"] > 0)
     last_upload_at = recent_upload_qs[0].created_at if recent_upload_qs else None
     assignment_coverage = round((assigned_users / len(managed_users)) * 100, 1) if managed_users else 0
+    reporting_year = _current_dhaka_year()
+    local_case_totals = LocalRecord.objects.filter(reporting_year=reporting_year).aggregate(
+        **{field: Coalesce(Sum(field), 0) for field in MONTH_COLUMNS}
+    )
+    non_local_case_totals = NonLocalRecord.objects.filter(reporting_year=reporting_year).aggregate(
+        **{field: Coalesce(Sum(field), 0) for field in MONTH_COLUMNS}
+    )
+    total_reported_cases = (
+        sum(int(local_case_totals.get(field) or 0) for field in MONTH_COLUMNS)
+        + sum(int(non_local_case_totals.get(field) or 0) for field in MONTH_COLUMNS)
+    )
 
     return {
         "generated_at": timezone.now(),
@@ -1183,6 +1195,8 @@ def _build_microstatification_dashboard_payload(request_user):
             "districts_with_users": districts_with_users,
             "villages": total_villages,
             "population": total_population,
+            "reported_cases": total_reported_cases,
+            "reporting_year": reporting_year,
             "uploads": total_uploads,
             "last_upload_at": last_upload_at,
             "last_village_update": latest_village_update,
@@ -2003,6 +2017,7 @@ class MicrostatificationDataUploadView(APIView):
             
             # Read Excel file
             file_content = excel_file.read()
+            excel_file.seek(0)
             workbook = openpyxl.load_workbook(io.BytesIO(file_content))
             
             # Create upload record
@@ -2013,151 +2028,29 @@ class MicrostatificationDataUploadView(APIView):
                 parsed_data={},
                 upload_note="Processing..."
             )
-            
-            parsed_data = {
-                "upazilas": [],
-                "unions": [],
-                "villages": [],
-            }
-            
-            # Process districts (should be a single district)
-            district, dist_created = District.objects.get_or_create(
-                name=district_name
+
+            sync_result = sync_microstatification_workbook(
+                workbook,
+                district_name=district_name,
+                prune_stale=True,
             )
-            if dist_created:
-                upload.districts_created = 1
-            
-            # Process each sheet (each sheet = upazila)
-            for sheet_name in workbook.sheetnames:
-                ws = workbook[sheet_name]
-                
-                upazila, up_created = Upazila.objects.get_or_create(
-                    district=district,
-                    name=sheet_name
-                )
-                if up_created:
-                    upload.upazilas_created += 1
-                
-                upazila_data = {
-                    "name": upazila.name,
-                    "id": upazila.id,
-                    "unions": []
-                }
-                
-                # Process rows starting from row 7
-                union_cache = {}
-                
-                for row_idx, row in enumerate(ws.iter_rows(min_row=7, values_only=True), start=7):
-                    if not row or not row[0]:  # Skip empty rows
-                        continue
-                    
-                    try:
-                        # Extract fields from template columns (row 6 header)
-                        # 0:SL, 4:Upazila, 5:Union, 6:Ward, 10:Village EN, 11:Village BN, 12:Village Code, 13:Lat, 14:Lon
-                        union_name = row[5] if len(row) > 5 and row[5] else None
-                        if not union_name:
-                            continue
-                        
-                        sk_shw_name = (str(row[7]).strip() if len(row) > 7 and row[7] else "")
-                        ss_name = (str(row[9]).strip() if len(row) > 9 and row[9] else "")
-                        village_name_en = row[10] if len(row) > 10 else None
-                        village_name_bn = row[11] if len(row) > 11 else None
-                        village_code = row[12] if len(row) > 12 else None
-                        latitude = row[13] if len(row) > 13 else None
-                        longitude = row[14] if len(row) > 14 else None
-                        population = row[15] if len(row) > 15 else None
-                        mmw_hp_chwc_name = (str(row[16]).strip() if len(row) > 16 and row[16] else "")
-                        distance_from_upazila_office_km = row[17] if len(row) > 17 else None
-                        bordering_country_name = (str(row[18]).strip() if len(row) > 18 and row[18] else "")
-                        other_activities = (str(row[19]).strip() if len(row) > 19 and row[19] else "")
-                        ward_no = row[6] if len(row) > 6 else None
-                        
-                        if not village_name_en:
-                            continue
-                        
-                        #Create or get union
-                        if union_name not in union_cache:
-                            union, union_created = Union.objects.get_or_create(
-                                upazila=upazila,
-                                name=union_name
-                            )
-                            union_cache[union_name] = union
-                            if union_created:
-                                upload.unions_created += 1
-                        else:
-                            union = union_cache[union_name]
-                        
-                        # Create or update village
-                        village, v_created = Village.objects.get_or_create(
-                            union=union,
-                            name=village_name_en,
-                            ward_no=ward_no,
-                            defaults={
-                                'name_bn': village_name_bn or '',
-                                'village_code': village_code or '',
-                                'latitude': latitude,
-                                'longitude': longitude,
-                                'population': population,
-                                'sk_shw_name': sk_shw_name,
-                                'ss_name': ss_name,
-                                'mmw_hp_chwc_name': mmw_hp_chwc_name,
-                                'distance_from_upazila_office_km': distance_from_upazila_office_km,
-                                'bordering_country_name': bordering_country_name,
-                                'other_activities': other_activities,
-                            }
-                        )
-                        
-                        if v_created:
-                            upload.villages_created += 1
-                        else:
-                            # Update existing village if new data provided
-                            updated = False
-                            if village_name_bn and village.name_bn != village_name_bn:
-                                village.name_bn = village_name_bn
-                                updated = True
-                            if village_code and village.village_code != village_code:
-                                village.village_code = village_code
-                                updated = True
-                            if latitude is not None and village.latitude != latitude:
-                                village.latitude = latitude
-                                updated = True
-                            if longitude is not None and village.longitude != longitude:
-                                village.longitude = longitude
-                                updated = True
-                            if population is not None and village.population != population:
-                                village.population = population
-                                updated = True
-                            if sk_shw_name and village.sk_shw_name != sk_shw_name:
-                                village.sk_shw_name = sk_shw_name
-                                updated = True
-                            if ss_name and village.ss_name != ss_name:
-                                village.ss_name = ss_name
-                                updated = True
-                            if mmw_hp_chwc_name and village.mmw_hp_chwc_name != mmw_hp_chwc_name:
-                                village.mmw_hp_chwc_name = mmw_hp_chwc_name
-                                updated = True
-                            if (
-                                distance_from_upazila_office_km is not None
-                                and village.distance_from_upazila_office_km != distance_from_upazila_office_km
-                            ):
-                                village.distance_from_upazila_office_km = distance_from_upazila_office_km
-                                updated = True
-                            if bordering_country_name and village.bordering_country_name != bordering_country_name:
-                                village.bordering_country_name = bordering_country_name
-                                updated = True
-                            if other_activities and village.other_activities != other_activities:
-                                village.other_activities = other_activities
-                                updated = True
-                            if updated:
-                                village.save()
-                                upload.villages_updated += 1
-                                
-                    except Exception as e:
-                        upload.upload_note += f"\n⚠ Row {row_idx} error: {str(e)}"
-                        continue
-            
-            upload.parsed_data = parsed_data
-            upload.upload_note = f"✓ Upload completed successfully\nDistricts: {upload.districts_created}, Upazilas: {upload.upazilas_created}, Unions: {upload.unions_created}, Villages created: {upload.villages_created}, Updated: {upload.villages_updated}"
+
+            upload.parsed_data = sync_result.parsed_data
+            upload.districts_created = sync_result.districts_created
+            upload.upazilas_created = sync_result.upazilas_created
+            upload.unions_created = sync_result.unions_created
+            upload.villages_created = sync_result.villages_created
+            upload.villages_updated = sync_result.villages_updated
+            upload.upload_note = (
+                "✓ Upload completed successfully\n"
+                f"Districts: {sync_result.districts_created}, "
+                f"Upazilas created: {sync_result.upazilas_created}, "
+                f"Unions created: {sync_result.unions_created}, "
+                f"Villages created: {sync_result.villages_created}, "
+                f"Villages updated: {sync_result.villages_updated}, "
+                f"Villages deleted: {sync_result.villages_deleted}, "
+                f"Local records deleted: {sync_result.local_records_deleted}"
+            )
             upload.save()
             
             serializer_out = MicrostatificationDataUploadSerializer(upload)

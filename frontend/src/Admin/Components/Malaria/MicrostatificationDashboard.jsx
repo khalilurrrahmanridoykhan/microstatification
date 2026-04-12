@@ -134,134 +134,6 @@ function DistributionCard({ title, items, type }) {
   );
 }
 
-function UploadTrendChart({ data }) {
-  const safeData = Array.isArray(data) ? data : [];
-
-  if (!safeData.length) {
-    return (
-      <div className="flex h-[260px] items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
-        No upload activity yet.
-      </div>
-    );
-  }
-
-  const width = 720;
-  const height = 260;
-  const padX = 34;
-  const padY = 30;
-  const maxValue = Math.max(
-    ...safeData.map((item) => Number(item?.villages_touched) || 0),
-    1
-  );
-  const step =
-    safeData.length > 1 ? (width - padX * 2) / (safeData.length - 1) : 0;
-
-  const points = safeData.map((item, index) => {
-    const value = Number(item?.villages_touched) || 0;
-    const x = safeData.length === 1 ? width / 2 : padX + index * step;
-    const y =
-      height -
-      padY -
-      (value / maxValue) * Math.max(height - padY * 2, 1);
-    return { x, y, value, label: item.label, district: item.district };
-  });
-
-  const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${point.y}`)
-    .join(" ");
-  const areaPath = `${linePath} L${points[points.length - 1].x} ${
-    height - padY
-  } L${points[0].x} ${height - padY} Z`;
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-semibold text-slate-900">Upload Momentum</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Villages touched across the latest upload events.
-          </p>
-        </div>
-        <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
-          <FiTrendingUp className="h-5 w-5" />
-        </div>
-      </div>
-
-      <div className="overflow-hidden rounded-3xl bg-slate-950/95 p-4 text-white">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="h-[260px] w-full"
-          preserveAspectRatio="none"
-        >
-          {[0, 1, 2, 3].map((stepIndex) => {
-            const y =
-              padY +
-              ((height - padY * 2) / 3) * stepIndex;
-            return (
-              <line
-                key={stepIndex}
-                x1={padX}
-                x2={width - padX}
-                y1={y}
-                y2={y}
-                stroke="rgba(255,255,255,0.12)"
-                strokeDasharray="4 6"
-              />
-            );
-          })}
-
-          <path d={areaPath} fill="rgba(45, 212, 191, 0.18)" />
-          <path
-            d={linePath}
-            fill="none"
-            stroke="url(#uploadTrendGradient)"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          <defs>
-            <linearGradient id="uploadTrendGradient" x1="0%" x2="100%">
-              <stop offset="0%" stopColor="#22d3ee" />
-              <stop offset="100%" stopColor="#34d399" />
-            </linearGradient>
-          </defs>
-
-          {points.map((point) => (
-            <g key={`${point.label}-${point.district}`}>
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r="6"
-                fill="#0f172a"
-                stroke="#67e8f9"
-                strokeWidth="3"
-              />
-            </g>
-          ))}
-        </svg>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {safeData.map((item) => (
-            <div
-              key={`${item.label}-${item.district}`}
-              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-            >
-              <div className="text-xs uppercase tracking-[0.18em] text-cyan-200">
-                {item.label}
-              </div>
-              <div className="mt-2 text-lg font-semibold">
-                {formatNumber(item.villages_touched)} villages
-              </div>
-              <div className="mt-1 text-sm text-slate-300">{item.district}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function DistrictOperationsCard({ districts }) {
   const safeDistricts = Array.isArray(districts) ? districts : [];
   const topDistricts = safeDistricts.slice(0, 5);
@@ -367,168 +239,6 @@ function DistrictOperationsCard({ districts }) {
   );
 }
 
-function RecentUploadsCard({ uploads }) {
-  const safeUploads = Array.isArray(uploads) ? uploads : [];
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-semibold text-slate-900">Recent Uploads</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Latest processed microstatification files.
-          </p>
-        </div>
-        <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
-          <FiActivity className="h-5 w-5" />
-        </div>
-      </div>
-
-      {safeUploads.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-          No uploads found.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {safeUploads.map((upload) => {
-            const touched =
-              Number(upload?.villages_created || 0) +
-              Number(upload?.villages_updated || 0);
-            const isSuccess = `${upload?.upload_note || ""}`
-              .toLowerCase()
-              .includes("completed");
-
-            return (
-              <div
-                key={upload.id}
-                className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-base font-semibold text-slate-900">
-                      {upload.district}
-                    </div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      {upload.uploaded_by_username || "Unknown user"} •{" "}
-                      {formatDate(upload.created_at, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      isSuccess
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {isSuccess ? "Completed" : "Processed"}
-                  </span>
-                </div>
-
-                <div className="mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
-                  <div>
-                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Created
-                    </span>
-                    <span className="font-semibold text-slate-900">
-                      {formatNumber(upload.villages_created)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Updated
-                    </span>
-                    <span className="font-semibold text-slate-900">
-                      {formatNumber(upload.villages_updated)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Total Touched
-                    </span>
-                    <span className="font-semibold text-slate-900">
-                      {formatNumber(touched)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DistrictTable({ districts }) {
-  const safeDistricts = Array.isArray(districts) ? districts : [];
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-semibold text-slate-900">
-            District Summary
-          </h3>
-          <p className="mt-1 text-sm text-slate-500">
-            Full microstatification operating view across all districts.
-          </p>
-        </div>
-        <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
-          <FiMapPin className="h-5 w-5" />
-        </div>
-      </div>
-
-      {safeDistricts.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-          No district summary available.
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-separate border-spacing-y-2">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-[0.18em] text-slate-400">
-                <th className="px-3 py-2">District</th>
-                <th className="px-3 py-2">Villages</th>
-                <th className="px-3 py-2">Population</th>
-                <th className="px-3 py-2">Assigned Users</th>
-                <th className="px-3 py-2">Uploads</th>
-                <th className="px-3 py-2">Last Upload</th>
-              </tr>
-            </thead>
-            <tbody>
-              {safeDistricts.map((district) => (
-                <tr
-                  key={district.name}
-                  className="rounded-2xl bg-slate-50 text-sm text-slate-700"
-                >
-                  <td className="rounded-l-2xl px-3 py-4 font-semibold text-slate-900">
-                    {district.name}
-                  </td>
-                  <td className="px-3 py-4">{formatNumber(district.villages)}</td>
-                  <td className="px-3 py-4">{formatNumber(district.population)}</td>
-                  <td className="px-3 py-4">
-                    {formatNumber(district.assigned_users)}
-                  </td>
-                  <td className="px-3 py-4">{formatNumber(district.uploads)}</td>
-                  <td className="rounded-r-2xl px-3 py-4">
-                    {formatDate(district.last_upload_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function LoadingState() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
@@ -617,12 +327,6 @@ function MicrostatificationDashboard() {
   const districtStats = Array.isArray(dashboard?.district_stats)
     ? dashboard.district_stats
     : [];
-  const recentUploads = Array.isArray(dashboard?.recent_uploads)
-    ? dashboard.recent_uploads
-    : [];
-  const uploadTrend = Array.isArray(dashboard?.upload_trend)
-    ? dashboard.upload_trend
-    : [];
 
   return (
     <div className="bg-slate-50/70 px-4 py-6">
@@ -666,7 +370,7 @@ function MicrostatificationDashboard() {
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            title="Managed Users"
+            title="Total Users"
             value={formatNumber(totals.managed_users)}
             subtitle="Users visible to the microstatification admin across User, SK, and SHW roles."
             Icon={FiUsers}
@@ -691,11 +395,13 @@ function MicrostatificationDashboard() {
             accentClass="from-violet-500 to-fuchsia-500"
           />
           <StatCard
-            title="Mapped Population"
-            value={formatNumber(totals.population)}
+            title="Total Reported Case"
+            value={formatNumber(totals.reported_cases)}
             subtitle={`${formatNumber(
               totals.uploads
-            )} upload events have contributed to the current data store.`}
+            )} upload events have contributed to the current data store for reporting year ${
+              totals.reporting_year || new Date().getFullYear()
+            }.`}
             Icon={FiTrendingUp}
             accentClass="from-amber-500 to-orange-500"
           />
@@ -716,14 +422,6 @@ function MicrostatificationDashboard() {
             />
           </div>
         </div>
-
-        <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <UploadTrendChart data={uploadTrend} />
-          <RecentUploadsCard uploads={recentUploads} />
-        </div>
-
-        <DistrictTable districts={districtStats} />
-
       </div>
     </div>
   );
