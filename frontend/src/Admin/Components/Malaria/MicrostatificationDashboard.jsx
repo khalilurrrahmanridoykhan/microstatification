@@ -52,9 +52,26 @@ function formatDate(value, options) {
   }
 }
 
-function StatCard({ title, value, subtitle, Icon, accentClass }) {
+function StatCard({ title, value, subtitle, Icon, accentClass, onClick }) {
+  const isClickable = typeof onClick === "function";
+
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+    <div
+      className={`relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] ${isClickable ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-[0_24px_58px_rgba(15,23,42,0.12)]" : ""}`}
+      onClick={onClick}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={
+        isClickable
+          ? (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onClick();
+            }
+          }
+          : undefined
+      }
+    >
       <div
         className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accentClass}`}
       />
@@ -87,7 +104,7 @@ function DistributionCard({ title, items, type }) {
         <div>
           <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
           <p className="mt-1 text-sm text-slate-500">
-            Live breakdown from current managed accounts.
+            Quantitative breakdown of users.
           </p>
         </div>
         <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
@@ -150,7 +167,7 @@ function DistrictOperationsCard({ districts }) {
             District Operations
           </h3>
           <p className="mt-1 text-sm text-slate-500">
-            Village footprint, user coverage, and upload volume by district.
+            Village footprint and user coverage by district.
           </p>
         </div>
         <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
@@ -180,9 +197,6 @@ function DistrictOperationsCard({ districts }) {
                     <div className="text-lg font-semibold text-slate-900">
                       {district.name}
                     </div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      Last upload: {formatDate(district.last_upload_at)}
-                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs font-semibold">
                     <span className="rounded-full bg-sky-100 px-3 py-1 text-sky-700">
@@ -191,9 +205,11 @@ function DistrictOperationsCard({ districts }) {
                     <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
                       {formatNumber(district.assigned_users)} users
                     </span>
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
-                      {formatNumber(district.uploads)} uploads
-                    </span>
+                    {Number(district.uploads) > 0 ? (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+                        {formatNumber(district.uploads)} uploads
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
@@ -215,7 +231,7 @@ function DistrictOperationsCard({ districts }) {
                   </div>
                   <div>
                     <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Villages Touched
+                      Tototal repot case
                     </span>
                     <span className="font-semibold text-slate-900">
                       {formatNumber(district.villages_touched)}
@@ -223,7 +239,7 @@ function DistrictOperationsCard({ districts }) {
                   </div>
                   <div>
                     <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Village Data Updated
+                      Last Updated
                     </span>
                     <span className="font-semibold text-slate-900">
                       {formatDate(district.last_updated)}
@@ -321,12 +337,10 @@ function MicrostatificationDashboard() {
   const roleBreakdown = Array.isArray(dashboard?.role_breakdown)
     ? dashboard.role_breakdown
     : [];
-  const scopeBreakdown = Array.isArray(dashboard?.scope_breakdown)
-    ? dashboard.scope_breakdown
-    : [];
   const districtStats = Array.isArray(dashboard?.district_stats)
     ? dashboard.district_stats
     : [];
+  const reportedCaseRows = Number(totals?.reported_case_rows || 0);
 
   return (
     <div className="bg-slate-50/70 px-4 py-6">
@@ -360,7 +374,7 @@ function MicrostatificationDashboard() {
                   onClick={() => window.location.assign("/microstatification/month-access")}
                   className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
                 >
-                  Month Access
+                  Monthly Access
                   <FiExternalLink className="h-4 w-4" />
                 </button>
               </div>
@@ -396,14 +410,16 @@ function MicrostatificationDashboard() {
           />
           <StatCard
             title="Total Reported Case"
-            value={formatNumber(totals.reported_cases)}
-            subtitle={`${formatNumber(
-              totals.uploads
-            )} upload events have contributed to the current data store for reporting year ${
-              totals.reporting_year || new Date().getFullYear()
-            }.`}
+            value={formatNumber(reportedCaseRows)}
+            subtitle={`Rows that have reported case data (any month Jan-Dec) in ${totals.reporting_year || new Date().getFullYear()
+              }.`}
             Icon={FiTrendingUp}
             accentClass="from-amber-500 to-orange-500"
+            onClick={() =>
+              window.location.assign(
+                "/malaria/?tab=local&quick_filter=reported_cases&district=all&rows=all"
+              )
+            }
           />
         </div>
 
@@ -411,14 +427,9 @@ function MicrostatificationDashboard() {
           <DistrictOperationsCard districts={districtStats} />
           <div className="grid gap-6">
             <DistributionCard
-              title="Managed User Roles"
+              title="ROLE-WISE USER COMPOSITION"
               items={roleBreakdown}
               type="role"
-            />
-            <DistributionCard
-              title="Assignment Scope"
-              items={scopeBreakdown}
-              type="scope"
             />
           </div>
         </div>

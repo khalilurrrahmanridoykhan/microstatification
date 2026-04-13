@@ -78,7 +78,7 @@ function DashboardSidebar({ setAuthToken, location }) {
             className={`menu-item border-b ${isActive("/microstatification/month-access") ? "active" : "text-black"
               }`}
           >
-            <i className="fas fa-calendar-alt" /> <span>Month Access</span>
+            <i className="fas fa-calendar-alt" /> <span>Monthly Access</span>
           </Link>
 
           <button className="w-full menu-item logout" onClick={handleLogout}>

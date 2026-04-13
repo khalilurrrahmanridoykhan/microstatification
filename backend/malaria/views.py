@@ -1,12 +1,14 @@
 from calendar import monthrange
+import csv
 from collections import defaultdict
 from copy import copy
 from datetime import date, datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 import json
 import math
 from pathlib import Path
 import re
+from tempfile import TemporaryFile
 from zoneinfo import ZoneInfo
 import zipfile
 from xml.etree import ElementTree as ET
@@ -14,9 +16,9 @@ from xml.etree import ElementTree as ET
 from django.contrib.auth.models import User
 from django.core import signing
 from django.core.signing import BadSignature, SignatureExpired
-from django.http import HttpResponse
-from django.db.models import Count, Max, Prefetch, Q, Sum
-from django.db.models.functions import Coalesce
+from django.http import FileResponse, HttpResponse
+from django.db.models import Count, Max, Prefetch, Q, Sum, Value
+from django.db.models.functions import Coalesce, Upper
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
@@ -73,6 +75,20 @@ MONTH_COLUMNS = [
     "nov_cases",
     "dec_cases",
 ]
+MONTH_COLUMN_LABELS = [
+    ("jan_cases", "January", "Jan"),
+    ("feb_cases", "February", "Feb"),
+    ("mar_cases", "March", "Mar"),
+    ("apr_cases", "April", "Apr"),
+    ("may_cases", "May", "May"),
+    ("jun_cases", "June", "Jun"),
+    ("jul_cases", "July", "Jul"),
+    ("aug_cases", "August", "Aug"),
+    ("sep_cases", "September", "Sep"),
+    ("oct_cases", "October", "Oct"),
+    ("nov_cases", "November", "Nov"),
+    ("dec_cases", "December", "Dec"),
+]
 ITN_FIELDS = ["itn_2023", "itn_2024", "itn_2025", "itn_2026"]
 COUNT_QUERY_VALUES = {"1", "true", "yes", "on", "exact"}
 REQUESTED_FIELD_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -85,6 +101,7 @@ MICROSTATIFICATION_TEMPLATE_DIR = (
 MICROSTATIFICATION_EXPORT_DEBUG_DIR = (
     MICROSTATIFICATION_TEMPLATE_DIR / "generated_microstatification_exports"
 )
+MICROSTATIFICATION_EXPORT_CACHE_TTL_SECONDS = 0
 MICROSTATIFICATION_TEMPLATE_FILES = {
     "Bandarban": "01_Microstatification Format _Bandarban_District_2026.xlsx",
     "Khagrachhari": "02_Microstatification Format _Khagrachhari_District_2026.xlsx",
@@ -94,6 +111,9 @@ MICROSTATIFICATION_TEMPLATE_FILES = {
 }
 MICROSTATIFICATION_TEMPLATE_HEADER_ROW = 6
 MICROSTATIFICATION_TEMPLATE_DATA_START_ROW = 7
+MICROSTATIFICATION_ALL_DISTRICTS_TOKEN = "__all__"
+MICROSTATIFICATION_ALL_DISTRICTS_VALUES = {"all", "all-districts", "all_districts", "*"}
+MICROSTATIFICATION_EXPORT_FORMATS = {"xlsx", "csv"}
 MICROSTATIFICATION_DIVISION_BY_DISTRICT = {
     "Bandarban": "Chattogram",
     "Khagrachhari": "Chattogram",
@@ -101,6 +121,44 @@ MICROSTATIFICATION_DIVISION_BY_DISTRICT = {
     "Rangamati": "Chattogram",
     "Chattogram": "Chattogram",
 }
+MICROSTATIFICATION_CSV_HEADERS = [
+    "SL",
+    "Country",
+    "Division",
+    "District",
+    "Upazila",
+    "Union",
+    "Ward No",
+    "Name of SK/SHW",
+    "Desig.",
+    "Name of SS",
+    "Village Name (English)",
+    "Village Name \n(Bangla)",
+    "Village \nCode",
+    "Latitude",
+    "Longitute",
+    "Population",
+    "HH Number",
+    "2026 \n(Active LLINs)",
+    "2025\n(Active LLINs)",
+    "2024\n(Active LLINs)",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+    "Name of\n MMW, \nHealth \npost &\nCHW(C)",
+    "Village \nDistance\n from \nupazila office (KM)",
+    "Name of Border\n with others\n country",
+    "Others\n Activities\n(TDA/Dev care)",
+]
 MICRO_DASHBOARD_ROLE_LABELS = {
     4: "User",
     8: "SK",
@@ -137,6 +195,16 @@ class XLSXBinaryRenderer(renderers.BaseRenderer):
         if isinstance(data, (bytes, bytearray)):
             return bytes(data)
         return data
+
+
+class JSONFormatXLSXRenderer(renderers.JSONRenderer):
+    # Allow using query param `format=xlsx` without triggering DRF 404 on JSON endpoints.
+    format = "xlsx"
+
+
+class JSONFormatCSVRenderer(renderers.JSONRenderer):
+    # Allow using query param `format=csv` without triggering DRF 404 on JSON endpoints.
+    format = "csv"
 
 
 def _serialize_user(user):
@@ -199,6 +267,37 @@ def _apply_filters(queryset, request, exact_fields, in_fields=None):
         queryset = queryset.order_by(order_field if ascending else f"-{order_field}")
 
     return queryset
+
+
+def _apply_micro_village_code_sort(queryset):
+    return queryset.annotate(
+        micro_sort_ward_no=Upper(Coalesce("ward_no", Value(""))),
+        micro_sort_village_code=Upper(Coalesce("village_code", Value(""))),
+        micro_sort_name=Upper(Coalesce("name", Value(""))),
+    ).order_by(
+        "union__upazila__district__name",
+        "union__upazila__name",
+        "union__name",
+        "micro_sort_ward_no",
+        "micro_sort_village_code",
+        "micro_sort_name",
+    )
+
+
+def _apply_micro_local_record_sort(queryset):
+    return queryset.annotate(
+        micro_sort_union=Upper(Coalesce("village__union__name", Value(""))),
+        micro_sort_ward_no=Upper(Coalesce("village__ward_no", Value(""))),
+        micro_sort_village_code=Upper(Coalesce("village__village_code", Value(""))),
+        micro_sort_name=Upper(Coalesce("village__name", Value(""))),
+    ).order_by(
+        "village__union__upazila__district__name",
+        "village__union__upazila__name",
+        "micro_sort_union",
+        "micro_sort_ward_no",
+        "micro_sort_village_code",
+        "micro_sort_name",
+    )
 
 
 def _count_requested(request):
@@ -480,6 +579,35 @@ def _normalize_micro_key(value):
     return " ".join(str(value or "").split()).strip().lower()
 
 
+def _normalize_micro_export_format(value):
+    normalized = (value or "xlsx").strip().lower()
+    if normalized in MICROSTATIFICATION_EXPORT_FORMATS:
+        return normalized
+    return None
+
+
+def _get_micro_request_export_format(request):
+    return _normalize_micro_export_format(
+        request.query_params.get("export_format")
+        or request.query_params.get("format")
+    )
+
+
+def _normalize_micro_district_name(value):
+    normalized = (value or "").strip()
+    if not normalized:
+        return ""
+
+    if normalized.lower() in MICROSTATIFICATION_ALL_DISTRICTS_VALUES:
+        return MICROSTATIFICATION_ALL_DISTRICTS_TOKEN
+
+    for district_name in MICROSTATIFICATION_TEMPLATE_FILES:
+        if district_name.lower() == normalized.lower():
+            return district_name
+
+    return normalized
+
+
 def _resolve_micro_template_path(district_name):
     template_name = MICROSTATIFICATION_TEMPLATE_FILES.get(district_name)
     if not template_name:
@@ -746,30 +874,132 @@ def _populate_micro_template_workbook(workbook, district_upazila_rows, local_rec
     return workbook
 
 
-def _get_micro_export_filename(district_name):
-    return f"microstatification_data_{slugify(district_name)}.xlsx"
+def _get_micro_export_filename(district_name, export_format="xlsx"):
+    normalized_format = _normalize_micro_export_format(export_format) or "xlsx"
+    extension = "csv" if normalized_format == "csv" else "xlsx"
+    return f"microstatification_data_{slugify(district_name)}.{extension}"
 
 
-def _store_micro_export_debug_copy(filename, workbook_bytes):
-    MICROSTATIFICATION_EXPORT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-    district_slug = Path(filename).stem.removeprefix("microstatification_data_")
-    for stale_path in MICROSTATIFICATION_EXPORT_DEBUG_DIR.glob(
-        f"microstatification_data_{district_slug}_*.xlsx"
-    ):
-        stale_path.unlink(missing_ok=True)
+def _store_micro_export_debug_copy(filename, export_bytes):
+    try:
+        MICROSTATIFICATION_EXPORT_DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+        export_path = MICROSTATIFICATION_EXPORT_DEBUG_DIR / filename
+        if export_path.suffix.lower() == ".xlsx":
+            district_slug = Path(filename).stem.removeprefix("microstatification_data_")
+            for stale_path in MICROSTATIFICATION_EXPORT_DEBUG_DIR.glob(
+                f"microstatification_data_{district_slug}_*.xlsx"
+            ):
+                stale_path.unlink(missing_ok=True)
 
-    export_path = MICROSTATIFICATION_EXPORT_DEBUG_DIR / filename
-    temp_path = export_path.with_suffix(".tmp")
-    temp_path.write_bytes(workbook_bytes)
-    temp_path.replace(export_path)
-    return export_path
+        temp_path = export_path.with_suffix(".tmp")
+        temp_path.write_bytes(export_bytes)
+        temp_path.replace(export_path)
+        return export_path
+    except OSError:
+        # Debug copy is optional; never fail user downloads if filesystem permissions block it.
+        return None
 
 
-def _build_micro_download_ticket(user_id, district_name):
+def _get_micro_export_cache_path(district_name, export_format="xlsx"):
+    return MICROSTATIFICATION_EXPORT_DEBUG_DIR / _get_micro_export_filename(
+        district_name,
+        export_format=export_format,
+    )
+
+
+def _get_micro_export_source_updated_at(district_name):
+    timestamps = []
+
+    template_path = _resolve_micro_template_path(district_name)
+    if template_path and template_path.exists():
+        timestamps.append(
+            datetime.fromtimestamp(template_path.stat().st_mtime, tz=ZoneInfo("UTC"))
+        )
+
+    village_updated_at = Village.objects.filter(
+        union__upazila__district__name=district_name
+    ).aggregate(last=Max("updated_at"))["last"]
+    if village_updated_at is not None:
+        timestamps.append(village_updated_at)
+
+    local_record_updated_at = LocalRecord.objects.filter(
+        village__union__upazila__district__name=district_name
+    ).aggregate(last=Max("updated_at"))["last"]
+    if local_record_updated_at is not None:
+        timestamps.append(local_record_updated_at)
+
+    upload_updated_at = MicrostatificationDataUpload.objects.filter(
+        district=district_name
+    ).aggregate(last=Max("updated_at"))["last"]
+    if upload_updated_at is not None:
+        timestamps.append(upload_updated_at)
+
+    if not timestamps:
+        return None
+
+    return max(timestamps)
+
+
+def _load_cached_micro_export_payload(
+    district_name,
+    export_format="xlsx",
+    ignore_freshness=False,
+):
+    normalized_format = _normalize_micro_export_format(export_format)
+    if not normalized_format:
+        return None
+
+    cache_path = _get_micro_export_cache_path(
+        district_name,
+        export_format=normalized_format,
+    )
+    if not cache_path.exists():
+        return None
+
+    try:
+        cached_at = datetime.fromtimestamp(cache_path.stat().st_mtime, tz=ZoneInfo("UTC"))
+    except OSError:
+        return None
+
+    if not ignore_freshness:
+        max_age_seconds = MICROSTATIFICATION_EXPORT_CACHE_TTL_SECONDS
+        if max_age_seconds > 0:
+            cache_age = (timezone.now().astimezone(ZoneInfo("UTC")) - cached_at).total_seconds()
+            if cache_age > max_age_seconds:
+                return None
+
+        source_updated_at = _get_micro_export_source_updated_at(district_name)
+        if source_updated_at is not None and cached_at < source_updated_at:
+            return None
+
+    try:
+        export_bytes = cache_path.read_bytes()
+    except OSError:
+        return None
+
+    if normalized_format == "xlsx" and not export_bytes.startswith(b"PK\x03\x04"):
+        return None
+
+    return {
+        "filename": cache_path.name,
+        "bytes": export_bytes,
+        "debug_path": str(cache_path),
+        "content_type": (
+            "text/csv; charset=utf-8"
+            if normalized_format == "csv"
+            else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+        "export_format": normalized_format,
+        "cache_hit": True,
+    }
+
+
+def _build_micro_download_ticket(user_id, district_name, export_format="xlsx"):
     return signing.dumps(
         {
             "user_id": user_id,
             "district": district_name,
+            "format": export_format,
         },
         salt=MICROSTATIFICATION_DOWNLOAD_TICKET_SALT,
     )
@@ -1178,10 +1408,27 @@ def _build_microstatification_dashboard_payload(request_user):
     non_local_case_totals = NonLocalRecord.objects.filter(reporting_year=reporting_year).aggregate(
         **{field: Coalesce(Sum(field), 0) for field in MONTH_COLUMNS}
     )
+    case_presence_q = Q()
+    for field in MONTH_COLUMNS:
+        case_presence_q |= Q(**{f"{field}__gt": 0})
+    reported_case_rows = (
+        LocalRecord.objects.filter(reporting_year=reporting_year)
+        .filter(case_presence_q)
+        .count()
+    )
     total_reported_cases = (
         sum(int(local_case_totals.get(field) or 0) for field in MONTH_COLUMNS)
         + sum(int(non_local_case_totals.get(field) or 0) for field in MONTH_COLUMNS)
     )
+    monthly_district_updates = [
+        {
+            "key": field_name,
+            "label": label,
+            "short_label": short_label,
+            "count": int(local_case_totals.get(field_name) or 0),
+        }
+        for field_name, label, short_label in MONTH_COLUMN_LABELS
+    ]
 
     return {
         "generated_at": timezone.now(),
@@ -1196,6 +1443,8 @@ def _build_microstatification_dashboard_payload(request_user):
             "villages": total_villages,
             "population": total_population,
             "reported_cases": total_reported_cases,
+            "reported_case_rows": reported_case_rows,
+            "monthly_district_updates": monthly_district_updates,
             "reporting_year": reporting_year,
             "uploads": total_uploads,
             "last_upload_at": last_upload_at,
@@ -1632,7 +1881,7 @@ class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        queryset = _apply_filters( 
+        queryset = _apply_filters(
             queryset,
             self.request,
             exact_fields=["id", "union_id", "ward_no"],
@@ -1649,6 +1898,18 @@ class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
                 | Q(sk_shw_name__icontains=query)
                 | Q(ss_name__icontains=query)
             )
+
+        requested_order = (
+            self.request.query_params.get("_order")
+            or self.request.query_params.get("order")
+            or ""
+        ).strip()
+        has_scope_filters = any(
+            (self.request.query_params.get(key) or "").strip()
+            for key in ("union_id", "union_id__in", "ward_no", "ward_no__in")
+        )
+        if not requested_order and has_scope_filters:
+            queryset = _apply_micro_village_code_sort(queryset)
 
         limit = (self.request.query_params.get("limit") or "").strip()
         if limit.isdigit():
@@ -1728,6 +1989,14 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         district_name = (self.request.query_params.get("district_name") or "").strip()
         if district_name:
             queryset = queryset.filter(village__union__upazila__district__name__iexact=district_name)
+
+        requested_order = (
+            self.request.query_params.get("_order")
+            or self.request.query_params.get("order")
+            or ""
+        ).strip()
+        if not requested_order:
+            queryset = _apply_micro_local_record_sort(queryset)
 
         return queryset
 
@@ -2065,69 +2334,53 @@ class MicrostatificationDataUploadView(APIView):
 
 class MicrostatificationDataDownloadView(APIView):
     permission_classes = [IsAuthenticated, IsMalariaAdmin]
-    renderer_classes = [XLSXBinaryRenderer, renderers.JSONRenderer]
+    renderer_classes = [
+        XLSXBinaryRenderer,
+        renderers.JSONRenderer,
+        JSONFormatCSVRenderer,
+    ]
 
-    def _build_export_file(self, district_name):
-        import openpyxl
-
-        if not district_name:
-            return Response(
-                {
-                    "detail": (
-                        "Please select a district. "
-                        "Template-formatted microstatification exports are generated one district at a time."
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+    def _build_district_export_context(self, district_name, designation_lookup=None):
+        villages = list(
+            _apply_micro_village_code_sort(
+                Village.objects.select_related(
+                    "union",
+                    "union__upazila",
+                    "union__upazila__district",
+                ).filter(union__upazila__district__name=district_name)
             )
-
-        if district_name not in MICROSTATIFICATION_TEMPLATE_FILES:
-            return Response(
-                {"detail": f"Unsupported district: {district_name}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        villages_qs = Village.objects.select_related(
-            "union",
-            "union__upazila",
-            "union__upazila__district",
-        ).order_by(
-            "union__upazila__district__name",
-            "union__upazila__name",
-            "union__name",
-            "ward_no",
-            "name",
         )
 
-        villages_qs = villages_qs.filter(union__upazila__district__name=district_name)
-
-        villages = list(villages_qs)
-        grouped_rows = defaultdict(lambda: defaultdict(list))
+        district_upazila_rows = defaultdict(list)
         for village in villages:
-            union = village.union
-            upazila = union.upazila if union else None
-            district = upazila.district if upazila else None
-            if not upazila or not district:
+            upazila = village.union.upazila if village.union else None
+            if upazila is None:
                 continue
-            grouped_rows[district.name][upazila.name].append(village)
-
-        template_path = _resolve_micro_template_path(district_name)
-        if template_path is None or not template_path.exists():
-            return Response(
-                {"detail": f"Template file not found for district: {district_name}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            district_upazila_rows[upazila.name].append(village)
 
         village_ids = [village.id for village in villages]
         reporting_year = _current_dhaka_year()
+        record_queryset = LocalRecord.objects.filter(
+            reporting_year=reporting_year,
+            village_id__in=village_ids,
+        )
+
+        # Prefer current-year records, but fall back to the newest available year
+        # so exported downloads stay populated with the latest data.
+        if village_ids and not record_queryset.exists():
+            latest_reporting_year = LocalRecord.objects.filter(
+                village_id__in=village_ids,
+            ).aggregate(latest=Max("reporting_year"))["latest"]
+            if latest_reporting_year is not None:
+                reporting_year = latest_reporting_year
+                record_queryset = LocalRecord.objects.filter(
+                    reporting_year=reporting_year,
+                    village_id__in=village_ids,
+                )
+
         local_record_lookup = {
             record.village_id: record
-            for record in LocalRecord.objects.filter(
-                reporting_year=reporting_year,
-                village_id__in=village_ids,
-            )
-            .select_related("sk_user", "sk_user__profile")
-            .only(
+            for record in record_queryset.select_related("sk_user", "sk_user__profile").only(
                 "village_id",
                 "sk_user__email",
                 "sk_user__first_name",
@@ -2144,39 +2397,254 @@ class MicrostatificationDataDownloadView(APIView):
                 *MONTH_COLUMNS,
             )
         }
-        designation_lookup = _build_micro_designation_lookup()
+
+        return {
+            "district_upazila_rows": district_upazila_rows,
+            "local_record_lookup": local_record_lookup,
+            "designation_lookup": designation_lookup or _build_micro_designation_lookup(),
+        }
+
+    def _build_csv_export_bytes(
+        self,
+        district_upazila_rows,
+        local_record_lookup,
+        designation_lookup,
+    ):
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(MICROSTATIFICATION_CSV_HEADERS)
+
+        sequence = 1
+        for villages in district_upazila_rows.values():
+            for village in villages:
+                local_record = local_record_lookup.get(village.id)
+                row_values = [
+                    _get_micro_template_cell_value(
+                        header,
+                        sequence,
+                        village,
+                        local_record,
+                        designation_lookup,
+                    )
+                    for header in MICROSTATIFICATION_CSV_HEADERS
+                ]
+                writer.writerow(["" if value is None else value for value in row_values])
+                sequence += 1
+
+        return output.getvalue().encode("utf-8-sig")
+
+    def _build_export_file(
+        self,
+        district_name,
+        export_format="xlsx",
+        store_debug_copy=True,
+        designation_lookup=None,
+        use_cache=True,
+        validate_xlsx=True,
+    ):
+        import openpyxl
+
+        normalized_format = _normalize_micro_export_format(export_format)
+        if not normalized_format:
+            return Response(
+                {
+                    "detail": (
+                        f"Unsupported export format: {export_format}. "
+                        "Supported formats are xlsx and csv."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not district_name or district_name == MICROSTATIFICATION_ALL_DISTRICTS_TOKEN:
+            return Response(
+                {
+                    "detail": (
+                        "Please select a district. "
+                        "Template-formatted microstatification exports are generated one district at a time."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if district_name not in MICROSTATIFICATION_TEMPLATE_FILES:
+            return Response(
+                {"detail": f"Unsupported district: {district_name}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if use_cache:
+            cached_payload = _load_cached_micro_export_payload(
+                district_name,
+                export_format=normalized_format,
+            )
+            if cached_payload is not None:
+                return cached_payload
+
+        context = self._build_district_export_context(
+            district_name,
+            designation_lookup=designation_lookup,
+        )
+        district_upazila_rows = context["district_upazila_rows"]
+        local_record_lookup = context["local_record_lookup"]
+        resolved_designation_lookup = context["designation_lookup"]
+
+        if normalized_format == "csv":
+            filename = _get_micro_export_filename(
+                district_name,
+                export_format=normalized_format,
+            )
+            export_bytes = self._build_csv_export_bytes(
+                district_upazila_rows,
+                local_record_lookup,
+                resolved_designation_lookup,
+            )
+            export_debug_path = None
+            if store_debug_copy:
+                export_debug_path = _store_micro_export_debug_copy(filename, export_bytes)
+            return {
+                "filename": filename,
+                "bytes": export_bytes,
+                "debug_path": str(export_debug_path) if export_debug_path else None,
+                "content_type": "text/csv; charset=utf-8",
+                "export_format": normalized_format,
+            }
+
+        template_path = _resolve_micro_template_path(district_name)
+        if template_path is None or not template_path.exists():
+            return Response(
+                {"detail": f"Template file not found for district: {district_name}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         workbook = openpyxl.load_workbook(template_path)
         workbook = _populate_micro_template_workbook(
             workbook,
-            grouped_rows.get(district_name, {}),
+            district_upazila_rows,
             local_record_lookup,
-            designation_lookup,
+            resolved_designation_lookup,
         )
 
         output = BytesIO()
         workbook.save(output)
         export_bytes = output.getvalue()
 
-        # Validate generated workbook bytes before returning the file.
-        # This prevents partially written or structurally invalid files from being served.
-        try:
-            openpyxl.load_workbook(BytesIO(export_bytes), data_only=False)
-        except Exception as exc:
-            return Response(
-                {"detail": f"Failed to generate a valid XLSX export: {exc}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        if validate_xlsx:
+            # Validate generated workbook bytes before returning the file.
+            # This prevents partially written or structurally invalid files from being served.
+            try:
+                openpyxl.load_workbook(BytesIO(export_bytes), data_only=False)
+            except Exception as exc:
+                return Response(
+                    {"detail": f"Failed to generate a valid XLSX export: {exc}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
-        filename = _get_micro_export_filename(district_name)
-        export_debug_path = _store_micro_export_debug_copy(filename, export_bytes)
+        filename = _get_micro_export_filename(
+            district_name,
+            export_format=normalized_format,
+        )
+        export_debug_path = None
+        if store_debug_copy:
+            export_debug_path = _store_micro_export_debug_copy(filename, export_bytes)
+
         return {
             "filename": filename,
             "bytes": export_bytes,
-            "debug_path": str(export_debug_path),
+            "debug_path": str(export_debug_path) if export_debug_path else None,
+            "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "export_format": normalized_format,
         }
 
-    def _build_download_response(self, district_name):
-        export_payload = self._build_export_file(district_name)
+    def _build_all_district_zip_response(self, export_format):
+        zip_buffer = TemporaryFile()
+        try:
+            designation_lookup = _build_micro_designation_lookup()
+            zip_compression = (
+                zipfile.ZIP_STORED
+                if export_format == "xlsx"
+                else zipfile.ZIP_DEFLATED
+            )
+            zip_kwargs = {
+                "compression": zip_compression,
+                "allowZip64": True,
+            }
+            if export_format != "xlsx":
+                zip_kwargs["compresslevel"] = 1
+            with zipfile.ZipFile(
+                zip_buffer,
+                "w",
+                **zip_kwargs,
+            ) as archive:
+                for district_name in MICROSTATIFICATION_TEMPLATE_FILES:
+                    export_payload = _load_cached_micro_export_payload(
+                        district_name,
+                        export_format=export_format,
+                        ignore_freshness=True,
+                    )
+                    if export_payload is None:
+                        export_payload = self._build_export_file(
+                            district_name,
+                            export_format=export_format,
+                            store_debug_copy=True,
+                            designation_lookup=designation_lookup,
+                            use_cache=True,
+                            validate_xlsx=False,
+                        )
+                    if isinstance(export_payload, Response):
+                        detail = "Unable to generate export file."
+                        payload = getattr(export_payload, "data", None)
+                        if isinstance(payload, dict):
+                            detail = payload.get("detail") or detail
+                        elif isinstance(payload, str):
+                            detail = payload or detail
+                        zip_buffer.close()
+                        return _micro_download_error_response(
+                            f"{district_name}: {detail}",
+                            export_payload.status_code,
+                        )
+
+                    archive.writestr(
+                        export_payload["filename"],
+                        export_payload["bytes"],
+                    )
+
+            zip_buffer.seek(0)
+        except Exception as exc:
+            zip_buffer.close()
+            return _micro_download_error_response(
+                f"Unable to generate all-district ZIP export: {exc}",
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        timestamp = timezone.now().astimezone(ZoneInfo("Asia/Dhaka")).strftime("%Y%m%d_%H%M%S")
+        filename = f"microstatification_all_districts_{export_format}_{timestamp}.zip"
+        response = FileResponse(
+            zip_buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/zip",
+        )
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        response["Expires"] = "0"
+        return response
+
+    def _build_download_response(self, district_name, export_format="xlsx"):
+        normalized_format = _normalize_micro_export_format(export_format)
+        if not normalized_format:
+            return _micro_download_error_response(
+                "Unsupported format. Use xlsx or csv.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if district_name == MICROSTATIFICATION_ALL_DISTRICTS_TOKEN:
+            return self._build_all_district_zip_response(normalized_format)
+
+        export_payload = self._build_export_file(
+            district_name,
+            export_format=normalized_format,
+        )
         if isinstance(export_payload, Response):
             detail = "Unable to generate export file."
             payload = getattr(export_payload, "data", None)
@@ -2189,8 +2657,9 @@ class MicrostatificationDataDownloadView(APIView):
         export_filename = export_payload.get("filename") or _get_micro_export_filename(district_name)
         export_bytes = export_payload.get("bytes") or b""
         export_debug_path = export_payload.get("debug_path")
+        content_type = export_payload.get("content_type") or "application/octet-stream"
 
-        if not export_bytes.startswith(b"PK\x03\x04"):
+        if normalized_format == "xlsx" and not export_bytes.startswith(b"PK\x03\x04"):
             return _micro_download_error_response(
                 "Generated export is invalid. Please try again.",
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2198,33 +2667,72 @@ class MicrostatificationDataDownloadView(APIView):
 
         response = HttpResponse(
             export_bytes,
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            content_type=content_type,
         )
         response["Content-Disposition"] = f'attachment; filename="{export_filename}"'
         response["Content-Length"] = str(len(export_bytes))
         response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response["Pragma"] = "no-cache"
         response["Expires"] = "0"
-        response["X-Micro-Export-Path"] = str(export_debug_path or "")
+        if export_debug_path:
+            response["X-Micro-Export-Path"] = str(export_debug_path)
         return response
 
     def get(self, request):
-        district_name = (request.query_params.get("district") or "").strip()
-        return self._build_download_response(district_name)
+        district_name = _normalize_micro_district_name(request.query_params.get("district"))
+        if not district_name:
+            return _micro_download_error_response(
+                "Please select a district or choose All Districts for ZIP export.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        export_format = _get_micro_request_export_format(request)
+        if not export_format:
+            return _micro_download_error_response(
+                "Unsupported format. Use xlsx or csv.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        return self._build_download_response(district_name, export_format)
 
 
 class MicrostatificationDataDownloadLinkView(APIView):
     permission_classes = [IsAuthenticated, IsMalariaAdmin]
+    renderer_classes = [
+        renderers.JSONRenderer,
+        JSONFormatXLSXRenderer,
+        JSONFormatCSVRenderer,
+    ]
 
     def get(self, request):
-        district_name = (request.query_params.get("district") or "").strip()
+        district_name = _normalize_micro_district_name(request.query_params.get("district"))
         if not district_name:
             return Response(
-                {"detail": "Please select a district."},
+                {"detail": "Please select a district or choose All Districts."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ticket = _build_micro_download_ticket(request.user.id, district_name)
+        if (
+            district_name != MICROSTATIFICATION_ALL_DISTRICTS_TOKEN
+            and district_name not in MICROSTATIFICATION_TEMPLATE_FILES
+        ):
+            return Response(
+                {"detail": f"Unsupported district: {district_name}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        export_format = _get_micro_request_export_format(request)
+        if not export_format:
+            return Response(
+                {"detail": "Unsupported format. Use xlsx or csv."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ticket = _build_micro_download_ticket(
+            request.user.id,
+            district_name,
+            export_format=export_format,
+        )
         download_path = (
             f"{reverse('malaria-download-microstatification-file')}?ticket={ticket}"
         )
@@ -2257,7 +2765,14 @@ class MicrostatificationDataDirectDownloadView(MicrostatificationDataDownloadVie
             )
 
         user_id = payload.get("user_id")
-        district_name = (payload.get("district") or "").strip()
+        district_name = _normalize_micro_district_name(payload.get("district"))
+        export_format = _normalize_micro_export_format(payload.get("format"))
+        if not district_name or not export_format:
+            return _micro_download_error_response(
+                "Invalid download link.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
         user = User.objects.filter(id=user_id, is_active=True).first()
         if user is None or not is_malaria_admin(user):
             return _micro_download_error_response(
@@ -2265,4 +2780,4 @@ class MicrostatificationDataDirectDownloadView(MicrostatificationDataDownloadVie
                 status.HTTP_403_FORBIDDEN,
             )
 
-        return self._build_download_response(district_name)
+        return self._build_download_response(district_name, export_format)

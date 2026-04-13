@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./UserList.css";
 import { Link, useNavigate } from "react-router-dom";
-import { FaEdit, FaKey, FaTrash } from "react-icons/fa";
+import { FaEdit, FaKey, FaTrash, FaUserSlash } from "react-icons/fa";
 import axios from "axios";
 import { BACKEND_URL } from "../../../config";
 import { toast } from "sonner";
@@ -286,6 +286,51 @@ function UserList() {
     }
   };
 
+  const handleRemoveAccess = async (user) => {
+    const roleName = getRoleName(user?.role);
+    const result = await Swal.fire({
+      title: `Remove ${roleName} access?`,
+      text: `${user?.username} will be changed to User.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Remove Access",
+      confirmButtonColor: "#d97706",
+      cancelButtonColor: "#6b7280",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      const token = sessionStorage.getItem("authToken");
+      await axios.post(
+        `${BACKEND_URL}/api/users/${user.username}/remove-access/`,
+        {},
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        }
+      );
+
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.username === user.username
+            ? {
+              ...item,
+              role: 4,
+            }
+            : item
+        )
+      );
+      toast.success(`${user.username} is now a User`);
+    } catch (error) {
+      console.error("Error removing access:", error);
+      toast.error("Failed to remove access");
+    }
+  };
+
   const resetFilters = () => {
     setSearchTerm("");
     setSelectedOrgId("");
@@ -300,6 +345,7 @@ function UserList() {
   const showingTo = totalCount
     ? Math.min((safePage - 1) * PAGE_SIZE + users.length, totalCount)
     : 0;
+  const canRemoveRoleAccess = (role) => role === 8 || role === 9;
 
   return (
     <div>
@@ -518,6 +564,14 @@ function UserList() {
                           >
                             <FaKey />
                           </button>
+                          {canRemoveRoleAccess(user.role) && (
+                            <button
+                              onClick={() => handleRemoveAccess(user)}
+                              title={`Remove ${getRoleName(user.role)} access`}
+                            >
+                              <FaUserSlash />
+                            </button>
+                          )}
                           {!isMicroAdminUser && (
                             <button
                               onClick={async () => {

@@ -22,6 +22,7 @@ import {
   getDhakaDateString,
   getDhakaMonth,
   getDhakaYear,
+  getMonthTotal,
 } from "@/lib/monthUtils";
 import {
   buildDefaultMonthAccessLookup,
@@ -293,6 +294,9 @@ const sortLocalRows = (input: LocalRow[]) =>
     const wardComparison = compareWardValues(left.ward_no, right.ward_no);
     if (wardComparison !== 0) return wardComparison;
 
+    const villageCodeComparison = compareNaturalText(left.village_code, right.village_code);
+    if (villageCodeComparison !== 0) return villageCodeComparison;
+
     const villageComparison = compareNaturalText(left.village_name, right.village_name);
     if (villageComparison !== 0) return villageComparison;
 
@@ -401,7 +405,19 @@ type ResizeState = {
   startWidth: number;
 };
 
-const LocalRecordsGrid = () => {
+type LocalApprovalFilter = "all" | "pending" | "reported_cases";
+
+interface LocalRecordsGridProps {
+  initialApprovalFilter?: LocalApprovalFilter;
+  initialDistrictFilter?: "all";
+  initialRowsPerPage?: 10 | 20 | 50 | -1;
+}
+
+const LocalRecordsGrid = ({
+  initialApprovalFilter = "all",
+  initialDistrictFilter,
+  initialRowsPerPage,
+}: LocalRecordsGridProps) => {
   const { user, role, microRole } = useAuth();
   const { toast } = useToast();
   const isAdmin = role === "admin";
@@ -418,13 +434,13 @@ const LocalRecordsGrid = () => {
   const [selectedUpazilaFilter, setSelectedUpazilaFilter] = useState("all");
   const [selectedUnionFilter, setSelectedUnionFilter] = useState("all");
   const [selectedWardFilter, setSelectedWardFilter] = useState("all");
-  const [approvalFilter, setApprovalFilter] = useState<"all" | "pending">("all");
+  const [approvalFilter, setApprovalFilter] = useState<LocalApprovalFilter>(initialApprovalFilter);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [explicitZeroMonthKeys, setExplicitZeroMonthKeys] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState<10 | 20 | 50 | -1>(10);
+  const [rowsPerPage, setRowsPerPage] = useState<10 | 20 | 50 | -1>(initialRowsPerPage ?? 10);
   const [showLoadingScreen, setShowLoadingScreen] = useState(true);
   const [approvalLookup, setApprovalLookup] = useState<Record<string, ApprovalStatus>>({});
   const [approvalSavingKey, setApprovalSavingKey] = useState<string | null>(null);
@@ -630,6 +646,10 @@ const LocalRecordsGrid = () => {
         }));
         setDistricts(options);
         setSelectedDistrictId((currentValue) => {
+          if (initialDistrictFilter === "all") {
+            return "all";
+          }
+
           if (currentValue && currentValue !== "all") {
             return currentValue;
           }
@@ -660,7 +680,7 @@ const LocalRecordsGrid = () => {
     return () => {
       canceled = true;
     };
-  }, [isMicroAdmin, toast]);
+  }, [initialDistrictFilter, isMicroAdmin, toast]);
 
   useEffect(() => {
     fetchData();
@@ -728,6 +748,23 @@ const LocalRecordsGrid = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedUpazilaFilter, selectedUnionFilter, selectedWardFilter, approvalFilter]);
+
+  useEffect(() => {
+    setApprovalFilter(initialApprovalFilter);
+  }, [initialApprovalFilter]);
+
+  useEffect(() => {
+    if (isMicroAdmin && initialDistrictFilter === "all") {
+      setSelectedDistrictId("all");
+    }
+  }, [initialDistrictFilter, isMicroAdmin]);
+
+  useEffect(() => {
+    if (typeof initialRowsPerPage === "number") {
+      setRowsPerPage(initialRowsPerPage);
+      setCurrentPage(1);
+    }
+  }, [initialRowsPerPage]);
 
   useEffect(() => {
     try {
@@ -985,7 +1022,7 @@ const LocalRecordsGrid = () => {
     !selectedDistrictId || selectedDistrictId === "all"
       ? ""
       : districts.find((district) => district.id === selectedDistrictId)?.name ||
-        "selected district";
+      "selected district";
   const sortedRows = useMemo(() => sortLocalRows(rows), [rows]);
   const upazilaOptions = useMemo(
     () =>
@@ -1063,6 +1100,10 @@ const LocalRecordsGrid = () => {
           );
         }
 
+        if (approvalFilter === "reported_cases") {
+          return getMonthTotal(row as unknown as Record<string, any>) > 0;
+        }
+
         return true;
       }),
     [
@@ -1080,21 +1121,21 @@ const LocalRecordsGrid = () => {
   const pagedRows = isMobile
     ? filteredSortedRows
     : filteredSortedRows.slice(
-        (currentPage - 1) * effectiveRowsPerPage,
-        currentPage * effectiveRowsPerPage,
-      );
+      (currentPage - 1) * effectiveRowsPerPage,
+      currentPage * effectiveRowsPerPage,
+    );
   const visibleRows =
     filteredSortedRows.length === 0
       ? []
       : isMobile
         ? pagedRows
         : [
-            ...pagedRows,
-            ...Array.from(
-              { length: Math.max(0, effectiveRowsPerPage - pagedRows.length) },
-              () => null,
-            ),
-          ];
+          ...pagedRows,
+          ...Array.from(
+            { length: Math.max(0, effectiveRowsPerPage - pagedRows.length) },
+            () => null,
+          ),
+        ];
 
   const handleDownloadData = useCallback(() => {
     if (!isAdmin) return;
@@ -1340,7 +1381,11 @@ const LocalRecordsGrid = () => {
                   value={value > 0 || showExplicitZero ? String(value) : ""}
                   placeholder={editable ? "" : undefined}
                   onChange={(event) =>
-                    handleMonthCellChange(row.id, column.key, event.target.value)
+                    handleMonthCellChange(
+                      row.id,
+                      column.key as (typeof MONTH_COLUMNS)[number],
+                      event.target.value,
+                    )
                   }
                   disabled={!editable}
                 />
@@ -1349,11 +1394,10 @@ const LocalRecordsGrid = () => {
                   <div className="flex items-center justify-center gap-2 border-t border-black/5 px-1 py-1 text-[9px]">
                     <button
                       type="button"
-                      className={`inline-flex min-w-[28px] items-center justify-center rounded border px-1.5 py-0.5 font-semibold transition-colors ${
-                        approvalStatus === "APPROVED"
-                          ? "border-green-700 bg-green-700 text-white"
-                          : "border-green-300 bg-white text-green-700"
-                      } ${approvalDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-green-50"}`}
+                      className={`inline-flex min-w-[28px] items-center justify-center rounded border px-1.5 py-0.5 font-semibold transition-colors ${approvalStatus === "APPROVED"
+                        ? "border-green-700 bg-green-700 text-white"
+                        : "border-green-300 bg-white text-green-700"
+                        } ${approvalDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-green-50"}`}
                       title="Approve"
                       aria-pressed={approvalStatus === "APPROVED"}
                       disabled={approvalDisabled}
@@ -1363,11 +1407,10 @@ const LocalRecordsGrid = () => {
                     </button>
                     <button
                       type="button"
-                      className={`inline-flex min-w-[28px] items-center justify-center rounded border px-1.5 py-0.5 font-semibold transition-colors ${
-                        approvalStatus === "REJECTED"
-                          ? "border-orange-700 bg-orange-700 text-white"
-                          : "border-orange-300 bg-white text-orange-700"
-                      } ${approvalDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-orange-50"}`}
+                      className={`inline-flex min-w-[28px] items-center justify-center rounded border px-1.5 py-0.5 font-semibold transition-colors ${approvalStatus === "REJECTED"
+                        ? "border-orange-700 bg-orange-700 text-white"
+                        : "border-orange-300 bg-white text-orange-700"
+                        } ${approvalDisabled ? "cursor-not-allowed opacity-60" : "hover:bg-orange-50"}`}
                       title="Not approve"
                       aria-pressed={approvalStatus === "REJECTED"}
                       disabled={approvalDisabled}
@@ -1481,7 +1524,7 @@ const LocalRecordsGrid = () => {
 
           <Select
             value={approvalFilter}
-            onValueChange={(value: "all" | "pending") => setApprovalFilter(value)}
+            onValueChange={(value: LocalApprovalFilter) => setApprovalFilter(value)}
           >
             <SelectTrigger className="h-9 w-full min-w-[170px] sm:w-[210px]">
               <SelectValue placeholder="All Status" />
@@ -1489,6 +1532,7 @@ const LocalRecordsGrid = () => {
             <SelectContent>
               <SelectItem value="all">All Records</SelectItem>
               <SelectItem value="pending">Waiting For Approval</SelectItem>
+              <SelectItem value="reported_cases">Total Reported Case</SelectItem>
             </SelectContent>
           </Select>
 
@@ -1564,6 +1608,12 @@ const LocalRecordsGrid = () => {
           </span>
         </div>
       </div>
+
+      {approvalFilter === "reported_cases" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+          Total Reported Case Rows: {filteredSortedRows.length}
+        </div>
+      )}
 
       <div>
         <div className="relative">

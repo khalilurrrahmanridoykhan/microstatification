@@ -6,8 +6,6 @@ import { CiAt, CiLock } from "react-icons/ci";
 import { FiEye, FiEyeOff } from "react-icons/fi";
 import { BACKEND_URL, ENKETO_URL } from "../config";
 import {
-  BRAND_ACRONYM,
-  BRAND_FULL_TITLE,
   BRAND_TAGLINE,
 } from "../shared/BrandHeading";
 
@@ -143,7 +141,7 @@ const EnketoLogin = () => {
     if (err.code === "ERR_NETWORK") {
       setError(
         "Network error. Please check if the backend server is running at " +
-          BACKEND_URL
+        BACKEND_URL
       );
     } else if (err.response?.status === 404) {
       setError("Login endpoint not found. Please check backend configuration.");
@@ -178,10 +176,12 @@ const EnketoLogin = () => {
             <div className="inline-block p-1 rounded-md bg-blue-300/50">
               <MdEditLocationAlt className="w-8 h-8 text-blue-600" />
             </div>
-            <h3 className="font-semibold text-gray-900">{BRAND_FULL_TITLE}</h3>
+            <h3 className="font-semibold text-gray-900">
+              Wellcome to Climate and Health Data Acquisition System
+            </h3>
             <p className="text-sm text-muted">{BRAND_TAGLINE}</p>
             <p className="text-xs text-gray-600">
-              Secure {BRAND_ACRONYM} authentication for Enketo forms
+              Secure authentication for Enketo forms
             </p>
             {returnUrl && (
               <div className="p-2 mt-2 text-xs text-gray-600 bg-gray-100 rounded">

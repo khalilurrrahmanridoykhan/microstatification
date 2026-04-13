@@ -6615,6 +6615,77 @@ class UserViewSet(viewsets.ModelViewSet):
 
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=True, methods=['post'], url_path='remove-access')
+    def remove_access(self, request, username=None):
+        """
+        Downgrade SK/SHW users to plain User and clear malaria-specific access.
+        """
+        acting_user = request.user
+        if not (
+            acting_user.is_superuser
+            or getattr(acting_user, 'role', 4) == 1
+            or _is_microstatification_admin(acting_user)
+        ):
+            raise PermissionDenied('Only admins can remove SK/SHW access.')
+
+        instance = self.get_object()
+        profile = getattr(instance, 'profile', None)
+        current_micro_role = (getattr(profile, 'micro_role', '') or '').strip().lower()
+        current_role = getattr(instance, 'role', None)
+
+        if current_role not in {8, 9} and current_micro_role not in {'sk', 'shw'}:
+            raise ValidationError(
+                {'detail': 'Remove access is available only for SK or SHW users.'}
+            )
+
+        from malaria.models import MalariaUserRole
+
+        with transaction.atomic():
+            instance.role = 4
+            instance.is_superuser = False
+            instance.is_staff = False
+            instance.save(update_fields=['role', 'is_superuser', 'is_staff'])
+
+            if profile is not None:
+                profile.data_collection_type = 'normal'
+                profile.micro_role = ''
+                profile.micro_division = ''
+                profile.micro_district = None
+                profile.micro_upazila = None
+                profile.micro_union = None
+                profile.micro_village = None
+                profile.micro_ward_no = ''
+                profile.micro_sk_shw_name = ''
+                profile.micro_designation = ''
+                profile.micro_ss_name = ''
+                profile.save(
+                    update_fields=[
+                        'data_collection_type',
+                        'micro_role',
+                        'micro_division',
+                        'micro_district',
+                        'micro_upazila',
+                        'micro_union',
+                        'micro_village',
+                        'micro_ward_no',
+                        'micro_sk_shw_name',
+                        'micro_designation',
+                        'micro_ss_name',
+                    ]
+                )
+                profile.micro_villages.clear()
+
+            MalariaUserRole.objects.filter(user=instance).delete()
+
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                'detail': f'{instance.username} access removed successfully.',
+                'user': serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 class DashboardSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 

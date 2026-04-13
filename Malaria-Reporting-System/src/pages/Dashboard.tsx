@@ -3,9 +3,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LocalRecordsGrid from "@/components/LocalRecordsGrid";
 import NonLocalRecordsGrid from "@/components/NonLocalRecordsGrid";
 import { LogOut, Shield } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import AppHeader from "@/components/AppHeader";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -19,8 +19,35 @@ import {
 const Dashboard = () => {
   const { profile, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const isAdmin = role === "admin";
-  const [activeTab, setActiveTab] = useState("local");
+  const tabFromQuery = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    const tab = query.get("tab");
+    return tab === "non-local" ? "non-local" : "local";
+  }, [location.search]);
+
+  const localQuickFilterFromQuery = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    const quickFilter = (query.get("quick_filter") || "").trim().toLowerCase();
+    if (quickFilter === "reported_cases") return "reported_cases";
+    if (quickFilter === "pending") return "pending";
+    return "all";
+  }, [location.search]);
+
+  const localDistrictFilterFromQuery = useMemo<"all" | undefined>(() => {
+    const query = new URLSearchParams(location.search);
+    const district = (query.get("district") || "").trim().toLowerCase();
+    return district === "all" ? "all" : undefined;
+  }, [location.search]);
+
+  const localRowsPerPageFromQuery = useMemo<10 | 20 | 50 | -1 | undefined>(() => {
+    const query = new URLSearchParams(location.search);
+    const rows = (query.get("rows") || "").trim().toLowerCase();
+    return rows === "all" ? -1 : undefined;
+  }, [location.search]);
+
+  const [activeTab, setActiveTab] = useState(tabFromQuery);
   const userLabel = profile?.full_name || profile?.email || "User";
   const initials = userLabel
     .split(" ")
@@ -28,6 +55,10 @@ const Dashboard = () => {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "U";
+
+  useEffect(() => {
+    setActiveTab(tabFromQuery);
+  }, [tabFromQuery]);
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="app-shell min-h-screen">
@@ -94,7 +125,13 @@ const Dashboard = () => {
           <div className="px-3 pb-3 pt-3 sm:px-4 sm:pb-4 md:px-6 md:pb-5 md:pt-4">
             <TabsContent value="local" className="m-0">
               <div className="data-grid-shell overflow-hidden p-1 sm:p-2 rounded-[1.5rem]">
-                {activeTab === "local" ? <LocalRecordsGrid /> : null}
+                {activeTab === "local" ? (
+                  <LocalRecordsGrid
+                    initialApprovalFilter={localQuickFilterFromQuery}
+                    initialDistrictFilter={localDistrictFilterFromQuery}
+                    initialRowsPerPage={localRowsPerPageFromQuery}
+                  />
+                ) : null}
               </div>
             </TabsContent>
 

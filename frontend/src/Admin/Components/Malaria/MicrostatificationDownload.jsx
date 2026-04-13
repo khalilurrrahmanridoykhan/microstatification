@@ -24,11 +24,21 @@ function resolveDownloadUrl(downloadUrl) {
   return `${BACKEND_URL}${downloadUrl}`;
 }
 
-function resolveDownloadFilename(contentDisposition, district) {
-  const fallback = `microstatification_data_${String(district || "district")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")}.xlsx`;
+function resolveDownloadFilename(
+  contentDisposition,
+  district,
+  format = "xlsx",
+  allDistricts = false
+) {
+  const safeFormat = String(format || "xlsx").toLowerCase();
+  const extension = safeFormat === "csv" ? "csv" : "xlsx";
+  const fallback = allDistricts
+    ? `microstatification_all_districts_${safeFormat}.zip`
+    : `microstatification_data_${String(district || "district")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")}.${extension}`;
+
   if (!contentDisposition) {
     return fallback;
   }
@@ -46,30 +56,50 @@ function resolveDownloadFilename(contentDisposition, district) {
   return plainMatch?.[1] || fallback;
 }
 
-async function downloadXlsxFile(downloadUrl, district) {
+async function parseBlobErrorDetail(blob, fallback = "Download failed") {
+  try {
+    const text = await blob.text();
+    if (!text) {
+      return fallback;
+    }
+    try {
+      const parsed = JSON.parse(text);
+      return parsed?.detail || fallback;
+    } catch {
+      return text;
+    }
+  } catch {
+    return fallback;
+  }
+}
+
+async function downloadExportFile(downloadUrl, { district, format, allDistricts }) {
   const resolvedUrl = resolveDownloadUrl(downloadUrl);
   const fileResponse = await axios.get(resolvedUrl, {
     responseType: "blob",
   });
 
+  const resolvedFormat = String(format || "xlsx").toLowerCase();
   const blob = fileResponse.data;
   const bytes = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
-  const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
-  if (!isZip) {
-    let detail = "Downloaded file is not a valid XLSX.";
-    try {
-      const text = await blob.text();
-      const parsed = JSON.parse(text);
-      detail = parsed?.detail || detail;
-    } catch {
-      // Ignore parse errors and use fallback detail.
-    }
+  const isZipSignature =
+    bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+
+  if ((allDistricts || resolvedFormat === "xlsx") && !isZipSignature) {
+    const detail = await parseBlobErrorDetail(
+      blob,
+      allDistricts
+        ? "Downloaded file is not a valid ZIP."
+        : "Downloaded file is not a valid XLSX."
+    );
     throw new Error(detail);
   }
 
   const filename = resolveDownloadFilename(
     fileResponse.headers?.["content-disposition"],
-    district
+    district,
+    resolvedFormat,
+    allDistricts
   );
 
   const objectUrl = URL.createObjectURL(blob);
@@ -82,8 +112,16 @@ async function downloadXlsxFile(downloadUrl, district) {
   }, 60_000);
 }
 
+async function resolveRequestErrorMessage(error) {
+  if (error?.response?.data instanceof Blob) {
+    return parseBlobErrorDetail(error.response.data, "Download failed");
+  }
+  return error?.response?.data?.detail || error?.message || "Download failed";
+}
+
 function MicrostatificationDownload() {
   const [downloadDistrict, setDownloadDistrict] = useState("");
+  const [downloadFormat, setDownloadFormat] = useState("xlsx");
   const [downloading, setDownloading] = useState(false);
 
   const districts = [
@@ -93,19 +131,25 @@ function MicrostatificationDownload() {
     "Rangamati",
     "Chattogram",
   ];
+  const districtOptions = [
+    { value: "all", label: "All Districts (ZIP)" },
+    ...districts.map((district) => ({ value: district, label: district })),
+  ];
 
   const handleDownload = async () => {
     if (!downloadDistrict) {
-      toast.error("Please select a district");
+      toast.error("Please select a district or All Districts");
       return;
     }
 
+    const isAllDistricts = downloadDistrict === "all";
     const token = sessionStorage.getItem("authToken");
     setDownloading(true);
 
     try {
       const params = new URLSearchParams();
       params.set("district", downloadDistrict);
+      params.set("export_format", downloadFormat);
       params.set("_t", Date.now().toString());
 
       const queryString = params.toString();
@@ -118,17 +162,34 @@ function MicrostatificationDownload() {
       if (!downloadUrl) {
         throw new Error("Download link not available");
       }
-      await downloadXlsxFile(downloadUrl, downloadDistrict);
+      await downloadExportFile(downloadUrl, {
+        district: downloadDistrict,
+        format: downloadFormat,
+        allDistricts: isAllDistricts,
+      });
 
-      toast.success("Microstatification data download started");
+      toast.success(
+        isAllDistricts
+          ? "All-district ZIP download started"
+          : `District ${downloadFormat.toUpperCase()} download started`
+      );
     } catch (error) {
       console.error("Download failed", error);
-      const errorMsg = error.response?.data?.detail || error.message || "Download failed";
+      const errorMsg = await resolveRequestErrorMessage(error);
       toast.error(errorMsg);
     } finally {
       setDownloading(false);
     }
   };
+
+  const isAllDistricts = downloadDistrict === "all";
+  const buttonText = downloading
+    ? isAllDistricts
+      ? "Preparing ZIP..."
+      : `Preparing ${downloadFormat.toUpperCase()}...`
+    : isAllDistricts
+      ? `Download All Districts ZIP (${downloadFormat.toUpperCase()})`
+      : `Download District ${downloadFormat.toUpperCase()}`;
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -137,13 +198,13 @@ function MicrostatificationDownload() {
           Microstatification Data
         </h1>
         <p className="text-sm text-gray-600">
-          Download the current microstatification data as an Excel file.
+          Download the latest microstatification data in CSV or XLSX.
         </p>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
         <h2 className="text-xl font-semibold mb-4 text-gray-700">
-          Download XLSX
+          Download Export
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -157,26 +218,42 @@ function MicrostatificationDownload() {
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={downloading}
             >
-              <option value="">-- Select a District --</option>
-              {districts.map((district) => (
-                <option key={district} value={district}>
-                  {district}
+              <option value="">-- Select an Option --</option>
+              {districtOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              File Format
+            </label>
+            <select
+              value={downloadFormat}
+              onChange={(e) => setDownloadFormat(e.target.value)}
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={downloading}
+            >
+              <option value="xlsx">XLSX</option>
+              <option value="csv">CSV</option>
             </select>
           </div>
         </div>
 
         <div className="mb-4 rounded-lg bg-blue-50 border border-blue-100 p-4 text-sm text-gray-700">
-          Select a district to generate the official microstatification template
-          as `.xlsx`. Each district is exported in its own workbook layout.
+          Select a district to export a single file in your chosen format. Select
+          All Districts to download a ZIP bundle containing one file per district
+          in the selected format.
         </div>
 
         <div className="mb-4 rounded-lg bg-gray-50 border border-gray-200 p-4 text-sm text-gray-700">
           Included columns: District, Upazila, Union, Ward No, Village Name
           (EN/BN), Village Code, Latitude, Longitude, Population, SK/SHW Name,
           SS Name, MMW/HP/CHWC Name, Distance From Upazila Office, Bordering
-          Country Name, Other Activities, Created At, Updated At.
+          Country Name, Other Activities, monthly case fields, and LLIN fields.
         </div>
 
         <button
@@ -185,7 +262,7 @@ function MicrostatificationDownload() {
           disabled={downloading || !downloadDistrict}
           className="w-full px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
-          {downloading ? "Preparing XLSX..." : "Download District XLSX"}
+          {buttonText}
         </button>
       </div>
     </div>

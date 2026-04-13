@@ -92,8 +92,8 @@ const Login = ({ setAuthToken }) => {
           isMalariaFieldUser(user)
             ? "/malaria/"
             : user?.username === BRAC_DOWNLOAD_USERNAME
-            ? "/projects/55/all-rows"
-            : "/dashboard";
+              ? "/projects/55/all-rows"
+              : "/dashboard";
 
         if (hasMalariaWorkspaceAccess(user)) {
           localStorage.setItem(MALARIA_TOKEN_KEY, token);
@@ -162,6 +162,9 @@ const Login = ({ setAuthToken }) => {
             <div className="inline-flex items-center justify-center p-2 rounded-full bg-blue-300/50">
               <MdEditLocationAlt className="w-8 h-8 text-blue-600" />
             </div>
+            <h3 className="mt-2 text-base font-semibold text-gray-900">
+              Wellcome to Climate and Health Data Acquisition System
+            </h3>
             <hr className="mt-4" />
           </div>
 
