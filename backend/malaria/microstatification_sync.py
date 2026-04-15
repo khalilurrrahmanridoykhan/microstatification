@@ -112,12 +112,49 @@ def _normalize_int(value):
         return None
 
 
-def _row_key(upazila_name, union_name, ward_no, village_name):
+def _row_key(upazila_name, union_name, ward_no, village_name, village_code):
     return (
         _clean_text(upazila_name),
         _clean_text(union_name),
         _clean_text(ward_no),
         _clean_text(village_name),
+        _clean_text(village_code),
+    )
+
+
+def _get_or_create_village(union, item, village_defaults):
+    village_code = _clean_text(item.get("village_code"))
+    village_lookup = {
+        "union": union,
+        "name": item["village_name"],
+        "ward_no": item["ward_no"],
+    }
+
+    if village_code:
+        try:
+            return Village.objects.get(
+                **village_lookup,
+                village_code=village_code,
+            ), False
+        except Village.DoesNotExist:
+            legacy_without_code = Village.objects.filter(
+                **village_lookup,
+                village_code="",
+            ).first()
+            if legacy_without_code is not None:
+                legacy_without_code.village_code = village_code
+                legacy_without_code.save(update_fields=["village_code", "updated_at"])
+                return legacy_without_code, False
+
+            village_with_code = {**village_lookup, "village_code": village_code}
+            return Village.objects.get_or_create(
+                **village_with_code,
+                defaults=village_defaults,
+            )
+
+    return Village.objects.get_or_create(
+        **village_lookup,
+        defaults=village_defaults,
     )
 
 
@@ -457,12 +494,7 @@ def sync_microstatification_csv_directory(csv_dir, reporting_year, fallback_user
                 "bordering_country_name": item["bordering_country_name"],
                 "other_activities": item["other_activities"],
             }
-            village, village_created = Village.objects.get_or_create(
-                union=union,
-                name=item["village_name"],
-                ward_no=item["ward_no"],
-                defaults=village_defaults,
-            )
+            village, village_created = _get_or_create_village(union, item, village_defaults)
 
             if village_created:
                 result.villages_created += 1
@@ -581,12 +613,7 @@ def sync_microstatification_workbook(workbook, district_name, prune_stale=False)
             "other_activities": item["other_activities"],
         }
 
-        village, village_created = Village.objects.get_or_create(
-            union=union,
-            name=item["village_name"],
-            ward_no=item["ward_no"],
-            defaults=village_defaults,
-        )
+        village, village_created = _get_or_create_village(union, item, village_defaults)
 
         if village_created:
             result.villages_created += 1
@@ -607,6 +634,7 @@ def sync_microstatification_workbook(workbook, district_name, prune_stale=False)
                 item["union_name"],
                 item["ward_no"],
                 item["village_name"],
+                item["village_code"],
             )
         )
 
@@ -640,6 +668,7 @@ def sync_microstatification_workbook(workbook, district_name, prune_stale=False)
             village.union.name,
             village.ward_no,
             village.name,
+            village.village_code,
         )
         if village_key not in valid_keys:
             stale_village_ids.append(village.id)

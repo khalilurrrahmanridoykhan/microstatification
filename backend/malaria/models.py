@@ -94,8 +94,8 @@ class Village(TimestampedModel):
         ordering = ("name",)
         constraints = [
             models.UniqueConstraint(
-                fields=("union", "name", "ward_no"),
-                name="malaria_unique_village_per_union_and_ward",
+                fields=("union", "name", "ward_no", "village_code"),
+                name="malaria_unique_village_per_union_ward_and_code",
             ),
         ]
 

@@ -231,7 +231,7 @@ function DistrictOperationsCard({ districts }) {
                   </div>
                   <div>
                     <span className="block text-xs uppercase tracking-[0.18em] text-slate-400">
-                      Tototal repot case
+                      Total report case
                     </span>
                     <span className="font-semibold text-slate-900">
                       {formatNumber(district.villages_touched)}
