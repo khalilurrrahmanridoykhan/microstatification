@@ -1,115 +1,195 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, MapPin, LayoutDashboard, Users, Database, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, UserPlus, EditIcon, FileText, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useMemo, useState } from "react";
-
-import AdminDashboard from "@/components/AdminDashboard";
+import { useMemo, useState, type ReactNode } from "react";
 import UserManagement from "@/components/UserManagement";
 import VillageAssignment from "@/components/VillageAssignment";
 import AdminRecordReview from "@/components/AdminRecordReview";
-import MasterDataManager from "@/components/MasterDataManager";
-import MonthAccessManager from "@/components/MonthAccessManager";
-import AppHeader from "@/components/AppHeader";
 
-type SectionKey = "overview" | "records" | "assignments" | "users" | "masterData" | "monthAccess";
+type SectionKey = "records" | "assignments" | "users" | "masterData";
 
 const Admin = () => {
   const { role } = useAuth();
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<SectionKey>("overview");
+  const [activeSection, setActiveSection] = useState<SectionKey>("records");
 
-  if (role !== "admin") {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-destructive text-lg font-medium">Access Denied</p>
-      </div>
-    );
-  }
+  // Premium compact button styles (neutral, professional)
+  const navBtnBase =
+    "h-8 px-3 rounded-md border text-xs font-medium " +
+    "inline-flex items-center justify-center gap-2 " +
+    "whitespace-nowrap shrink-0 " +
+    "bg-white border-gray-200 text-gray-800 " +
+    "shadow-[0_1px_2px_rgba(0,0,0,0.06)] " +
+    "hover:bg-gray-50 hover:border-gray-300 hover:shadow-[0_2px_6px_rgba(0,0,0,0.08)] " +
+    "active:translate-y-[0.5px] " +
+    "transition-all duration-150 " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
-  const sectionMeta = useMemo(() => ({
-    overview:    { title: "Overview",             subtitle: "Summary of system activity and pending actions." },
-    records:     { title: "Submitted Records",    subtitle: "Review SK submissions and approve monthly reporting." },
-    assignments: { title: "Village Assignments",  subtitle: "Assign villages to SKs and manage existing assignments." },
-    users:       { title: "User Management",      subtitle: "Add users and view their assigned villages." },
-    masterData:  { title: "Master Data",          subtitle: "Manage districts, upazilas, unions, and villages." },
-    monthAccess: { title: "Month Access",         subtitle: "Open or close month-column entry access for all SK and SHW users." },
-  }), []);
+  const navBtnActive =
+    "bg-gray-900 text-white border-gray-900 " +
+    "hover:bg-gray-900 hover:border-gray-900 " +
+    "shadow-[0_2px_10px_rgba(0,0,0,0.14)] " +
+    "ring-1 ring-inset ring-black/10";
 
-  const SectionCard = ({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) => (
-    <section className="report-surface rounded-[1.75rem]">
-      <div className="border-b border-border/70 p-4 md:p-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Admin Section</p>
-        <h2 className="font-display mt-2 text-2xl text-foreground md:text-[1.9rem]">{title}</h2>
-        {subtitle && <p className="mt-1 text-xs md:text-sm text-muted-foreground">{subtitle}</p>}
+  const iconCls = "h-4 w-4";
+
+  const sectionMeta = useMemo(
+    () => ({
+      records: {
+        title: "Submitted Records",
+        subtitle: "Review SK submissions and approve monthly reporting.",
+      },
+      assignments: {
+        title: "Assign New Village",
+        subtitle: "Assign villages to users and manage coverage.",
+      },
+      users: {
+        title: "User Management",
+        subtitle: "Add, update, and manage user access.",
+      },
+      masterData: {
+        title: "Manage Master Data",
+        subtitle: "Maintain core reference lists like villages and regions.",
+      },
+    }),
+    [],
+  );
+
+  const NavButton = ({
+    id,
+    label,
+    icon,
+  }: {
+    id: SectionKey;
+    label: string;
+    icon: ReactNode;
+  }) => (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() => setActiveSection(id)}
+      aria-current={activeSection === id ? "page" : undefined}
+      className={`${navBtnBase} ${activeSection === id ? navBtnActive : ""}`}
+    >
+      {icon}
+      <span className="leading-none">{label}</span>
+    </Button>
+  );
+
+  const SectionCard = ({
+    title,
+    subtitle,
+    children,
+  }: {
+    title: string;
+    subtitle?: string;
+    children: ReactNode;
+  }) => (
+    <section className="rounded-xl border bg-white shadow-sm">
+      <div className="p-4 md:p-6 border-b">
+        <h2 className="text-base md:text-lg font-semibold text-gray-900 tracking-tight">
+          {title}
+        </h2>
+        {subtitle ? (
+          <p className="text-xs md:text-sm text-gray-500 mt-1">{subtitle}</p>
+        ) : null}
       </div>
       <div className="p-4 md:p-6">{children}</div>
     </section>
   );
 
+  if (role !== "admin") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-destructive text-lg">Access Denied</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="app-shell min-h-screen">
-      <AppHeader
-        title="Admin Panel"
-        subtitle="Manage records, assignments, users, and master data from one responsive admin workspace."
-        backLabel="Back to Reporting"
-        onBack={() => navigate("/")}
-        navItems={[
-          { id: "overview", label: "Overview", icon: <LayoutDashboard className="mr-2 h-4 w-4" />, active: activeSection === "overview", onClick: () => setActiveSection("overview") },
-          { id: "records", label: "Records", icon: <FileText className="mr-2 h-4 w-4" />, active: activeSection === "records", onClick: () => setActiveSection("records") },
-          { id: "assignments", label: "Assignments", icon: <MapPin className="mr-2 h-4 w-4" />, active: activeSection === "assignments", onClick: () => setActiveSection("assignments") },
-          { id: "users", label: "Users", icon: <Users className="mr-2 h-4 w-4" />, active: activeSection === "users", onClick: () => setActiveSection("users") },
-          { id: "masterData", label: "Master Data", icon: <Database className="mr-2 h-4 w-4" />, active: activeSection === "masterData", onClick: () => setActiveSection("masterData") },
-          { id: "monthAccess", label: "Month Access", icon: <Lock className="mr-2 h-4 w-4" />, active: activeSection === "monthAccess", onClick: () => setActiveSection("monthAccess") },
-        ]}
-      />
+    <div className="min-h-screen bg-gradient-to-r from-white via-white to-gray-100">
+      <header className="sticky top-0 z-10 border-b bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/65 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/")}
+            className="h-8 px-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
 
-      <main className="mx-auto w-full max-w-[1800px] space-y-6 p-3 sm:p-4 md:p-6">
-        {activeSection === "overview" && (
-          <>
-            <SectionCard title={sectionMeta.overview.title} subtitle={sectionMeta.overview.subtitle}>
-              <AdminDashboard />
-            </SectionCard>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-              {([
-                { id: "records",     icon: <FileText className="h-5 w-5" />,     label: "Review Records",  color: "text-blue-600 bg-blue-50" },
-                { id: "assignments", icon: <MapPin className="h-5 w-5" />,       label: "Assign Villages", color: "text-violet-600 bg-violet-50" },
-                { id: "users",       icon: <Users className="h-5 w-5" />,        label: "Manage Users",    color: "text-green-600 bg-green-50" },
-                { id: "masterData",  icon: <Database className="h-5 w-5" />,     label: "Master Data",     color: "text-amber-600 bg-amber-50" },
-                { id: "monthAccess", icon: <Lock className="h-5 w-5" />,         label: "Month Access",    color: "text-slate-700 bg-slate-100" },
-              ] as { id: SectionKey; icon: React.ReactNode; label: string; color: string }[]).map((item) => (
-                <button key={item.id} onClick={() => setActiveSection(item.id)}
-                  className="report-surface flex flex-col items-center gap-2 rounded-[1.5rem] p-4 text-center transition-transform hover:-translate-y-0.5">
-                  <div className={`p-2 rounded-lg ${item.color}`}>{item.icon}</div>
-                  <span className="text-xs font-medium text-foreground">{item.label}</span>
-                </button>
-              ))}
+          <h1 className="text-base md:text-lg font-semibold text-gray-900 tracking-tight">
+            Admin Panel
+          </h1>
+
+          {/* Nav - wrap on desktop, scroll on very small screens */}
+          <div className="max-w-[72vw]">
+            <div className="flex flex-nowrap md:flex-wrap items-center justify-end gap-2 overflow-x-auto md:overflow-visible py-1">
+              <NavButton
+                id="records"
+                label="View Records"
+                icon={<FileText className={iconCls} />}
+              />
+              <NavButton
+                id="assignments"
+                label="Assign Villages"
+                icon={<MapPin className={iconCls} />}
+              />
+              <NavButton
+                id="users"
+                label="Manage Users"
+                icon={<UserPlus className={iconCls} />}
+              />
+              <NavButton
+                id="masterData"
+                label="Master Data"
+                icon={<EditIcon className={iconCls} />}
+              />
             </div>
-          </>
-        )}
+          </div>
+        </div>
+      </header>
 
+      <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
         {activeSection === "records" && (
-          <SectionCard title={sectionMeta.records.title} subtitle={sectionMeta.records.subtitle}>
+          <SectionCard
+            title={sectionMeta.records.title}
+            subtitle={sectionMeta.records.subtitle}
+          >
             <AdminRecordReview />
           </SectionCard>
         )}
+
         {activeSection === "assignments" && (
-          <SectionCard title={sectionMeta.assignments.title} subtitle={sectionMeta.assignments.subtitle}>
+          <SectionCard
+            title={sectionMeta.assignments.title}
+            subtitle={sectionMeta.assignments.subtitle}
+          >
             <VillageAssignment />
           </SectionCard>
         )}
+
         {activeSection === "users" && (
-          <SectionCard title={sectionMeta.users.title} subtitle={sectionMeta.users.subtitle}>
+          <SectionCard
+            title={sectionMeta.users.title}
+            subtitle={sectionMeta.users.subtitle}
+          >
             <UserManagement />
           </SectionCard>
         )}
+
         {activeSection === "masterData" && (
-          <SectionCard title={sectionMeta.masterData.title} subtitle={sectionMeta.masterData.subtitle}>
-            <MasterDataManager />
-          </SectionCard>
-        )}
-        {activeSection === "monthAccess" && (
-          <SectionCard title={sectionMeta.monthAccess.title} subtitle={sectionMeta.monthAccess.subtitle}>
-            <MonthAccessManager />
+          <SectionCard
+            title={sectionMeta.masterData.title}
+            subtitle={sectionMeta.masterData.subtitle}
+          >
+            <p className="text-sm text-gray-600">
+              Add or update master data here (e.g., villages, regions).
+            </p>
           </SectionCard>
         )}
       </main>

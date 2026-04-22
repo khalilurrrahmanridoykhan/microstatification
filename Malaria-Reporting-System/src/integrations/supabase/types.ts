@@ -73,7 +73,6 @@ export type Database = {
           itn_2023: number
           itn_2024: number
           itn_2025: number
-          itn_2026: number
           jan_cases: number
           jul_cases: number
           jun_cases: number
@@ -99,7 +98,6 @@ export type Database = {
           itn_2023?: number
           itn_2024?: number
           itn_2025?: number
-          itn_2026?: number
           jan_cases?: number
           jul_cases?: number
           jun_cases?: number
@@ -125,7 +123,6 @@ export type Database = {
           itn_2023?: number
           itn_2024?: number
           itn_2025?: number
-          itn_2026?: number
           jan_cases?: number
           jul_cases?: number
           jun_cases?: number

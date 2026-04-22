@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from "react";
 
-// Placeholder for future backend API call
+interface RecordListRow {
+  id: number;
+  skName: string;
+  submissionDate: string;
+  status: string;
+  village: string;
+}
+
 const fetchRecords = async () => {
   return [
     { id: 1, skName: "SK Rahim Uddin", submissionDate: "2026-02-24", status: "Completed", village: "Village 1" },
     { id: 2, skName: "SK Hasan Ali", submissionDate: "2026-02-23", status: "Pending", village: "Village 2" },
     { id: 3, skName: "SK Mizanur Rahman", submissionDate: "2026-02-22", status: "Completed", village: "Village 3" },
     { id: 4, skName: "SK Rani Begum", submissionDate: "2026-02-21", status: "In Progress", village: "Village 4" },
-  ];
+  ] satisfies RecordListRow[];
 };
 
 const RecordList = () => {
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<RecordListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 

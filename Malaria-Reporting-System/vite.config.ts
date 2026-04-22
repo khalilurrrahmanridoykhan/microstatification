@@ -1,24 +1,28 @@
 import { defineConfig } from "vite";
+import legacy from "@vitejs/plugin-legacy";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-export default defineConfig(() => ({
-  base: "/malaria/",
+export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 5180,
+    port: 8080,
     proxy: {
-      "/api": {
-        target: process.env.MALARIA_PROXY_TARGET || "http://127.0.0.1:9200",
-        changeOrigin: true,
-      },
+      "/api": "http://127.0.0.1:3000",
     },
     hmr: {
       overlay: false,
     },
   },
-  plugins: [react()],
+  plugins: [
+    react(),
+    legacy({
+      targets: ["defaults", "not IE 11"],
+    }),
+    mode === "development" && componentTagger(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
