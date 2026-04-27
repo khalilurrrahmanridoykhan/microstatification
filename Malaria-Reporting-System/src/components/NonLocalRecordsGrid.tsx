@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,14 @@ import { Plus, Trash2, RefreshCw, Save } from "lucide-react";
 import {
   createNonLocalRecord,
   deleteNonLocalRecord,
+  fetchMalariaMasterData,
+  fetchMonthlyApprovals,
   fetchMonthAccessSettings,
   fetchNonLocalRecords,
+  upsertMonthlyApproval,
   updateNonLocalRecord,
+  type ApprovalRow,
+  type MalariaMasterData,
   type NonLocalRecord,
   type NonLocalRecordPayload,
 } from "@/lib/api";
@@ -32,7 +37,7 @@ interface NonLocalRow extends NonLocalRecord {
   _isNew?: boolean;
 }
 
-type CellStatus = "RED" | "YELLOW" | "GREEN";
+type CellStatus = "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
 type NonLocalEditableField =
   | "country"
   | "district_or_state"
@@ -42,6 +47,7 @@ type NonLocalEditableField =
   | MonthColumn;
 
 const COUNTRIES = ["Bangladesh", "India", "Myanmar"];
+const OTHER_OPTION = "__other__";
 
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -122,29 +128,77 @@ const NonLocalRecordsGrid = () => {
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [openMonthNumbers, setOpenMonthNumbers] = useState<Set<number>>(new Set([currentMonth]));
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
+  const [approvalRows, setApprovalRows] = useState<ApprovalRow[]>([]);
+  const [recordView, setRecordView] = useState<"all" | "pending">("all");
+  const [masterData, setMasterData] = useState<MalariaMasterData>({
+    districts: [],
+    upazilas: [],
+    unions: [],
+    villages: [],
+  });
+  const [wardByRow, setWardByRow] = useState<Record<string, string>>({});
+  const [otherModeByRow, setOtherModeByRow] = useState<
+    Record<string, Partial<Record<"country" | "district" | "upazila" | "union" | "ward" | "village", boolean>>>
+  >({});
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
 
   // -------- Color Logic (No DB Change) --------
-  const getMonthStatus = (value: number, monthIndex: number): CellStatus => {
-    if (!value || value === 0) return "RED";
+  const approvalByKey = useMemo(() => {
+    const map = new Map<string, ApprovalRow["status"]>();
+    for (const approval of approvalRows) {
+      map.set(`${approval.record_id}:${approval.month}`, approval.status);
+    }
+    return map;
+  }, [approvalRows]);
+
+  const getMonthStatus = (row: NonLocalRow, value: number, monthIndex: number): CellStatus => {
+    if (!value || value === 0) return "NOT_SUBMITTED";
     const monthNumber = monthIndex + 1;
+    const approvalStatus = approvalByKey.get(`${row.id}:${monthNumber}`);
+    if (approvalStatus === "PENDING") return "PENDING";
+    if (approvalStatus === "APPROVED") return "APPROVED";
+    if (approvalStatus === "REJECTED") return "REJECTED";
 
     if (!isAdmin && year === currentYear && monthNumber === currentMonth) {
-      return "YELLOW";
+      return "PENDING";
     }
-    return "GREEN";
+    return "APPROVED";
   };
 
   const getMonthBg = (status: CellStatus) => {
     switch (status) {
-      case "GREEN":
+      case "APPROVED":
         return "bg-green-50 border-green-200";
-      case "YELLOW":
+      case "PENDING":
         return "bg-yellow-50 border-yellow-200";
+      case "REJECTED":
+        return "bg-fuchsia-50 border-fuchsia-200";
       default:
         return "bg-red-50 border-red-200";
+    }
+  };
+
+  const handleApprovalAction = async (recordId: string, month: number, status: "APPROVED" | "REJECTED") => {
+    try {
+      await upsertMonthlyApproval({
+        recordType: "non_local",
+        recordId,
+        reportingYear: year,
+        month,
+        status,
+      });
+      setApprovalRows((prev) => {
+        const filtered = prev.filter((a) => !(a.record_id === recordId && a.month === month));
+        return [...filtered, { record_id: recordId, month, status }];
+      });
+    } catch (error) {
+      toast({
+        title: "Approval update failed",
+        description: error instanceof Error ? error.message : "Failed to update approval.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -168,7 +222,13 @@ const NonLocalRecordsGrid = () => {
         setYear(effectiveYear);
       }
 
-      setRows(isAdmin ? data : data.filter((row) => row.sk_user_id === user.id));
+      const visibleRows = isAdmin ? data : data.filter((row) => row.sk_user_id === user.id);
+      setRows(visibleRows);
+      const approvals = await fetchMonthlyApprovals({
+        recordType: "non_local",
+        reportingYear: effectiveYear,
+      });
+      setApprovalRows(approvals);
       setDirtyIds(new Set());
       setDeletedIds([]);
     } catch (error) {
@@ -185,6 +245,29 @@ const NonLocalRecordsGrid = () => {
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadMasterData = async () => {
+      try {
+        const data = await fetchMalariaMasterData();
+        if (mounted) setMasterData(data);
+      } catch (_error) {
+        if (mounted) {
+          setMasterData({
+            districts: [],
+            upazilas: [],
+            unions: [],
+            villages: [],
+          });
+        }
+      }
+    };
+    void loadMasterData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isAdmin) return;
@@ -323,6 +406,63 @@ const NonLocalRecordsGrid = () => {
     });
   };
 
+  const setOtherMode = (
+    rowId: string,
+    field: "country" | "district" | "upazila" | "union" | "ward" | "village",
+    enabled: boolean,
+  ) => {
+    setOtherModeByRow((prev) => ({
+      ...prev,
+      [rowId]: {
+        ...(prev[rowId] || {}),
+        [field]: enabled,
+      },
+    }));
+  };
+
+  const getDistrictOptions = () => masterData.districts.map((item) => item.name).sort((a, b) => a.localeCompare(b));
+
+  const getUpazilaOptions = (row: NonLocalRow) => {
+    const district = masterData.districts.find((item) => item.name === row.district_or_state);
+    if (!district) return [];
+    return masterData.upazilas
+      .filter((item) => item.district_id === district.id)
+      .map((item) => item.name)
+      .sort((a, b) => a.localeCompare(b));
+  };
+
+  const getUnionOptions = (row: NonLocalRow) => {
+    const upazila = masterData.upazilas.find((item) => item.name === row.upazila_or_township);
+    if (!upazila) return [];
+    return masterData.unions
+      .filter((item) => item.upazila_id === upazila.id)
+      .map((item) => item.name)
+      .sort((a, b) => a.localeCompare(b));
+  };
+
+  const getWardOptions = (row: NonLocalRow) => {
+    const union = masterData.unions.find((item) => item.name === row.union_name);
+    if (!union) return [];
+    return Array.from(
+      new Set(
+        masterData.villages
+          .filter((item) => item.union_id === union.id && item.ward_no)
+          .map((item) => String(item.ward_no)),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  };
+
+  const getVillageOptions = (row: NonLocalRow) => {
+    const union = masterData.unions.find((item) => item.name === row.union_name);
+    if (!union) return [];
+    const ward = wardByRow[row.id] || "";
+    return masterData.villages
+      .filter((item) => item.union_id === union.id)
+      .filter((item) => (ward ? String(item.ward_no || "") === ward : true))
+      .map((item) => item.name)
+      .sort((a, b) => a.localeCompare(b));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -362,6 +502,19 @@ const NonLocalRecordsGrid = () => {
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
   const hasDirty = dirtyIds.size > 0 || deletedIds.length > 0;
+  const pendingRecordIds = useMemo(() => {
+    const ids = new Set<string>();
+    approvalRows.forEach((approval) => {
+      if (approval.status === "PENDING") {
+        ids.add(approval.record_id);
+      }
+    });
+    return ids;
+  }, [approvalRows]);
+  const displayedRows = useMemo(() => {
+    if (!isAdmin || recordView === "all") return rows;
+    return rows.filter((row) => pendingRecordIds.has(row.id));
+  }, [rows, isAdmin, recordView, pendingRecordIds]);
 
   return (
     <div className="space-y-3">
@@ -390,6 +543,35 @@ const NonLocalRecordsGrid = () => {
         <Button variant="outline" size="sm" onClick={addRow}>
           <Plus className="h-4 w-4 mr-1" /> Add Row
         </Button>
+        {isAdmin && (
+          <Select value={recordView} onValueChange={(value) => setRecordView(value as "all" | "pending")}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Records View" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Records</SelectItem>
+              <SelectItem value="pending">Waiting Approval</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+        <div className="flex items-center gap-2 ml-auto text-[11px] text-gray-600">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-red-200 border border-red-300" />
+            Not submitted
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-yellow-200 border border-yellow-300" />
+            Pending approval
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-green-200 border border-green-300" />
+            Approved
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-fuchsia-200 border border-fuchsia-300" />
+            Rejected
+          </span>
+        </div>
       </div>
 
       <div className="border rounded-md overflow-auto max-h-[calc(100vh-220px)] bg-white relative">
@@ -403,7 +585,7 @@ const NonLocalRecordsGrid = () => {
         )}
         <table className="w-full text-[10px] border-collapse table-fixed">
           <colgroup>
-            {Array.from({ length: 19 }).map((_, index) => (
+            {Array.from({ length: 20 }).map((_, index) => (
               <col key={index} style={columnWidths[index] ? { width: `${columnWidths[index]}px` } : undefined} />
             ))}
           </colgroup>
@@ -414,24 +596,25 @@ const NonLocalRecordsGrid = () => {
               {renderHeaderCell("District/State", 2, "grid-th min-w-[10px]")}
               {renderHeaderCell("Upazila/Township", 3, "grid-th min-w-[10px]")}
               {renderHeaderCell("Union", 4, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Village", 5, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Ward No", 5, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village", 6, "grid-th min-w-[10px]")}
               {MONTH_LABELS.map((m, idx) => (
-                renderHeaderCell(<span className="month-th-label">{m}</span>, 6 + idx, "grid-th month-th min-w-[10px]")
+                renderHeaderCell(<span className="month-th-label">{m}</span>, 7 + idx, "grid-th month-th min-w-[10px]")
               ))}
-              {renderHeaderCell("Total", 18, "grid-th min-w-[10px] font-bold")}
+              {renderHeaderCell("Total", 19, "grid-th min-w-[10px] font-bold")}
             </tr>
           </thead>
 
           <tbody>
-            {rows.length === 0 && !loading && (
+            {displayedRows.length === 0 && !loading && (
               <tr>
-                <td colSpan={19} className="text-center py-8 text-muted-foreground">
-                  No records for {year}
+                <td colSpan={20} className="text-center py-8 text-muted-foreground">
+                  {isAdmin && recordView === "pending" ? "No pending records for current filters" : `No records for ${year}`}
                 </td>
               </tr>
             )}
 
-            {rows.map((row) => (
+            {displayedRows.map((row) => (
               <tr key={row.id} className="hover:bg-gray-50">
                 <td className="grid-td p-1 text-center">
                   <button
@@ -443,55 +626,219 @@ const NonLocalRecordsGrid = () => {
                 </td>
 
                 <td className="grid-td p-0">
-                  <select
-                    className="grid-input bg-transparent"
-                    value={row.country}
-                    onChange={(e) => handleCellChange(row.id, "country", e.target.value)}
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                  {otherModeByRow[row.id]?.country ? (
+                    <input
+                      className="grid-input"
+                      placeholder="Enter country"
+                      value={row.country}
+                      onChange={(e) => handleCellChange(row.id, "country", e.target.value)}
+                    />
+                  ) : (
+                    <select
+                      className="grid-input bg-transparent"
+                      value={row.country}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER_OPTION) {
+                          setOtherMode(row.id, "country", true);
+                          handleCellChange(row.id, "country", "");
+                          return;
+                        }
+                        setOtherMode(row.id, "country", false);
+                        handleCellChange(row.id, "country", e.target.value);
+                      }}
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                      <option value={OTHER_OPTION}>Other</option>
+                    </select>
+                  )}
                 </td>
 
                 <td className="grid-td p-0">
-                  <input
-                    className="grid-input"
-                    value={row.district_or_state}
-                    onChange={(e) => handleCellChange(row.id, "district_or_state", e.target.value)}
-                  />
+                  {row.country === "Bangladesh" && !otherModeByRow[row.id]?.district ? (
+                    <select
+                      className="grid-input bg-transparent"
+                      value={row.district_or_state}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER_OPTION) {
+                          setOtherMode(row.id, "district", true);
+                          handleCellChange(row.id, "district_or_state", "");
+                          return;
+                        }
+                        setOtherMode(row.id, "district", false);
+                        handleCellChange(row.id, "district_or_state", e.target.value);
+                        handleCellChange(row.id, "upazila_or_township", "");
+                        handleCellChange(row.id, "union_name", "");
+                        handleCellChange(row.id, "village_name", "");
+                        setWardByRow((prev) => ({ ...prev, [row.id]: "" }));
+                      }}
+                    >
+                      <option value="">Select District</option>
+                      {getDistrictOptions().map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                      <option value={OTHER_OPTION}>Other</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="grid-input"
+                      placeholder="District/State"
+                      value={row.district_or_state}
+                      onChange={(e) => handleCellChange(row.id, "district_or_state", e.target.value)}
+                    />
+                  )}
                 </td>
 
                 <td className="grid-td p-0">
-                  <input
-                    className="grid-input"
-                    value={row.upazila_or_township}
-                    onChange={(e) => handleCellChange(row.id, "upazila_or_township", e.target.value)}
-                  />
+                  {row.country === "Bangladesh" && !otherModeByRow[row.id]?.upazila ? (
+                    <select
+                      className="grid-input bg-transparent"
+                      value={row.upazila_or_township}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER_OPTION) {
+                          setOtherMode(row.id, "upazila", true);
+                          handleCellChange(row.id, "upazila_or_township", "");
+                          return;
+                        }
+                        setOtherMode(row.id, "upazila", false);
+                        handleCellChange(row.id, "upazila_or_township", e.target.value);
+                        handleCellChange(row.id, "union_name", "");
+                        handleCellChange(row.id, "village_name", "");
+                        setWardByRow((prev) => ({ ...prev, [row.id]: "" }));
+                      }}
+                    >
+                      <option value="">Select Upazila</option>
+                      {getUpazilaOptions(row).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                      <option value={OTHER_OPTION}>Other</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="grid-input"
+                      placeholder="Upazila/Township"
+                      value={row.upazila_or_township}
+                      onChange={(e) => handleCellChange(row.id, "upazila_or_township", e.target.value)}
+                    />
+                  )}
                 </td>
 
                 <td className="grid-td p-0">
-                  <input
-                    className="grid-input"
-                    value={row.union_name}
-                    onChange={(e) => handleCellChange(row.id, "union_name", e.target.value)}
-                  />
+                  {row.country === "Bangladesh" && !otherModeByRow[row.id]?.union ? (
+                    <select
+                      className="grid-input bg-transparent"
+                      value={row.union_name}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER_OPTION) {
+                          setOtherMode(row.id, "union", true);
+                          handleCellChange(row.id, "union_name", "");
+                          return;
+                        }
+                        setOtherMode(row.id, "union", false);
+                        handleCellChange(row.id, "union_name", e.target.value);
+                        handleCellChange(row.id, "village_name", "");
+                        setWardByRow((prev) => ({ ...prev, [row.id]: "" }));
+                      }}
+                    >
+                      <option value="">Select Union</option>
+                      {getUnionOptions(row).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                      <option value={OTHER_OPTION}>Other</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="grid-input"
+                      placeholder="Union"
+                      value={row.union_name}
+                      onChange={(e) => handleCellChange(row.id, "union_name", e.target.value)}
+                    />
+                  )}
                 </td>
 
                 <td className="grid-td p-0">
-                  <input
-                    className="grid-input"
-                    value={row.village_name}
-                    onChange={(e) => handleCellChange(row.id, "village_name", e.target.value)}
-                  />
+                  {row.country === "Bangladesh" && !otherModeByRow[row.id]?.ward ? (
+                    <select
+                      className="grid-input bg-transparent"
+                      value={wardByRow[row.id] || ""}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER_OPTION) {
+                          setOtherMode(row.id, "ward", true);
+                          setWardByRow((prev) => ({ ...prev, [row.id]: "" }));
+                          handleCellChange(row.id, "village_name", "");
+                          return;
+                        }
+                        setOtherMode(row.id, "ward", false);
+                        setWardByRow((prev) => ({ ...prev, [row.id]: e.target.value }));
+                        handleCellChange(row.id, "village_name", "");
+                      }}
+                    >
+                      <option value="">All Wards</option>
+                      {getWardOptions(row).map((ward) => (
+                        <option key={ward} value={ward}>
+                          {ward}
+                        </option>
+                      ))}
+                      <option value={OTHER_OPTION}>Other</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="grid-input"
+                      placeholder="Ward No"
+                      value={wardByRow[row.id] || ""}
+                      onChange={(e) => setWardByRow((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                    />
+                  )}
+                </td>
+
+                <td className="grid-td p-0">
+                  {row.country === "Bangladesh" && !otherModeByRow[row.id]?.village ? (
+                    <select
+                      className="grid-input bg-transparent"
+                      value={row.village_name}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER_OPTION) {
+                          setOtherMode(row.id, "village", true);
+                          handleCellChange(row.id, "village_name", "");
+                          return;
+                        }
+                        setOtherMode(row.id, "village", false);
+                        handleCellChange(row.id, "village_name", e.target.value);
+                      }}
+                    >
+                      <option value="">Select Village</option>
+                      {getVillageOptions(row).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                      <option value={OTHER_OPTION}>Other</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="grid-input"
+                      placeholder="Village"
+                      value={row.village_name}
+                      onChange={(e) => handleCellChange(row.id, "village_name", e.target.value)}
+                    />
+                  )}
                 </td>
 
                 {MONTH_COLUMNS.map((col, idx) => {
                   const value = row[col as MonthColumn];
-                  const status = getMonthStatus(value, idx);
+                  const status = getMonthStatus(row, value, idx);
                   const editable = isMonthEditable(idx);
+                  const monthNumber = idx + 1;
+                  const isPendingCell = status === "PENDING";
 
                   return (
                     <td
@@ -500,23 +847,47 @@ const NonLocalRecordsGrid = () => {
                         editable ? "" : "opacity-80"
                       }`}
                       title={
-                        status === "GREEN"
+                        status === "APPROVED"
                           ? "Approved"
-                          : status === "YELLOW"
+                          : status === "PENDING"
                           ? "Waiting for approval"
+                          : status === "REJECTED"
+                          ? "Rejected"
                           : "Not submitted"
                       }
                     >
-                      <input
-                        type="number"
-                        min={0}
-                        className={`grid-input bg-transparent ${
-                          editable ? "" : "text-muted-foreground"
-                        }`}
-                        value={value}
-                        onChange={(e) => handleCellChange(row.id, col, e.target.value)}
-                        disabled={!editable}
-                      />
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          min={0}
+                          className={`grid-input bg-transparent ${
+                            editable ? "" : "text-muted-foreground"
+                          }`}
+                          value={value}
+                          onChange={(e) => handleCellChange(row.id, col, e.target.value)}
+                          disabled={!editable}
+                        />
+                        {isAdmin && isPendingCell && (
+                          <div className="pr-1 flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              className="h-4 w-4 rounded text-[9px] leading-none bg-green-600 text-white"
+                              title="Approve"
+                              onClick={() => handleApprovalAction(row.id, monthNumber, "APPROVED")}
+                            >
+                              A
+                            </button>
+                            <button
+                              type="button"
+                              className="h-4 w-4 rounded text-[9px] leading-none bg-fuchsia-600 text-white"
+                              title="Reject"
+                              onClick={() => handleApprovalAction(row.id, monthNumber, "REJECTED")}
+                            >
+                              R
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   );
                 })}

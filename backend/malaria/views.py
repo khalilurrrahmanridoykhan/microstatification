@@ -2050,6 +2050,12 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+        month_field_set = set(MONTH_COLUMNS)
+        non_month_changes = [
+            field
+            for field, value in serializer.validated_data.items()
+            if field not in month_field_set and value != getattr(instance, field, None)
+        ]
         changed_month_fields = [
             field
             for field in MONTH_COLUMNS
@@ -2070,11 +2076,16 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             if profile is not None:
                 profile.micro_designation = designation
                 profile.save(update_fields=["micro_designation"])
-        if not is_malaria_admin(request.user) and changed_month_fields:
+        if not is_malaria_admin(request.user) and (changed_month_fields or non_month_changes):
+            month_fields_for_approval = (
+                changed_month_fields
+                if changed_month_fields
+                else sorted(_get_open_month_fields(serializer.instance.reporting_year))
+            )
             _sync_monthly_approvals_for_user_submission(
                 MonthlyApproval.RECORD_TYPE_LOCAL,
                 serializer.instance,
-                changed_month_fields,
+                month_fields_for_approval,
             )
         return Response(serializer.data)
 
@@ -2112,6 +2123,22 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         self.perform_create(serializer)
+        if not is_malaria_admin(request.user):
+            submitted_month_fields = [
+                field
+                for field in MONTH_COLUMNS
+                if serializer.validated_data.get(field, 0)
+            ]
+            month_fields_for_approval = (
+                submitted_month_fields
+                if submitted_month_fields
+                else sorted(_get_open_month_fields(serializer.instance.reporting_year))
+            )
+            _sync_monthly_approvals_for_user_submission(
+                MonthlyApproval.RECORD_TYPE_NON_LOCAL,
+                serializer.instance,
+                month_fields_for_approval,
+            )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -2119,6 +2146,12 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         partial = kwargs.pop("partial", False)
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+        month_field_set = set(MONTH_COLUMNS)
+        non_month_changes = [
+            field
+            for field, value in serializer.validated_data.items()
+            if field not in month_field_set and value != getattr(instance, field, None)
+        ]
         changed_month_fields = [
             field
             for field in MONTH_COLUMNS
@@ -2133,11 +2166,16 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         self.perform_update(serializer)
-        if not is_malaria_admin(request.user) and changed_month_fields:
+        if not is_malaria_admin(request.user) and (changed_month_fields or non_month_changes):
+            month_fields_for_approval = (
+                changed_month_fields
+                if changed_month_fields
+                else sorted(_get_open_month_fields(serializer.instance.reporting_year))
+            )
             _sync_monthly_approvals_for_user_submission(
                 MonthlyApproval.RECORD_TYPE_NON_LOCAL,
                 serializer.instance,
-                changed_month_fields,
+                month_fields_for_approval,
             )
         return Response(serializer.data)
 

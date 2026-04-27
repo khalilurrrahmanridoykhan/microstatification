@@ -84,6 +84,25 @@ const AdminRecordReview = () => {
     }
   };
 
+  const denyMonth = async (recordId: string, month: number) => {
+    try {
+      await upsertMonthlyApproval({
+        recordType,
+        recordId,
+        reportingYear: year,
+        month,
+        status: "REJECTED",
+      });
+      await fetchData();
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Failed to deny month.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const approveAllRow = async (recordId: string) => {
     try {
       await Promise.all(
@@ -107,12 +126,40 @@ const AdminRecordReview = () => {
     }
   };
 
+  const denyAllRow = async (recordId: string) => {
+    try {
+      await Promise.all(
+        MONTH_COLUMNS.map((_column, index) =>
+          upsertMonthlyApproval({
+            recordType,
+            recordId,
+            reportingYear: year,
+            month: index + 1,
+            status: "REJECTED",
+          }),
+        ),
+      );
+      await fetchData();
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "Failed to deny all months.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getCellColor = (row: ReviewRow, month: number) => {
     const status = getStatus(row, month);
     if (status === "APPROVED") return "bg-green-100 text-green-700";
     if (status === "PENDING") return "bg-yellow-100 text-yellow-700";
+    if (status === "REJECTED") return "bg-red-100 text-red-700";
     return "bg-red-100 text-red-700";
   };
+
+  const rowsWithPending = rows.filter((row) =>
+    MONTH_COLUMNS.some((_, idx) => getStatus(row, idx + 1) === "PENDING"),
+  );
 
   return (
     <div className="space-y-4">
@@ -177,7 +224,7 @@ const AdminRecordReview = () => {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {rowsWithPending.map((row) => (
               <tr key={row.id} className="border-t">
                 <td className="p-2">{row.sk_name}</td>
                 <td className="p-2">{row.location}</td>
@@ -187,31 +234,43 @@ const AdminRecordReview = () => {
                   return (
                     <td key={col} className="p-1 text-center">
                       <button
-                        onClick={() => approveMonth(row.id, month)}
+                        onClick={() =>
+                          getStatus(row, month) === "PENDING"
+                            ? approveMonth(row.id, month)
+                            : undefined
+                        }
                         className={`px-2 py-1 rounded text-xs ${getCellColor(row, month)}`}
                       >
                         {getStatus(row, month) || "—"}
                       </button>
+                      {getStatus(row, month) === "PENDING" && (
+                        <button
+                          onClick={() => denyMonth(row.id, month)}
+                          className="ml-1 px-2 py-1 rounded text-xs bg-red-100 text-red-700"
+                        >
+                          Deny
+                        </button>
+                      )}
                     </td>
                   );
                 })}
 
                 <td className="p-2 text-center">
-                  <Button
-                    size="sm"
-                    onClick={() => approveAllRow(row.id)}
-                  >
+                  <Button size="sm" onClick={() => approveAllRow(row.id)}>
                     <Check className="h-4 w-4 mr-1" />
                     Approve All
+                  </Button>
+                  <Button size="sm" variant="destructive" className="ml-2" onClick={() => denyAllRow(row.id)}>
+                    Deny All
                   </Button>
                 </td>
               </tr>
             ))}
 
-            {rows.length === 0 && !loading && (
+            {rowsWithPending.length === 0 && !loading && (
               <tr>
                 <td colSpan={15} className="text-center p-6 text-muted-foreground">
-                  No records found
+                  No pending approvals found
                 </td>
               </tr>
             )}

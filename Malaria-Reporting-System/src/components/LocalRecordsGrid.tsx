@@ -20,8 +20,10 @@ import {
 import { RefreshCw, Save } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
+  fetchMonthlyApprovals,
   fetchLocalRecords,
   fetchMonthAccessSettings,
+  upsertMonthlyApproval,
   updateDistrict,
   updateLocalRecord,
   updateUnion,
@@ -29,10 +31,11 @@ import {
   updateVillage,
   type LocalRecord,
   type LocalRecordUpdate,
+  type ApprovalRow,
   type VillageUpdatePayload,
 } from "@/lib/api";
 
-type CellStatus = "RED" | "YELLOW" | "GREEN";
+type CellStatus = "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
 type LocalEditableField = keyof LocalRecordUpdate;
 
 const itnColumns = ["itn_2026", "itn_2025", "itn_2024"] as const;
@@ -135,6 +138,8 @@ const LocalRecordsGrid = () => {
   const [pageSize, setPageSize] = useState(100);
   const [openMonthNumbers, setOpenMonthNumbers] = useState<Set<number>>(new Set([currentMonth]));
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
+  const [approvalRows, setApprovalRows] = useState<ApprovalRow[]>([]);
+  const [recordView, setRecordView] = useState<"all" | "pending">("all");
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
@@ -143,25 +148,61 @@ const LocalRecordsGrid = () => {
   // RED: value = 0
   // YELLOW: value > 0 AND (current month + current year) AND non-admin
   // GREEN: value > 0 otherwise
-  const getMonthStatus = (value: number, monthIndex: number): CellStatus => {
-    if (!value || value === 0) return "RED";
+  const approvalByKey = useMemo(() => {
+    const map = new Map<string, ApprovalRow["status"]>();
+    for (const approval of approvalRows) {
+      map.set(`${approval.record_id}:${approval.month}`, approval.status);
+    }
+    return map;
+  }, [approvalRows]);
+
+  const getMonthStatus = (row: LocalRecord, value: number, monthIndex: number): CellStatus => {
+    if (!value || value === 0) return "NOT_SUBMITTED";
     const monthNumber = monthIndex + 1;
+    const approvalStatus = approvalByKey.get(`${row.id}:${monthNumber}`);
+    if (approvalStatus === "PENDING") return "PENDING";
+    if (approvalStatus === "APPROVED") return "APPROVED";
+    if (approvalStatus === "REJECTED") return "REJECTED";
 
     if (!isAdmin && year === currentYear && monthNumber === currentMonth) {
-      return "YELLOW";
+      return "PENDING";
     }
-    return "GREEN";
+    return "APPROVED";
   };
 
   const getMonthBg = (status: CellStatus) => {
     // subtle but clear
     switch (status) {
-      case "GREEN":
+      case "APPROVED":
         return "bg-green-50 border-green-200";
-      case "YELLOW":
+      case "PENDING":
         return "bg-yellow-50 border-yellow-200";
+      case "REJECTED":
+        return "bg-fuchsia-50 border-fuchsia-200";
       default:
         return "bg-red-50 border-red-200";
+    }
+  };
+
+  const handleApprovalAction = async (recordId: string, month: number, status: "APPROVED" | "REJECTED") => {
+    try {
+      await upsertMonthlyApproval({
+        recordType: "local",
+        recordId,
+        reportingYear: year,
+        month,
+        status,
+      });
+      setApprovalRows((prev) => {
+        const filtered = prev.filter((a) => !(a.record_id === recordId && a.month === month));
+        return [...filtered, { record_id: recordId, month, status }];
+      });
+    } catch (error) {
+      toast({
+        title: "Approval update failed",
+        description: error instanceof Error ? error.message : "Failed to update approval.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -186,6 +227,15 @@ const LocalRecordsGrid = () => {
       }
 
       setRows(data);
+      if (isAdmin) {
+        const approvals = await fetchMonthlyApprovals({
+          recordType: "local",
+          reportingYear: effectiveYear,
+        });
+        setApprovalRows(approvals);
+      } else {
+        setApprovalRows([]);
+      }
       setDirtyIds(new Set());
     } catch (error) {
       toast({
@@ -324,6 +374,16 @@ const LocalRecordsGrid = () => {
     );
   }, [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion, selectedVillage]);
 
+  const pendingRecordIds = useMemo(() => {
+    const ids = new Set<string>();
+    approvalRows.forEach((approval) => {
+      if (approval.status === "PENDING") {
+        ids.add(approval.record_id);
+      }
+    });
+    return ids;
+  }, [approvalRows]);
+
   const filteredRows = useMemo(
     () =>
       scopeFilteredRows.filter((row) => {
@@ -332,9 +392,20 @@ const LocalRecordsGrid = () => {
         if (selectedUnion !== "all" && row.union_name !== selectedUnion) return false;
         if (selectedVillage !== "all" && row.village_name !== selectedVillage) return false;
         if (selectedWard !== "all" && (row.ward_no || "") !== selectedWard) return false;
+        if (isAdmin && recordView === "pending" && !pendingRecordIds.has(row.id)) return false;
         return true;
       }),
-    [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion, selectedVillage, selectedWard],
+    [
+      scopeFilteredRows,
+      selectedDistrict,
+      selectedUpazila,
+      selectedUnion,
+      selectedVillage,
+      selectedWard,
+      isAdmin,
+      recordView,
+      pendingRecordIds,
+    ],
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
@@ -660,6 +731,18 @@ const LocalRecordsGrid = () => {
           Download Data
         </Button>
 
+        {isAdmin && (
+          <Select value={recordView} onValueChange={(value: "all" | "pending") => setRecordView(value)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Records View" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Records</SelectItem>
+              <SelectItem value="pending">Waiting Approval</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
         {/* Optional legend (helps users understand colors) */}
         <div className="flex items-center gap-2 ml-auto text-[11px] text-gray-600">
           <span className="inline-flex items-center gap-1">
@@ -673,6 +756,10 @@ const LocalRecordsGrid = () => {
           <span className="inline-flex items-center gap-1">
             <span className="h-2.5 w-2.5 rounded-sm bg-green-200 border border-green-300" />
             Approved
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm bg-fuchsia-200 border border-fuchsia-300" />
+            Rejected
           </span>
         </div>
       </div>
@@ -896,8 +983,10 @@ const LocalRecordsGrid = () => {
 
                 {MONTH_COLUMNS.map((col, idx) => {
                   const value = row[col as MonthColumn];
-                  const status = getMonthStatus(value, idx);
+                  const status = getMonthStatus(row, value, idx);
                   const editable = isMonthEditable(idx);
+                  const monthNumber = idx + 1;
+                  const isPendingCell = status === "PENDING";
 
                   return (
                     <td
@@ -906,23 +995,47 @@ const LocalRecordsGrid = () => {
                         editable ? "" : "opacity-80"
                       }`}
                       title={
-                        status === "GREEN"
+                        status === "APPROVED"
                           ? "Approved"
-                          : status === "YELLOW"
+                          : status === "PENDING"
                           ? "Waiting for approval"
+                          : status === "REJECTED"
+                          ? "Rejected"
                           : "Not submitted"
                       }
                     >
-                      <input
-                        type="number"
-                        min={0}
-                        className={`grid-input bg-transparent ${
-                          editable ? "" : "text-muted-foreground"
-                        }`}
-                        value={value}
-                        onChange={(e) => handleCellChange(row.id, col, e.target.value)}
-                        disabled={!editable}
-                      />
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          min={0}
+                          className={`grid-input bg-transparent ${
+                            editable ? "" : "text-muted-foreground"
+                          }`}
+                          value={value}
+                          onChange={(e) => handleCellChange(row.id, col, e.target.value)}
+                          disabled={!editable}
+                        />
+                        {isAdmin && isPendingCell && (
+                          <div className="pr-1 flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              className="h-4 w-4 rounded text-[9px] leading-none bg-green-600 text-white"
+                              title="Approve"
+                              onClick={() => handleApprovalAction(row.id, monthNumber, "APPROVED")}
+                            >
+                              A
+                            </button>
+                            <button
+                              type="button"
+                              className="h-4 w-4 rounded text-[9px] leading-none bg-fuchsia-600 text-white"
+                              title="Reject"
+                              onClick={() => handleApprovalAction(row.id, monthNumber, "REJECTED")}
+                            >
+                              R
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   );
                 })}

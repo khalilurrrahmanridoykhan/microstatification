@@ -1,5 +1,5 @@
 export type AppRole = "admin" | "sk";
-export type ApprovalStatus = "PENDING" | "APPROVED";
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type RecordType = "local" | "non_local";
 
 export interface SessionUser {
@@ -141,6 +141,37 @@ export interface DistrictNode {
   id: string;
   name: string;
   upazilas: UpazilaNode[];
+}
+
+export interface MasterDistrict {
+  id: number;
+  name: string;
+}
+
+export interface MasterUpazila {
+  id: number;
+  name: string;
+  district_id: number;
+}
+
+export interface MasterUnion {
+  id: number;
+  name: string;
+  upazila_id: number;
+}
+
+export interface MasterVillage {
+  id: number;
+  name: string;
+  ward_no: string | null;
+  union_id: number;
+}
+
+export interface MalariaMasterData {
+  districts: MasterDistrict[];
+  upazilas: MasterUpazila[];
+  unions: MasterUnion[];
+  villages: MasterVillage[];
 }
 
 export interface Assignment {
@@ -455,10 +486,31 @@ export function upsertMonthlyApproval(payload: {
   month: number;
   status: ApprovalStatus;
 }): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>("/admin/monthly-approvals", {
+  return request<{ success: boolean }>("/malaria/monthly-approvals/", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      record_type: payload.recordType,
+      record_id: payload.recordId,
+      reporting_year: payload.reportingYear,
+      month: payload.month,
+      status: payload.status,
+    }),
   });
+}
+
+export function fetchMonthlyApprovals(params: {
+  recordType: RecordType;
+  reportingYear: number;
+  status?: ApprovalStatus;
+}): Promise<ApprovalRow[]> {
+  const query = new URLSearchParams({
+    record_type: params.recordType,
+    reporting_year: String(params.reportingYear),
+  });
+  if (params.status) {
+    query.set("status", params.status);
+  }
+  return request<ApprovalRow[]>(`/malaria/monthly-approvals/?${query.toString()}`);
 }
 
 export function fetchUsers(): Promise<AdminUser[]> {
@@ -491,6 +543,10 @@ export function fetchLocations(): Promise<DistrictNode[]> {
 
 export function fetchAssignments(): Promise<Assignment[]> {
   return request<Assignment[]>("/admin/assignments");
+}
+
+export function fetchMalariaMasterData(): Promise<MalariaMasterData> {
+  return request<MalariaMasterData>("/malaria/master-data/");
 }
 
 export function assignVillage(skUserId: string, villageId: string): Promise<{ success: boolean; message: string }> {
