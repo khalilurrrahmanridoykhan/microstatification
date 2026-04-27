@@ -44,4 +44,4 @@ Additional seeded SK users:
 ## Notes
 
 - The database is created and seeded automatically on server start.
-- The old `supabase/` directory remains in the repo as historical source material, but the app no longer depends on Supabase to run.
+- The application uses only the local Express + SQLite stack.
