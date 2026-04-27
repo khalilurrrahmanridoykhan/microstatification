@@ -37,7 +37,7 @@ function DashboardSidebar({ setAuthToken, location }) {
             className={`menu-item border-b ${isActive("/dashboard") ? "active" : "text-black"
               }`}
           >
-            <i className="fas fa-tachometer-alt" /> <span>Dashboard</span>
+            <i className="fas fa-tachometer-alt" /> <span>Data Summary</span>
           </Link>
 
           <Link
@@ -46,7 +46,7 @@ function DashboardSidebar({ setAuthToken, location }) {
               }`}
           >
             <i className="fas fa-file-excel" />{" "}
-            <span>Micro Data Download</span>
+            <span>Data Download</span>
           </Link>
 
           <Link
@@ -119,7 +119,7 @@ function DashboardSidebar({ setAuthToken, location }) {
             }`}
         >
           <i className="fas fa-tachometer-alt" />{" "}
-          <span className="">Dashboard</span>
+          <span className="">Data Summary</span>
         </Link>
 
         {/* Organization */}

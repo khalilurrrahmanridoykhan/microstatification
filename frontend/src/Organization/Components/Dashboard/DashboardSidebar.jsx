@@ -29,7 +29,7 @@ function DashboardSidebar({ setAuthToken, location }) {
           }`}
       >
         <i className="fas fa-tachometer-alt" />{" "}
-        <span className="">Dashboard</span>
+        <span className="">Data Summary</span>
       </Link>
 
       {/* Organization */}

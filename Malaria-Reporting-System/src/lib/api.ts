@@ -156,19 +156,84 @@ export interface UserPayload {
 }
 
 const authTokenStorageKey = "malaria_reporting_auth_token";
+const legacyMalariaTokenKey = "malaria_auth_token";
+const mainSessionTokenKey = "authToken";
+const mainSessionUserKey = "userInfo";
 const requestTimeoutMs = 8000;
 
 export function getAuthToken(): string | null {
-  return window.localStorage.getItem(authTokenStorageKey);
+  const primary = window.localStorage.getItem(authTokenStorageKey);
+  if (primary) return primary;
+
+  const legacy = window.localStorage.getItem(legacyMalariaTokenKey);
+  if (legacy) {
+    window.localStorage.setItem(authTokenStorageKey, legacy);
+    return legacy;
+  }
+
+  const mainSession = window.sessionStorage.getItem(mainSessionTokenKey);
+  if (mainSession) {
+    window.localStorage.setItem(authTokenStorageKey, mainSession);
+    return mainSession;
+  }
+
+  return null;
 }
 
 export function setAuthToken(token: string | null): void {
   if (token) {
     window.localStorage.setItem(authTokenStorageKey, token);
+    window.localStorage.setItem(legacyMalariaTokenKey, token);
     return;
   }
 
   window.localStorage.removeItem(authTokenStorageKey);
+  window.localStorage.removeItem(legacyMalariaTokenKey);
+}
+
+function parseLegacyRole(value: unknown, microRole: unknown): AppRole {
+  const numericRole = Number(value);
+  const normalizedMicroRole = String(microRole || "").toLowerCase();
+  if (numericRole === 1 || numericRole === 7 || normalizedMicroRole === "micro_admin") {
+    return "admin";
+  }
+  return "sk";
+}
+
+function getLegacySessionFromMainApp(): SessionData | null {
+  const userInfoRaw = window.sessionStorage.getItem(mainSessionUserKey);
+  if (!userInfoRaw) return null;
+
+  try {
+    const userInfo = JSON.parse(userInfoRaw) as {
+      id?: string | number;
+      email?: string;
+      username?: string;
+      full_name?: string;
+      role?: number | string;
+      profile?: { micro_role?: string; email?: string; full_name?: string };
+    };
+
+    const email =
+      String(userInfo.email || userInfo.profile?.email || "").trim() ||
+      `${String(userInfo.username || "user").trim()}@commicplan.local`;
+    const fullName =
+      String(userInfo.full_name || userInfo.profile?.full_name || "").trim() || "User";
+
+    return {
+      user: {
+        id: String(userInfo.id || email),
+        email,
+      },
+      profile: {
+        full_name: fullName,
+        email,
+      },
+      role: parseLegacyRole(userInfo.role, userInfo.profile?.micro_role),
+    };
+  } catch (_error) {
+    return null;
+  }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -178,7 +243,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs);
 
   if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+    headers.set("Authorization", `Token ${token}`);
   }
 
   if (init.body && !headers.has("Content-Type")) {
@@ -236,6 +301,11 @@ export function logout(): Promise<void> {
 }
 
 export function getSession(): Promise<SessionData> {
+  const legacySession = getLegacySessionFromMainApp();
+  if (legacySession && getAuthToken()) {
+    return Promise.resolve(legacySession);
+  }
+
   return request<SessionData>("/auth/me");
 }
 

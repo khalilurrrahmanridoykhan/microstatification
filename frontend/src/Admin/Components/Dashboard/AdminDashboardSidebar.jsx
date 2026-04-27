@@ -39,7 +39,7 @@ function DashboardSidebar({ setAuthToken, location }) {
     <div>
       <div className="menu border-r ">
         <Link to="/dashboard" className={`menu-item border-b  ${isActive('/dashboard') ? 'active' : ''}`}>
-          <i className="fas fa-tachometer-alt"></i> <span>Dashboard</span>
+          <i className="fas fa-tachometer-alt"></i> <span>Data Summary</span>
         </Link>
 
 

@@ -16,8 +16,10 @@ function Header({ setAuthToken, user, isOpen, setIsOpen }) {
     const pathParts = location.pathname.split('/'); // ["", "organization", "all"]
     const mainSegment = pathParts[1]; // "organization"
 
-    // Capitalize the first letter
-    const pageTitle = mainSegment.charAt(0).toUpperCase() + mainSegment.slice(1);
+    const pageTitle =
+        mainSegment === "dashboard"
+            ? "Data Summary"
+            : mainSegment.charAt(0).toUpperCase() + mainSegment.slice(1);
 
 
     const toggleSidebar = () => {

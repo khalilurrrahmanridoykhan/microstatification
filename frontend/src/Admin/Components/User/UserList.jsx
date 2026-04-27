@@ -364,16 +364,6 @@ function UserList() {
                   Create User
                 </Link>
               </button>
-              <button
-                className="bg-emerald-600 px-5 py-2 rounded-lg cursor-pointer text-base transition-all duration-300 ease-in-out outline-none hover:bg-emerald-700 mt-btn"
-              >
-                <Link
-                  to="/microstatification/download"
-                  className="text-white no-underline"
-                >
-                  Download Micro Data
-                </Link>
-              </button>
             </div>
           )}
           {!isMicroAdminUser && (

@@ -928,6 +928,12 @@ def _get_micro_export_source_updated_at(district_name):
     if local_record_updated_at is not None:
         timestamps.append(local_record_updated_at)
 
+    non_local_record_updated_at = NonLocalRecord.objects.filter(
+        district_or_state__iexact=district_name
+    ).aggregate(last=Max("updated_at"))["last"]
+    if non_local_record_updated_at is not None:
+        timestamps.append(non_local_record_updated_at)
+
     upload_updated_at = MicrostatificationDataUpload.objects.filter(
         district=district_name
     ).aggregate(last=Max("updated_at"))["last"]
@@ -2433,6 +2439,129 @@ class MicrostatificationDataDownloadView(APIView):
 
         return output.getvalue().encode("utf-8-sig")
 
+    def _build_indigenous_export_rows(
+        self,
+        district_upazila_rows,
+        local_record_lookup,
+        designation_lookup,
+    ):
+        rows = []
+        sequence = 1
+        for villages in district_upazila_rows.values():
+            for village in villages:
+                local_record = local_record_lookup.get(village.id)
+                row_values = [
+                    _get_micro_template_cell_value(
+                        header,
+                        sequence,
+                        village,
+                        local_record,
+                        designation_lookup,
+                    )
+                    for header in MICROSTATIFICATION_CSV_HEADERS
+                ]
+                rows.append(["" if value is None else value for value in row_values])
+                sequence += 1
+        return rows
+
+    def _build_imported_export_rows(self, district_name):
+        reporting_year = _current_dhaka_year()
+        queryset = NonLocalRecord.objects.filter(
+            reporting_year=reporting_year,
+            district_or_state__iexact=district_name,
+        )
+
+        if not queryset.exists():
+            latest_reporting_year = NonLocalRecord.objects.filter(
+                district_or_state__iexact=district_name,
+            ).aggregate(latest=Max("reporting_year"))["latest"]
+            if latest_reporting_year is not None:
+                reporting_year = latest_reporting_year
+                queryset = NonLocalRecord.objects.filter(
+                    reporting_year=reporting_year,
+                    district_or_state__iexact=district_name,
+                )
+
+        rows = []
+        for sequence, record in enumerate(
+            queryset.order_by("country", "upazila_or_township", "union_name", "village_name"),
+            start=1,
+        ):
+            rows.append(
+                [
+                    sequence,  # SL
+                    record.country or "",
+                    "",  # Division
+                    district_name,
+                    record.upazila_or_township or "",
+                    record.union_name or "",
+                    "",  # Ward No
+                    "",  # Name of SK/SHW
+                    "",  # Desig.
+                    "",  # Name of SS
+                    record.village_name or "",  # Village Name (English)
+                    "",  # Village Name (Bangla)
+                    "",  # Village Code
+                    "",  # Latitude
+                    "",  # Longitude
+                    "",  # Population
+                    "",  # HH Number
+                    "",  # 2026 (Active LLINs)
+                    "",  # 2025 (Active LLINs)
+                    "",  # 2024 (Active LLINs)
+                    record.jan_cases or "",
+                    record.feb_cases or "",
+                    record.mar_cases or "",
+                    record.apr_cases or "",
+                    record.may_cases or "",
+                    record.jun_cases or "",
+                    record.jul_cases or "",
+                    record.aug_cases or "",
+                    record.sep_cases or "",
+                    record.oct_cases or "",
+                    record.nov_cases or "",
+                    record.dec_cases or "",
+                    "",  # Name of MMW, Health post & CHW(C)
+                    "",  # Village Distance from upazila office (KM)
+                    "",  # Name of Border with others country
+                    "",  # Others Activities (TDA/Dev care)
+                ]
+            )
+        return rows
+
+    def _build_combined_csv_export_bytes(self, indigenous_rows, imported_rows):
+        output = StringIO()
+        writer = csv.writer(output)
+        combined_headers = ["Dataset", *MICROSTATIFICATION_CSV_HEADERS]
+        writer.writerow(combined_headers)
+
+        for row_values in indigenous_rows:
+            writer.writerow(["Indigenous", *row_values])
+        for row_values in imported_rows:
+            writer.writerow(["Imported", *row_values])
+
+        return output.getvalue().encode("utf-8-sig")
+
+    def _build_combined_xlsx_export_bytes(self, indigenous_rows, imported_rows):
+        import openpyxl
+
+        workbook = openpyxl.Workbook()
+        indigenous_sheet = workbook.active
+        indigenous_sheet.title = "Indigenous"
+        imported_sheet = workbook.create_sheet("Imported")
+
+        indigenous_sheet.append(MICROSTATIFICATION_CSV_HEADERS)
+        for row_values in indigenous_rows:
+            indigenous_sheet.append(row_values)
+
+        imported_sheet.append(MICROSTATIFICATION_CSV_HEADERS)
+        for row_values in imported_rows:
+            imported_sheet.append(row_values)
+
+        output = BytesIO()
+        workbook.save(output)
+        return output.getvalue()
+
     def _build_export_file(
         self,
         district_name,
@@ -2489,15 +2618,21 @@ class MicrostatificationDataDownloadView(APIView):
         local_record_lookup = context["local_record_lookup"]
         resolved_designation_lookup = context["designation_lookup"]
 
+        indigenous_rows = self._build_indigenous_export_rows(
+            district_upazila_rows,
+            local_record_lookup,
+            resolved_designation_lookup,
+        )
+        imported_rows = self._build_imported_export_rows(district_name)
+
         if normalized_format == "csv":
             filename = _get_micro_export_filename(
                 district_name,
                 export_format=normalized_format,
             )
-            export_bytes = self._build_csv_export_bytes(
-                district_upazila_rows,
-                local_record_lookup,
-                resolved_designation_lookup,
+            export_bytes = self._build_combined_csv_export_bytes(
+                indigenous_rows,
+                imported_rows,
             )
             export_debug_path = None
             if store_debug_copy:
@@ -2510,24 +2645,10 @@ class MicrostatificationDataDownloadView(APIView):
                 "export_format": normalized_format,
             }
 
-        template_path = _resolve_micro_template_path(district_name)
-        if template_path is None or not template_path.exists():
-            return Response(
-                {"detail": f"Template file not found for district: {district_name}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        workbook = openpyxl.load_workbook(template_path)
-        workbook = _populate_micro_template_workbook(
-            workbook,
-            district_upazila_rows,
-            local_record_lookup,
-            resolved_designation_lookup,
+        export_bytes = self._build_combined_xlsx_export_bytes(
+            indigenous_rows,
+            imported_rows,
         )
-
-        output = BytesIO()
-        workbook.save(output)
-        export_bytes = output.getvalue()
 
         if validate_xlsx:
             # Validate generated workbook bytes before returning the file.

@@ -295,8 +295,8 @@ function MicrostatificationDashboard() {
       setDashboard(response.data || null);
     } catch (err) {
       console.error("Failed to load microstatification dashboard", err);
-      setError("Failed to load dashboard data.");
-      toast.error("Failed to load dashboard data");
+      setError("Failed to load data summary.");
+      toast.error("Failed to load data summary");
     } finally {
       setLoading(false);
     }
@@ -318,7 +318,7 @@ function MicrostatificationDashboard() {
             <FiActivity className="h-6 w-6" />
           </div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Dashboard unavailable
+            Data summary unavailable
           </h2>
           <p className="mt-3 text-sm text-slate-600">{error}</p>
           <button

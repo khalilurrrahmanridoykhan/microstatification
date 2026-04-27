@@ -42,7 +42,7 @@ function DashboardSidebar({ userDetails, setAuthToken, location }) {
             className={`menu-item border-b ${isActive("/dashboard") ? "active" : "text-black"
               }`}
           >
-            <i className="fas fa-tachometer-alt"></i> <span>Dashboard</span>
+            <i className="fas fa-tachometer-alt"></i> <span>Data Summary</span>
           </Link>
         )}
 
