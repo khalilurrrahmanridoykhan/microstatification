@@ -351,28 +351,28 @@ const LocalRecordsGrid = () => {
     return Array.from(new Set(scoped.map((row) => row.union_name))).sort((a, b) => a.localeCompare(b));
   }, [scopeFilteredRows, selectedDistrict, selectedUpazila]);
 
-  const villageOptions = useMemo(() => {
-    const scoped = scopeFilteredRows.filter((row) => {
-      if (selectedDistrict !== "all" && row.district_name !== selectedDistrict) return false;
-      if (selectedUpazila !== "all" && row.upazila_name !== selectedUpazila) return false;
-      if (selectedUnion !== "all" && row.union_name !== selectedUnion) return false;
-      return true;
-    });
-    return Array.from(new Set(scoped.map((row) => row.village_name))).sort((a, b) => a.localeCompare(b));
-  }, [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion]);
-
   const wardOptions = useMemo(() => {
     const scoped = scopeFilteredRows.filter((row) => {
       if (selectedDistrict !== "all" && row.district_name !== selectedDistrict) return false;
       if (selectedUpazila !== "all" && row.upazila_name !== selectedUpazila) return false;
       if (selectedUnion !== "all" && row.union_name !== selectedUnion) return false;
-      if (selectedVillage !== "all" && row.village_name !== selectedVillage) return false;
       return true;
     });
     return Array.from(new Set(scoped.map((row) => row.ward_no || "").filter(Boolean))).sort((a, b) =>
       a.localeCompare(b),
     );
-  }, [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion, selectedVillage]);
+  }, [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion]);
+
+  const villageOptions = useMemo(() => {
+    const scoped = scopeFilteredRows.filter((row) => {
+      if (selectedDistrict !== "all" && row.district_name !== selectedDistrict) return false;
+      if (selectedUpazila !== "all" && row.upazila_name !== selectedUpazila) return false;
+      if (selectedUnion !== "all" && row.union_name !== selectedUnion) return false;
+      if (selectedWard !== "all" && (row.ward_no || "") !== selectedWard) return false;
+      return true;
+    });
+    return Array.from(new Set(scoped.map((row) => row.village_name))).sort((a, b) => a.localeCompare(b));
+  }, [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion, selectedWard]);
 
   const pendingRecordIds = useMemo(() => {
     const ids = new Set<string>();
@@ -662,8 +662,8 @@ const LocalRecordsGrid = () => {
           value={selectedUnion}
           onValueChange={(value) => {
             setSelectedUnion(value);
-            setSelectedVillage("all");
             setSelectedWard("all");
+            setSelectedVillage("all");
           }}
           disabled={selectedUpazila === "all"}
         >
@@ -681,27 +681,13 @@ const LocalRecordsGrid = () => {
         </Select>
 
         <Select
-          value={selectedVillage}
+          value={selectedWard}
           onValueChange={(value) => {
-            setSelectedVillage(value);
-            setSelectedWard("all");
+            setSelectedWard(value);
+            setSelectedVillage("all");
           }}
           disabled={selectedUnion === "all"}
         >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Village" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Villages</SelectItem>
-            {villageOptions.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedWard} onValueChange={setSelectedWard} disabled={selectedVillage === "all"}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Ward" />
           </SelectTrigger>
@@ -710,6 +696,20 @@ const LocalRecordsGrid = () => {
             {wardOptions.map((ward) => (
               <SelectItem key={ward} value={ward}>
                 {ward}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedVillage} onValueChange={setSelectedVillage} disabled={selectedWard === "all"}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Village" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Villages</SelectItem>
+            {villageOptions.map((name) => (
+              <SelectItem key={name} value={name}>
+                {name}
               </SelectItem>
             ))}
           </SelectContent>
