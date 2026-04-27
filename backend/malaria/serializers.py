@@ -125,6 +125,19 @@ class ProfileSerializer(serializers.Serializer):
     full_name = serializers.CharField()
     email = serializers.CharField()
     micro_role = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    micro_district = serializers.IntegerField(required=False, allow_null=True)
+    micro_upazila = serializers.IntegerField(required=False, allow_null=True)
+    micro_union = serializers.IntegerField(required=False, allow_null=True)
+    micro_village = serializers.IntegerField(required=False, allow_null=True)
+    micro_villages = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+    )
+    micro_ward_no = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    micro_sk_shw_name = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    micro_designation = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    micro_ss_name = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 
 class MalariaUserRoleSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
@@ -247,6 +260,9 @@ class VillageNestedSerializer(serializers.ModelSerializer):
 class LocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     village_id = serializers.IntegerField(read_only=True)
     sk_user_id = serializers.IntegerField(read_only=True)
+    district_id = serializers.ReadOnlyField(source="village.union.upazila.district.id")
+    upazila_id = serializers.ReadOnlyField(source="village.union.upazila.id")
+    union_id = serializers.ReadOnlyField(source="village.union.id")
     sk_user_username = serializers.CharField(source="sk_user.username", read_only=True)
     sk_user_display_name = serializers.SerializerMethodField()
     sk_user_designation = serializers.SerializerMethodField()
@@ -296,6 +312,9 @@ class LocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
             "id",
             "village_id",
             "sk_user_id",
+            "district_id",
+            "upazila_id",
+            "union_id",
             "sk_user_username",
             "sk_user_display_name",
             "sk_user_designation",

@@ -176,6 +176,15 @@ MICRO_DASHBOARD_SCOPE_LABELS = (
 MICROSTATIFICATION_DOWNLOAD_TICKET_SALT = "microstatification-download-ticket"
 MICROSTATIFICATION_DOWNLOAD_TICKET_MAX_AGE_SECONDS = 300
 FIELD_USER_VILLAGE_EDITABLE_FIELDS = {
+    "name",
+    "name_bn",
+    "village_code",
+    "latitude",
+    "longitude",
+    "population",
+    "ward_no",
+    "sk_shw_name",
+    "ss_name",
     "mmw_hp_chwc_name",
     "distance_from_upazila_office_km",
     "bordering_country_name",
@@ -1556,12 +1565,6 @@ def _ensure_local_record_editable(user, instance, validated_data):
     if not can_access:
         raise PermissionError("You can only edit local records within your assigned scope.")
 
-    if any(
-        field in validated_data and validated_data[field] != getattr(instance, field)
-        for field in ("hh", "population", *ITN_FIELDS)
-    ):
-        raise ValueError("Only malaria admins can edit household, population, or ITN fields.")
-
     rejected_month_fields = _get_rejected_month_fields(MonthlyApproval.RECORD_TYPE_LOCAL, instance)
     changed_month_fields = [
         field
@@ -1603,6 +1606,7 @@ class MalariaSessionView(APIView):
         role = get_malaria_role(request.user)
         profile = getattr(request.user, "profile", None)
         micro_role = getattr(profile, "micro_role", "") if profile else ""
+        micro_villages = list(profile.micro_villages.values_list("id", flat=True)) if profile and hasattr(profile, "micro_villages") else []
         payload = {
             "user": _serialize_user(request.user),
             "profile": {
@@ -1610,6 +1614,15 @@ class MalariaSessionView(APIView):
                 "full_name": build_full_name(request.user),
                 "email": request.user.email or request.user.username,
                 "micro_role": micro_role or None,
+                "micro_district": getattr(profile, "micro_district_id", None) if profile else None,
+                "micro_upazila": getattr(profile, "micro_upazila_id", None) if profile else None,
+                "micro_union": getattr(profile, "micro_union_id", None) if profile else None,
+                "micro_village": getattr(profile, "micro_village_id", None) if profile else None,
+                "micro_villages": micro_villages,
+                "micro_ward_no": getattr(profile, "micro_ward_no", "") if profile else "",
+                "micro_sk_shw_name": getattr(profile, "micro_sk_shw_name", "") if profile else "",
+                "micro_designation": getattr(profile, "micro_designation", "") if profile else "",
+                "micro_ss_name": getattr(profile, "micro_ss_name", "") if profile else "",
             },
             "role": role,
         }
@@ -2051,6 +2064,12 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         self.perform_update(serializer)
+        if "sk_user_designation" in request.data:
+            designation = str(request.data.get("sk_user_designation") or "").strip()
+            profile = getattr(serializer.instance.sk_user, "profile", None)
+            if profile is not None:
+                profile.micro_designation = designation
+                profile.save(update_fields=["micro_designation"])
         if not is_malaria_admin(request.user) and changed_month_fields:
             _sync_monthly_approvals_for_user_submission(
                 MonthlyApproval.RECORD_TYPE_LOCAL,

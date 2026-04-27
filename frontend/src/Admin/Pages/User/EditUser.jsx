@@ -57,6 +57,12 @@ function EditUser() {
     },
   });
   const [message, setMessage] = useState("");
+  const [microMasterData, setMicroMasterData] = useState({
+    districts: [],
+    upazilas: [],
+    unions: [],
+    villages: [],
+  });
   const user = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
   const [formSearch, setFormSearch] = useState("");
   const isUserAdmin = user.role === 1;
@@ -83,6 +89,31 @@ function EditUser() {
       }
     };
     fetchForms();
+  }, [isMicroAdmin]);
+
+  useEffect(() => {
+    if (!isMicroAdmin) return;
+    const token = sessionStorage.getItem("authToken");
+    axios
+      .get(`${BACKEND_URL}/api/malaria/master-data/`, {
+        headers: { Authorization: `Token ${token}` },
+      })
+      .then((res) => {
+        setMicroMasterData({
+          districts: res.data?.districts || [],
+          upazilas: res.data?.upazilas || [],
+          unions: res.data?.unions || [],
+          villages: res.data?.villages || [],
+        });
+      })
+      .catch(() => {
+        setMicroMasterData({
+          districts: [],
+          upazilas: [],
+          unions: [],
+          villages: [],
+        });
+      });
   }, [isMicroAdmin]);
 
   useEffect(() => {
@@ -178,6 +209,31 @@ function EditUser() {
     }
   };
 
+  const updateMicroProfileField = (field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      profile: {
+        ...prev.profile,
+        [field]: value,
+      },
+    }));
+  };
+
+  const clearMicroAccess = () => {
+    setForm((prev) => ({
+      ...prev,
+      profile: {
+        ...prev.profile,
+        micro_district: null,
+        micro_upazila: null,
+        micro_union: null,
+        micro_village: null,
+        micro_villages: [],
+        micro_ward_no: "",
+      },
+    }));
+  };
+
   const currentRoleValue = Number(form.role);
   const canEditProjectManagerRole =
     isUserAdmin || user.role === 2 || (user.username === id && user.role === 3);
@@ -256,6 +312,18 @@ function EditUser() {
         organizations: form.profile.organizations || [],
         projects: form.profile.projects || [],
         forms: form.profile.forms || [],
+      };
+    } else {
+      data.profile = {
+        micro_district: form.profile?.micro_district || null,
+        micro_upazila: form.profile?.micro_upazila || null,
+        micro_union: form.profile?.micro_union || null,
+        micro_village: form.profile?.micro_village || null,
+        micro_villages: form.profile?.micro_villages || [],
+        micro_ward_no: form.profile?.micro_ward_no || "",
+        micro_sk_shw_name: form.profile?.micro_sk_shw_name || "",
+        micro_designation: form.profile?.micro_designation || "",
+        micro_ss_name: form.profile?.micro_ss_name || "",
       };
     }
 
@@ -482,6 +550,101 @@ function EditUser() {
               </div>
             </div>
           </>
+        )}
+
+        {isMicroAdmin && (
+          <div className="col-span-2 p-3 border rounded bg-blue-50">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-blue-900">Current Microstatification Access</h3>
+              <button
+                type="button"
+                className="px-3 py-1 text-sm text-white bg-red-600 rounded hover:bg-red-700"
+                onClick={clearMicroAccess}
+              >
+                Remove All Access
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="block mb-1 text-sm font-medium">District</label>
+                <select
+                  className="w-full px-3 py-2 border rounded"
+                  value={form.profile?.micro_district ?? ""}
+                  onChange={(e) => updateMicroProfileField("micro_district", e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">No district access</option>
+                  {microMasterData.districts.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block mb-1 text-sm font-medium">Upazila</label>
+                <select
+                  className="w-full px-3 py-2 border rounded"
+                  value={form.profile?.micro_upazila ?? ""}
+                  onChange={(e) => updateMicroProfileField("micro_upazila", e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">No upazila access</option>
+                  {microMasterData.upazilas.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block mb-1 text-sm font-medium">Union</label>
+                <select
+                  className="w-full px-3 py-2 border rounded"
+                  value={form.profile?.micro_union ?? ""}
+                  onChange={(e) => updateMicroProfileField("micro_union", e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">No union access</option>
+                  {microMasterData.unions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block mb-1 text-sm font-medium">Village</label>
+                <select
+                  className="w-full px-3 py-2 border rounded"
+                  value={form.profile?.micro_village ?? ""}
+                  onChange={(e) => updateMicroProfileField("micro_village", e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">No single-village access</option>
+                  {microMasterData.villages.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block mb-1 text-sm font-medium">Ward No</label>
+                <input
+                  className="w-full px-3 py-2 border rounded"
+                  value={form.profile?.micro_ward_no || ""}
+                  onChange={(e) => updateMicroProfileField("micro_ward_no", e.target.value)}
+                  placeholder="Leave empty for all wards"
+                />
+              </div>
+            </div>
+
+            <p className="mt-2 text-xs text-gray-600">
+              Save to apply updates. You can remove access by clearing values or using Remove All Access.
+            </p>
+          </div>
         )}
 
         <div className="col-span-2 mt-6 button-container">

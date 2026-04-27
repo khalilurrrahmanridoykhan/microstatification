@@ -21,15 +21,57 @@ import { RefreshCw, Save } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   fetchLocalRecords,
+  fetchMonthAccessSettings,
+  updateDistrict,
   updateLocalRecord,
+  updateUnion,
+  updateUpazila,
+  updateVillage,
   type LocalRecord,
   type LocalRecordUpdate,
+  type VillageUpdatePayload,
 } from "@/lib/api";
 
 type CellStatus = "RED" | "YELLOW" | "GREEN";
 type LocalEditableField = keyof LocalRecordUpdate;
 
 const itnColumns = ["itn_2026", "itn_2025", "itn_2024"] as const;
+
+function getDhakaTodayIso(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dhaka",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function getMonthLastDayIso(year: number, month: number): string {
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
+function computeOpenMonthNumbers(
+  year: number,
+  settings: Array<{ month: number; close_date: string | null }>,
+): Set<number> {
+  const today = getDhakaTodayIso();
+  const closeDateByMonth = new Map<number, string>();
+  settings.forEach((item) => {
+    const closeDate = item.close_date || getMonthLastDayIso(year, item.month);
+    closeDateByMonth.set(item.month, closeDate);
+  });
+
+  const open = new Set<number>();
+  for (let month = 1; month <= 12; month += 1) {
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    const monthClose = closeDateByMonth.get(month) || getMonthLastDayIso(year, month);
+    if (today >= monthStart && today <= monthClose) {
+      open.add(month);
+    }
+  }
+  return open;
+}
 
 function buildUpdatePayload(row: LocalRecord): LocalRecordUpdate {
   return {
@@ -39,6 +81,7 @@ function buildUpdatePayload(row: LocalRecord): LocalRecordUpdate {
     itn_2023: row.itn_2023,
     itn_2024: row.itn_2024,
     itn_2025: row.itn_2025,
+    sk_user_designation: row.sk_user_designation || "",
     jan_cases: row.jan_cases,
     feb_cases: row.feb_cases,
     mar_cases: row.mar_cases,
@@ -54,8 +97,25 @@ function buildUpdatePayload(row: LocalRecord): LocalRecordUpdate {
   };
 }
 
+function buildVillageUpdatePayload(row: LocalRecord): VillageUpdatePayload {
+  return {
+    name: row.village_name || "",
+    name_bn: row.village_name_bn || "",
+    village_code: row.village_code || "",
+    latitude: row.village_latitude,
+    longitude: row.village_longitude,
+    ward_no: row.ward_no || null,
+    sk_shw_name: row.village_sk_shw_name || "",
+    ss_name: row.village_ss_name || "",
+    mmw_hp_chwc_name: row.village_mmw_hp_chwc_name || "",
+    distance_from_upazila_office_km: row.village_distance_from_upazila_office_km,
+    bordering_country_name: row.village_bordering_country_name || "",
+    other_activities: row.village_other_activities || "",
+  };
+}
+
 const LocalRecordsGrid = () => {
-  const { user, role } = useAuth();
+  const { user, role, profile } = useAuth();
   const { toast } = useToast();
   const isAdmin = role === "admin";
   const currentMonth = getDhakaMonth(); // 1..12
@@ -73,6 +133,7 @@ const LocalRecordsGrid = () => {
   const [selectedWard, setSelectedWard] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
+  const [openMonthNumbers, setOpenMonthNumbers] = useState<Set<number>>(new Set([currentMonth]));
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
@@ -124,7 +185,7 @@ const LocalRecordsGrid = () => {
         setYear(effectiveYear);
       }
 
-      setRows(isAdmin ? data : data.filter((row) => row.sk_user_id === user.id));
+      setRows(data);
       setDirtyIds(new Set());
     } catch (error) {
       toast({
@@ -141,37 +202,117 @@ const LocalRecordsGrid = () => {
     void fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (isAdmin) return;
+    let mounted = true;
+    const loadMonthAccess = async () => {
+      try {
+        const settings = await fetchMonthAccessSettings(year);
+        const open = computeOpenMonthNumbers(year, settings);
+        if (mounted) {
+          setOpenMonthNumbers(open);
+        }
+      } catch (_error) {
+        if (mounted) {
+          setOpenMonthNumbers(new Set([currentMonth]));
+        }
+      }
+    };
+    void loadMonthAccess();
+    return () => {
+      mounted = false;
+    };
+  }, [year, isAdmin, currentMonth]);
+
+  const scopeFilteredRows = useMemo(() => {
+    if (isAdmin || !user) return rows;
+
+    const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase();
+    const isNumericLike = (value: string) => /^\d+$/.test(value.trim());
+
+    const districtScope = profile?.micro_district ? String(profile.micro_district).trim() : "";
+    const upazilaScope = profile?.micro_upazila ? String(profile.micro_upazila).trim() : "";
+    const unionScope = profile?.micro_union ? String(profile.micro_union).trim() : "";
+    const villageScope = profile?.micro_village ? String(profile.micro_village).trim() : "";
+    const villageScopes = new Set((profile?.micro_villages || []).map((id) => String(id).trim()));
+    const wardNo = String(profile?.micro_ward_no || "").trim().toLowerCase();
+    const hasScope =
+      !!districtScope || !!upazilaScope || !!unionScope || !!villageScope || villageScopes.size > 0 || !!wardNo;
+
+    // If no explicit scope metadata is available in session profile, trust backend-filtered rows.
+    if (!hasScope) {
+      return rows;
+    }
+
+    return rows.filter((row) => {
+      if (villageScopes.size > 0) {
+        const rowVillageId = String(row.village_id);
+        const rowVillageName = normalize(row.village_name);
+        return Array.from(villageScopes).some((scope) => {
+          if (!scope) return false;
+          if (isNumericLike(scope)) return rowVillageId === scope;
+          return rowVillageName === normalize(scope);
+        });
+      }
+      if (villageScope) {
+        if (isNumericLike(villageScope)) return String(row.village_id) === villageScope;
+        return normalize(row.village_name) === normalize(villageScope);
+      }
+      if (unionScope) {
+        const unionMatched = isNumericLike(unionScope)
+          ? String(row.union_id) === unionScope
+          : normalize(row.union_name) === normalize(unionScope);
+        if (!unionMatched) return false;
+        if (wardNo) return String(row.ward_no || "").trim().toLowerCase() === wardNo;
+        return true;
+      }
+      if (upazilaScope) {
+        if (isNumericLike(upazilaScope)) return String(row.upazila_id) === upazilaScope;
+        return normalize(row.upazila_name) === normalize(upazilaScope);
+      }
+      if (districtScope) {
+        if (isNumericLike(districtScope)) return String(row.district_id) === districtScope;
+        return normalize(row.district_name) === normalize(districtScope);
+      }
+
+      return true;
+    });
+  }, [rows, isAdmin, user, profile]);
+
   const districtOptions = useMemo(
-    () => Array.from(new Set(rows.map((row) => row.district_name))).sort((a, b) => a.localeCompare(b)),
-    [rows],
+    () => Array.from(new Set(scopeFilteredRows.map((row) => row.district_name))).sort((a, b) => a.localeCompare(b)),
+    [scopeFilteredRows],
   );
 
   const upazilaOptions = useMemo(() => {
-    const scoped = selectedDistrict === "all" ? rows : rows.filter((row) => row.district_name === selectedDistrict);
+    const scoped =
+      selectedDistrict === "all"
+        ? scopeFilteredRows
+        : scopeFilteredRows.filter((row) => row.district_name === selectedDistrict);
     return Array.from(new Set(scoped.map((row) => row.upazila_name))).sort((a, b) => a.localeCompare(b));
-  }, [rows, selectedDistrict]);
+  }, [scopeFilteredRows, selectedDistrict]);
 
   const unionOptions = useMemo(() => {
-    const scoped = rows.filter((row) => {
+    const scoped = scopeFilteredRows.filter((row) => {
       if (selectedDistrict !== "all" && row.district_name !== selectedDistrict) return false;
       if (selectedUpazila !== "all" && row.upazila_name !== selectedUpazila) return false;
       return true;
     });
     return Array.from(new Set(scoped.map((row) => row.union_name))).sort((a, b) => a.localeCompare(b));
-  }, [rows, selectedDistrict, selectedUpazila]);
+  }, [scopeFilteredRows, selectedDistrict, selectedUpazila]);
 
   const villageOptions = useMemo(() => {
-    const scoped = rows.filter((row) => {
+    const scoped = scopeFilteredRows.filter((row) => {
       if (selectedDistrict !== "all" && row.district_name !== selectedDistrict) return false;
       if (selectedUpazila !== "all" && row.upazila_name !== selectedUpazila) return false;
       if (selectedUnion !== "all" && row.union_name !== selectedUnion) return false;
       return true;
     });
     return Array.from(new Set(scoped.map((row) => row.village_name))).sort((a, b) => a.localeCompare(b));
-  }, [rows, selectedDistrict, selectedUpazila, selectedUnion]);
+  }, [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion]);
 
   const wardOptions = useMemo(() => {
-    const scoped = rows.filter((row) => {
+    const scoped = scopeFilteredRows.filter((row) => {
       if (selectedDistrict !== "all" && row.district_name !== selectedDistrict) return false;
       if (selectedUpazila !== "all" && row.upazila_name !== selectedUpazila) return false;
       if (selectedUnion !== "all" && row.union_name !== selectedUnion) return false;
@@ -181,11 +322,11 @@ const LocalRecordsGrid = () => {
     return Array.from(new Set(scoped.map((row) => row.ward_no || "").filter(Boolean))).sort((a, b) =>
       a.localeCompare(b),
     );
-  }, [rows, selectedDistrict, selectedUpazila, selectedUnion, selectedVillage]);
+  }, [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion, selectedVillage]);
 
   const filteredRows = useMemo(
     () =>
-      rows.filter((row) => {
+      scopeFilteredRows.filter((row) => {
         if (selectedDistrict !== "all" && row.district_name !== selectedDistrict) return false;
         if (selectedUpazila !== "all" && row.upazila_name !== selectedUpazila) return false;
         if (selectedUnion !== "all" && row.union_name !== selectedUnion) return false;
@@ -193,7 +334,7 @@ const LocalRecordsGrid = () => {
         if (selectedWard !== "all" && (row.ward_no || "") !== selectedWard) return false;
         return true;
       }),
-    [rows, selectedDistrict, selectedUpazila, selectedUnion, selectedVillage, selectedWard],
+    [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion, selectedVillage, selectedWard],
   );
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
@@ -264,6 +405,31 @@ const LocalRecordsGrid = () => {
     });
   };
 
+  const handleTextCellChange = (rowId: string, field: keyof LocalRecord, value: string) => {
+    setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r)));
+    setDirtyIds((prev) => {
+      const next = new Set(prev);
+      next.add(rowId);
+      return next;
+    });
+  };
+
+  const handleDecimalCellChange = (rowId: string, field: keyof LocalRecord, value: string) => {
+    const normalized = value.trim();
+    if (normalized === "") {
+      setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, [field]: null } : r)));
+    } else {
+      const parsed = Number(normalized);
+      if (Number.isNaN(parsed)) return;
+      setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, [field]: parsed } : r)));
+    }
+    setDirtyIds((prev) => {
+      const next = new Set(prev);
+      next.add(rowId);
+      return next;
+    });
+  };
+
   const handleSave = async () => {
     if (dirtyIds.size === 0) return;
     setSaving(true);
@@ -271,7 +437,15 @@ const LocalRecordsGrid = () => {
       const dirty = rows.filter((r) => dirtyIds.has(r.id));
 
       for (const r of dirty) {
+        if (isAdmin) {
+          await updateDistrict(r.district_id, { name: r.district_name });
+          await updateUpazila(r.upazila_id, { name: r.upazila_name });
+          await updateUnion(r.union_id, { name: r.union_name });
+        }
         await updateLocalRecord(r.id, buildUpdatePayload(r));
+        if (isAdmin) {
+          await updateVillage(r.village_id, buildVillageUpdatePayload(r));
+        }
       }
 
       setDirtyIds(new Set());
@@ -290,10 +464,10 @@ const LocalRecordsGrid = () => {
   const isMonthEditable = (monthIndex: number) => {
     if (isAdmin) return true;
     if (year !== currentYear) return false;
-    return monthIndex + 1 === currentMonth;
+    return openMonthNumbers.has(monthIndex + 1);
   };
 
-  const isITNEditable = isAdmin;
+  const isITNEditable = true;
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   const handleDownloadXlsx = () => {
@@ -591,19 +765,111 @@ const LocalRecordsGrid = () => {
                 <td className="grid-td">
                   Chattogram
                 </td>
-                <td className="grid-td font-medium">{row.district_name}</td>
-                <td className="grid-td">{row.upazila_name}</td>
-                <td className="grid-td">{row.union_name}</td>
-                <td className="grid-td">{row.ward_no || ""}</td>
-                <td className="grid-td">{row.village_sk_shw_name || row.sk_user_display_name || ""}</td>
-                <td className="grid-td">{row.sk_user_designation || ""}</td>
-                <td className="grid-td">{row.village_ss_name || row.sk_user_ss_name || ""}</td>
-                <td className="grid-td">{row.village_name}</td>
-                <td className="grid-td">{row.village_name_bn || ""}</td>
-                <td className="grid-td">{row.village_code || ""}</td>
-                <td className="grid-td">{row.village_latitude ?? ""}</td>
-                <td className="grid-td">{row.village_longitude ?? ""}</td>
-                <td className="grid-td">{row.population}</td>
+                <td className="grid-td p-0">
+                  {isAdmin ? (
+                    <input
+                      className="grid-input"
+                      value={row.district_name}
+                      onChange={(e) => handleTextCellChange(row.id, "district_name", e.target.value)}
+                    />
+                  ) : (
+                    <span className="font-medium">{row.district_name}</span>
+                  )}
+                </td>
+                <td className="grid-td p-0">
+                  {isAdmin ? (
+                    <input
+                      className="grid-input"
+                      value={row.upazila_name}
+                      onChange={(e) => handleTextCellChange(row.id, "upazila_name", e.target.value)}
+                    />
+                  ) : (
+                    row.upazila_name
+                  )}
+                </td>
+                <td className="grid-td p-0">
+                  {isAdmin ? (
+                    <input
+                      className="grid-input"
+                      value={row.union_name}
+                      onChange={(e) => handleTextCellChange(row.id, "union_name", e.target.value)}
+                    />
+                  ) : (
+                    row.union_name
+                  )}
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.ward_no || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "ward_no", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_sk_shw_name || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "village_sk_shw_name", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.sk_user_designation || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "sk_user_designation", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_ss_name || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "village_ss_name", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_name}
+                    onChange={(e) => handleTextCellChange(row.id, "village_name", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_name_bn || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "village_name_bn", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_code || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "village_code", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_latitude ?? ""}
+                    onChange={(e) => handleDecimalCellChange(row.id, "village_latitude", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_longitude ?? ""}
+                    onChange={(e) => handleDecimalCellChange(row.id, "village_longitude", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    type="number"
+                    min={0}
+                    className="grid-input"
+                    value={row.population}
+                    onChange={(e) => handleCellChange(row.id, "population", e.target.value)}
+                  />
+                </td>
 
                 <td className="grid-td p-0">
                   <input
@@ -661,10 +927,36 @@ const LocalRecordsGrid = () => {
                   );
                 })}
 
-                <td className="grid-td">{row.village_mmw_hp_chwc_name || ""}</td>
-                <td className="grid-td">{row.village_distance_from_upazila_office_km ?? ""}</td>
-                <td className="grid-td">{row.village_bordering_country_name || ""}</td>
-                <td className="grid-td">{row.village_other_activities || ""}</td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_mmw_hp_chwc_name || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "village_mmw_hp_chwc_name", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_distance_from_upazila_office_km ?? ""}
+                    onChange={(e) =>
+                      handleDecimalCellChange(row.id, "village_distance_from_upazila_office_km", e.target.value)
+                    }
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_bordering_country_name || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "village_bordering_country_name", e.target.value)}
+                  />
+                </td>
+                <td className="grid-td p-0">
+                  <input
+                    className="grid-input"
+                    value={row.village_other_activities || ""}
+                    onChange={(e) => handleTextCellChange(row.id, "village_other_activities", e.target.value)}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

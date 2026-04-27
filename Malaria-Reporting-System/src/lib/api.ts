@@ -10,6 +10,13 @@ export interface SessionUser {
 export interface AuthProfile {
   full_name: string;
   email: string;
+  micro_role?: string;
+  micro_district?: string | number | null;
+  micro_upazila?: string | number | null;
+  micro_union?: string | number | null;
+  micro_village?: string | number | null;
+  micro_villages?: Array<string | number>;
+  micro_ward_no?: string | null;
 }
 
 export interface SessionData {
@@ -41,6 +48,9 @@ export interface LocalRecord extends MonthlyValues {
   id: string;
   village_id: string;
   sk_user_id: string;
+  district_id: string;
+  upazila_id: string;
+  union_id: string;
   reporting_year: number;
   sk_user_display_name: string;
   sk_user_designation: string;
@@ -152,6 +162,7 @@ export interface LocalRecordUpdate extends MonthlyValues {
   itn_2024: number;
   itn_2025: number;
   itn_2026: number;
+  sk_user_designation?: string;
 }
 
 export interface NonLocalRecordPayload extends MonthlyValues {
@@ -162,6 +173,29 @@ export interface NonLocalRecordPayload extends MonthlyValues {
   upazila_or_township: string;
   union_name: string;
   village_name: string;
+}
+
+export interface VillageUpdatePayload {
+  name: string;
+  name_bn: string;
+  village_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  ward_no: string | null;
+  sk_shw_name: string;
+  ss_name: string;
+  mmw_hp_chwc_name: string;
+  distance_from_upazila_office_km: number | null;
+  bordering_country_name: string;
+  other_activities: string;
+}
+
+export interface MonthAccessSetting {
+  id: string;
+  reporting_year: number;
+  month: number;
+  is_open: boolean;
+  close_date: string | null;
 }
 
 export interface UserPayload {
@@ -200,11 +234,14 @@ export function setAuthToken(token: string | null): void {
   if (token) {
     window.localStorage.setItem(authTokenStorageKey, token);
     window.localStorage.setItem(legacyMalariaTokenKey, token);
+    window.sessionStorage.setItem(mainSessionTokenKey, token);
     return;
   }
 
   window.localStorage.removeItem(authTokenStorageKey);
   window.localStorage.removeItem(legacyMalariaTokenKey);
+  window.sessionStorage.removeItem(mainSessionTokenKey);
+  window.sessionStorage.removeItem(mainSessionUserKey);
 }
 
 function parseLegacyRole(value: unknown, microRole: unknown): AppRole {
@@ -244,6 +281,17 @@ function getLegacySessionFromMainApp(): SessionData | null {
       profile: {
         full_name: fullName,
         email,
+        micro_role: String(userInfo.profile?.micro_role || ""),
+        micro_district: userInfo.profile?.micro_district ?? null,
+        micro_upazila: userInfo.profile?.micro_upazila ?? null,
+        micro_union: userInfo.profile?.micro_union ?? null,
+        micro_village: userInfo.profile?.micro_village ?? null,
+        micro_villages: Array.isArray((userInfo.profile as { micro_villages?: unknown[] } | undefined)?.micro_villages)
+          ? ((userInfo.profile as { micro_villages?: unknown[] }).micro_villages || []).map((item) =>
+              String(item),
+            )
+          : [],
+        micro_ward_no: String(userInfo.profile?.micro_ward_no || ""),
       },
       role: parseLegacyRole(userInfo.role, userInfo.profile?.micro_role),
     };
@@ -313,16 +361,12 @@ export function login(email: string, password: string): Promise<LoginResponse> {
 }
 
 export function logout(): Promise<void> {
-  return request<void>("/auth/logout", { method: "POST" });
+  return request<void>("/malaria/auth/logout/", { method: "POST" });
 }
 
 export function getSession(): Promise<SessionData> {
-  const legacySession = getLegacySessionFromMainApp();
-  if (legacySession && getAuthToken()) {
-    return Promise.resolve(legacySession);
-  }
-
-  return request<SessionData>("/auth/me");
+  // Always prefer malaria API session so scope fields (district/upazila/union/village) stay accurate.
+  return request<SessionData>("/malaria/auth/session/");
 }
 
 export function fetchLocalRecords(year?: number): Promise<LocalRecord[]> {
@@ -335,6 +379,44 @@ export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promi
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export function updateVillage(id: string, payload: VillageUpdatePayload): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/malaria/villages/${id}/`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateDistrict(id: string, payload: { name: string }): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/malaria/districts/${id}/`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateUpazila(
+  id: string,
+  payload: { name: string; district?: string },
+): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/malaria/upazilas/${id}/`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateUnion(
+  id: string,
+  payload: { name: string; upazila?: string },
+): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/malaria/unions/${id}/`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchMonthAccessSettings(year: number): Promise<MonthAccessSetting[]> {
+  return request<MonthAccessSetting[]>(`/malaria/month-access-settings/?reporting_year=${year}`);
 }
 
 export function fetchNonLocalRecords(year?: number): Promise<NonLocalRecord[]> {

@@ -19,6 +19,12 @@ const isMalariaFieldUser = (user) => {
   return role === 8 || role === 9 || microRole === "sk" || microRole === "shw";
 };
 
+const isMalariaAdminUser = (user) => {
+  const role = Number(user?.role || 0);
+  const microRole = getMicroRole(user);
+  return role === 1 || role === 7 || microRole === "micro_admin";
+};
+
 const hasMalariaWorkspaceAccess = (user) => {
   const role = Number(user?.role || 0);
   const microRole = getMicroRole(user);
@@ -89,11 +95,13 @@ const Login = ({ setAuthToken }) => {
         setAuthToken(token);
 
         const nextPath =
-          isMalariaFieldUser(user)
-            ? "/malaria/"
-            : user?.username === BRAC_DOWNLOAD_USERNAME
-              ? "/projects/55/all-rows"
-              : "/dashboard";
+          isMalariaAdminUser(user)
+            ? "/dashboard"
+            : isMalariaFieldUser(user)
+              ? "/malaria/"
+              : user?.username === BRAC_DOWNLOAD_USERNAME
+                ? "/projects/55/all-rows"
+                : "/dashboard";
 
         if (hasMalariaWorkspaceAccess(user)) {
           localStorage.setItem(MALARIA_TOKEN_KEY, token);

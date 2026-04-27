@@ -85,8 +85,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Local auth is stateless; clearing the client token is sufficient.
     }
 
+    // Extra cleanup for cross-app shared keys.
+    window.localStorage.removeItem("authToken");
+    window.localStorage.removeItem("userInfo");
+    window.localStorage.removeItem("malaria_auth_token");
+    window.localStorage.removeItem("malaria_reporting_auth_token");
+    window.sessionStorage.removeItem("authToken");
+    window.sessionStorage.removeItem("userInfo");
+
     setAuthToken(null);
     clearSession();
+    window.location.replace("/login");
   }, [clearSession]);
 
   return (

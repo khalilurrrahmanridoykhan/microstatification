@@ -21,6 +21,7 @@ import { Plus, Trash2, RefreshCw, Save } from "lucide-react";
 import {
   createNonLocalRecord,
   deleteNonLocalRecord,
+  fetchMonthAccessSettings,
   fetchNonLocalRecords,
   updateNonLocalRecord,
   type NonLocalRecord,
@@ -41,6 +42,42 @@ type NonLocalEditableField =
   | MonthColumn;
 
 const COUNTRIES = ["Bangladesh", "India", "Myanmar"];
+
+function getDhakaTodayIso(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dhaka",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function getMonthLastDayIso(year: number, month: number): string {
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
+function computeOpenMonthNumbers(
+  year: number,
+  settings: Array<{ month: number; close_date: string | null }>,
+): Set<number> {
+  const today = getDhakaTodayIso();
+  const closeDateByMonth = new Map<number, string>();
+  settings.forEach((item) => {
+    const closeDate = item.close_date || getMonthLastDayIso(year, item.month);
+    closeDateByMonth.set(item.month, closeDate);
+  });
+
+  const open = new Set<number>();
+  for (let month = 1; month <= 12; month += 1) {
+    const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    const monthClose = closeDateByMonth.get(month) || getMonthLastDayIso(year, month);
+    if (today >= monthStart && today <= monthClose) {
+      open.add(month);
+    }
+  }
+  return open;
+}
 
 function isMonthField(field: NonLocalEditableField): field is MonthColumn {
   return MONTH_COLUMNS.includes(field as MonthColumn);
@@ -83,6 +120,7 @@ const NonLocalRecordsGrid = () => {
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
+  const [openMonthNumbers, setOpenMonthNumbers] = useState<Set<number>>(new Set([currentMonth]));
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
@@ -147,6 +185,28 @@ const NonLocalRecordsGrid = () => {
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (isAdmin) return;
+    let mounted = true;
+    const loadMonthAccess = async () => {
+      try {
+        const settings = await fetchMonthAccessSettings(year);
+        const open = computeOpenMonthNumbers(year, settings);
+        if (mounted) {
+          setOpenMonthNumbers(open);
+        }
+      } catch (_error) {
+        if (mounted) {
+          setOpenMonthNumbers(new Set([currentMonth]));
+        }
+      }
+    };
+    void loadMonthAccess();
+    return () => {
+      mounted = false;
+    };
+  }, [year, isAdmin, currentMonth]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -297,7 +357,7 @@ const NonLocalRecordsGrid = () => {
   const isMonthEditable = (monthIndex: number) => {
     if (isAdmin) return true;
     if (year !== currentYear) return false;
-    return monthIndex + 1 === currentMonth;
+    return openMonthNumbers.has(monthIndex + 1);
   };
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
