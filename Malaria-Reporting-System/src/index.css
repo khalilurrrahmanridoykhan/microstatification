@@ -106,15 +106,21 @@ All colors MUST be HSL.
 
 /* Grid styles for Excel-like tables */
 .grid-th {
-  @apply px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-r last:border-r-0 select-none;
+  width: auto;
+  min-width: 120px !important;
+  max-width: 240px;
+  @apply px-1 py-1 text-left text-[9px] font-semibold uppercase tracking-tight text-muted-foreground border-b border-r last:border-r-0 select-none whitespace-nowrap overflow-hidden text-ellipsis;
 }
 
 .grid-td {
-  @apply px-2 py-1 border-b border-r last:border-r-0 text-xs;
+  width: auto;
+  min-width: 120px !important;
+  max-width: 240px;
+  @apply px-1 py-0.5 border-b border-r last:border-r-0 text-[10px] leading-tight whitespace-nowrap overflow-hidden text-ellipsis;
 }
 
 .grid-input {
-  @apply w-full h-full px-1.5 py-1 text-xs border-0 bg-transparent outline-none focus:ring-1 focus:ring-ring rounded-none;
+  @apply w-full h-full min-w-0 px-1 py-0.5 text-[10px] border-0 bg-transparent outline-none focus:ring-1 focus:ring-ring rounded-none overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .grid-input:disabled {
@@ -129,4 +135,17 @@ All colors MUST be HSL.
 .grid-input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+.month-th {
+  min-width: 24px !important;
+  max-width: 24px !important;
+  @apply p-0 align-bottom text-center;
+}
+
+.month-th-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  @apply inline-block text-[9px] leading-none px-0.5 py-1;
 }

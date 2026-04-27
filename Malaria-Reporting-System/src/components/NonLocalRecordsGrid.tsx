@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -83,6 +83,10 @@ const NonLocalRecordsGrid = () => {
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
+  const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
+  const resizingColumnRef = useRef<number | null>(null);
+  const resizeStartXRef = useRef(0);
+  const resizeStartWidthRef = useRef(0);
 
   // -------- Color Logic (No DB Change) --------
   const getMonthStatus = (value: number, monthIndex: number): CellStatus => {
@@ -110,7 +114,22 @@ const NonLocalRecordsGrid = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const data = await fetchNonLocalRecords(year);
+      let data = await fetchNonLocalRecords(year);
+      let effectiveYear = year;
+
+      if (data.length === 0) {
+        const allRecords = await fetchNonLocalRecords();
+        if (allRecords.length > 0) {
+          const latestYear = Math.max(...allRecords.map((record) => record.reporting_year));
+          data = allRecords.filter((record) => record.reporting_year === latestYear);
+          effectiveYear = latestYear;
+        }
+      }
+
+      if (effectiveYear !== year) {
+        setYear(effectiveYear);
+      }
+
       setRows(isAdmin ? data : data.filter((row) => row.sk_user_id === user.id));
       setDirtyIds(new Set());
       setDeletedIds([]);
@@ -128,6 +147,46 @@ const NonLocalRecordsGrid = () => {
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      const col = resizingColumnRef.current;
+      if (col === null) return;
+      const deltaX = event.clientX - resizeStartXRef.current;
+      const nextWidth = Math.max(10, resizeStartWidthRef.current + deltaX);
+      setColumnWidths((prev) => ({ ...prev, [col]: nextWidth }));
+    };
+
+    const handleMouseUp = () => {
+      resizingColumnRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  const startColumnResize = (index: number, event: React.MouseEvent<HTMLSpanElement>) => {
+    const th = event.currentTarget.parentElement as HTMLElement | null;
+    if (!th) return;
+    resizingColumnRef.current = index;
+    resizeStartXRef.current = event.clientX;
+    resizeStartWidthRef.current = th.getBoundingClientRect().width;
+    event.preventDefault();
+  };
+
+  const renderHeaderCell = (label: React.ReactNode, index: number, className: string) => (
+    <th key={index} className={`${className} relative`}>
+      {label}
+      <span
+        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-primary/20"
+        onMouseDown={(event) => startColumnResize(index, event)}
+      />
+    </th>
+  );
 
   const addRow = () => {
     if (!user) return;
@@ -273,22 +332,33 @@ const NonLocalRecordsGrid = () => {
         </Button>
       </div>
 
-      <div className="border rounded-md overflow-auto max-h-[calc(100vh-220px)] bg-white">
-        <table className="w-full text-xs border-collapse">
+      <div className="border rounded-md overflow-auto max-h-[calc(100vh-220px)] bg-white relative">
+        {loading && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/80 backdrop-blur-[1px]">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span>Loading non-local records...</span>
+            </div>
+          </div>
+        )}
+        <table className="w-full text-[10px] border-collapse table-fixed">
+          <colgroup>
+            {Array.from({ length: 19 }).map((_, index) => (
+              <col key={index} style={columnWidths[index] ? { width: `${columnWidths[index]}px` } : undefined} />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 z-10 bg-gray-50 border-b">
             <tr>
-              <th className="grid-th min-w-[40px]"></th>
-              <th className="grid-th min-w-[100px]">Country</th>
-              <th className="grid-th min-w-[110px]">District/State</th>
-              <th className="grid-th min-w-[110px]">Upazila/Township</th>
-              <th className="grid-th min-w-[90px]">Union</th>
-              <th className="grid-th min-w-[90px]">Village</th>
-              {MONTH_LABELS.map((m) => (
-                <th key={m} className="grid-th min-w-[55px]">
-                  {m}
-                </th>
+              {renderHeaderCell("", 0, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Country", 1, "grid-th min-w-[10px]")}
+              {renderHeaderCell("District/State", 2, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Upazila/Township", 3, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Union", 4, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village", 5, "grid-th min-w-[10px]")}
+              {MONTH_LABELS.map((m, idx) => (
+                renderHeaderCell(<span className="month-th-label">{m}</span>, 6 + idx, "grid-th month-th min-w-[10px]")
               ))}
-              <th className="grid-th min-w-[60px] font-bold">Total</th>
+              {renderHeaderCell("Total", 18, "grid-th min-w-[10px] font-bold")}
             </tr>
           </thead>
 

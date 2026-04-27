@@ -42,15 +42,30 @@ export interface LocalRecord extends MonthlyValues {
   village_id: string;
   sk_user_id: string;
   reporting_year: number;
+  sk_user_display_name: string;
+  sk_user_designation: string;
+  sk_user_ss_name: string;
   hh: number;
   population: number;
   itn_2023: number;
   itn_2024: number;
   itn_2025: number;
+  itn_2026: number;
   district_name: string;
   upazila_name: string;
   union_name: string;
   village_name: string;
+  village_name_bn: string;
+  village_code: string;
+  village_latitude: number | null;
+  village_longitude: number | null;
+  village_population: number | null;
+  village_sk_shw_name: string;
+  village_ss_name: string;
+  village_mmw_hp_chwc_name: string;
+  village_distance_from_upazila_office_km: number | null;
+  village_bordering_country_name: string;
+  village_other_activities: string;
   ward_no: string | null;
 }
 
@@ -136,6 +151,7 @@ export interface LocalRecordUpdate extends MonthlyValues {
   itn_2023: number;
   itn_2024: number;
   itn_2025: number;
+  itn_2026: number;
 }
 
 export interface NonLocalRecordPayload extends MonthlyValues {
@@ -309,37 +325,39 @@ export function getSession(): Promise<SessionData> {
   return request<SessionData>("/auth/me");
 }
 
-export function fetchLocalRecords(year: number): Promise<LocalRecord[]> {
-  return request<LocalRecord[]>(`/local-records?year=${year}`);
+export function fetchLocalRecords(year?: number): Promise<LocalRecord[]> {
+  const query = Number.isFinite(year) ? `?reporting_year=${year}` : "";
+  return request<LocalRecord[]>(`/malaria/local-records/${query}`);
 }
 
 export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>(`/local-records/${id}`, {
+  return request<{ success: boolean }>(`/malaria/local-records/${id}/`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-export function fetchNonLocalRecords(year: number): Promise<NonLocalRecord[]> {
-  return request<NonLocalRecord[]>(`/non-local-records?year=${year}`);
+export function fetchNonLocalRecords(year?: number): Promise<NonLocalRecord[]> {
+  const query = Number.isFinite(year) ? `?reporting_year=${year}` : "";
+  return request<NonLocalRecord[]>(`/malaria/non-local-records/${query}`);
 }
 
 export function createNonLocalRecord(payload: NonLocalRecordPayload): Promise<NonLocalRecord> {
-  return request<NonLocalRecord>("/non-local-records", {
+  return request<NonLocalRecord>("/malaria/non-local-records/", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export function updateNonLocalRecord(id: string, payload: NonLocalRecordPayload): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>(`/non-local-records/${id}`, {
+  return request<{ success: boolean }>(`/malaria/non-local-records/${id}/`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
 export function deleteNonLocalRecord(id: string): Promise<void> {
-  return request<void>(`/non-local-records/${id}`, {
+  return request<void>(`/malaria/non-local-records/${id}/`, {
     method: "DELETE",
   });
 }

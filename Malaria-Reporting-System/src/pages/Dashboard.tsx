@@ -15,7 +15,7 @@ const Dashboard = () => {
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between">
+        <div className="w-full px-4 md:px-6 py-3 flex items-center justify-between">
           <h1 className="text-base md:text-lg font-semibold tracking-tight text-gray-900">
             Malaria Reporting System
           </h1>
@@ -57,7 +57,7 @@ const Dashboard = () => {
 
       {/* Content */}
       <main className="flex-1">
-        <div className="max-w-6xl mx-auto p-4 md:p-6">
+        <div className="w-full p-2 md:p-4">
           <div className="rounded-2xl border bg-white shadow-sm">
             <div className="px-4 md:px-6 py-4 border-b">
               <Tabs defaultValue="local" className="w-full">
