@@ -66,13 +66,13 @@ const Dashboard = () => {
                     value="local"
                     className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
                   >
-                    Local
+                    Indigenous
                   </TabsTrigger>
                   <TabsTrigger
                     value="non-local"
                     className="data-[state=active]:bg-white data-[state=active]:shadow-sm"
                   >
-                    Non-Local
+                    Imported
                   </TabsTrigger>
                 </TabsList>
 

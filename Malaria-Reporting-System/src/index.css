@@ -149,3 +149,15 @@ All colors MUST be HSL.
   transform: rotate(180deg);
   @apply inline-block text-[9px] leading-none px-0.5 py-1;
 }
+
+.month-th-horizontal {
+  min-width: auto !important;
+  max-width: none !important;
+}
+
+.month-th-label-horizontal {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  transform: none;
+  @apply px-1 py-1;
+}

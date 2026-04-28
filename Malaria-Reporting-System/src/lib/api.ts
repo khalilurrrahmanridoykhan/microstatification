@@ -196,6 +196,18 @@ export interface LocalRecordUpdate extends MonthlyValues {
   sk_user_designation?: string;
 }
 
+export interface LocalRecordCreatePayload extends MonthlyValues {
+  village: string | number;
+  sk_user?: string;
+  reporting_year: number;
+  hh: number;
+  population: number;
+  itn_2023: number;
+  itn_2024: number;
+  itn_2025: number;
+  itn_2026: number;
+}
+
 export interface NonLocalRecordPayload extends MonthlyValues {
   sk_user_id?: string;
   reporting_year: number;
@@ -400,8 +412,13 @@ export function getSession(): Promise<SessionData> {
   return request<SessionData>("/malaria/auth/session/");
 }
 
-export function fetchLocalRecords(year?: number): Promise<LocalRecord[]> {
-  const query = Number.isFinite(year) ? `?reporting_year=${year}` : "";
+export function fetchLocalRecords(year?: number | "latest"): Promise<LocalRecord[]> {
+  const query =
+    year === "latest"
+      ? "?reporting_year=latest"
+      : Number.isFinite(year)
+      ? `?reporting_year=${year}`
+      : "";
   return request<LocalRecord[]>(`/malaria/local-records/${query}`);
 }
 
@@ -412,6 +429,12 @@ export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promi
   });
 }
 
+export function deleteLocalRecord(id: string): Promise<void> {
+  return request<void>(`/malaria/local-records/${id}/`, {
+    method: "DELETE",
+  });
+}
+
 export function updateVillage(id: string, payload: VillageUpdatePayload): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/malaria/villages/${id}/`, {
     method: "PUT",
@@ -419,9 +442,23 @@ export function updateVillage(id: string, payload: VillageUpdatePayload): Promis
   });
 }
 
+export function createVillage(payload: VillageUpdatePayload & { union: string | number }): Promise<{ id: string }> {
+  return request<{ id: string }>("/malaria/villages/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function updateDistrict(id: string, payload: { name: string }): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/malaria/districts/${id}/`, {
     method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createDistrict(payload: { name: string }): Promise<{ id: string }> {
+  return request<{ id: string }>("/malaria/districts/", {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 }
@@ -436,6 +473,13 @@ export function updateUpazila(
   });
 }
 
+export function createUpazila(payload: { name: string; district: string | number }): Promise<{ id: string }> {
+  return request<{ id: string }>("/malaria/upazilas/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function updateUnion(
   id: string,
   payload: { name: string; upazila?: string },
@@ -446,12 +490,24 @@ export function updateUnion(
   });
 }
 
+export function createUnion(payload: { name: string; upazila: string | number }): Promise<{ id: string }> {
+  return request<{ id: string }>("/malaria/unions/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchMonthAccessSettings(year: number): Promise<MonthAccessSetting[]> {
   return request<MonthAccessSetting[]>(`/malaria/month-access-settings/?reporting_year=${year}`);
 }
 
-export function fetchNonLocalRecords(year?: number): Promise<NonLocalRecord[]> {
-  const query = Number.isFinite(year) ? `?reporting_year=${year}` : "";
+export function fetchNonLocalRecords(year?: number | "latest"): Promise<NonLocalRecord[]> {
+  const query =
+    year === "latest"
+      ? "?reporting_year=latest"
+      : Number.isFinite(year)
+      ? `?reporting_year=${year}`
+      : "";
   return request<NonLocalRecord[]>(`/malaria/non-local-records/${query}`);
 }
 
@@ -465,6 +521,13 @@ export function createNonLocalRecord(payload: NonLocalRecordPayload): Promise<No
 export function updateNonLocalRecord(id: string, payload: NonLocalRecordPayload): Promise<{ success: boolean }> {
   return request<{ success: boolean }>(`/malaria/non-local-records/${id}/`, {
     method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createLocalRecord(payload: LocalRecordCreatePayload): Promise<LocalRecord> {
+  return request<LocalRecord>("/malaria/local-records/", {
+    method: "POST",
     body: JSON.stringify(payload),
   });
 }
@@ -510,6 +573,7 @@ export function fetchMonthlyApprovals(params: {
   if (params.status) {
     query.set("status", params.status);
   }
+  query.set("_fields", "record_id,month,status");
   return request<ApprovalRow[]>(`/malaria/monthly-approvals/?${query.toString()}`);
 }
 
@@ -545,8 +609,13 @@ export function fetchAssignments(): Promise<Assignment[]> {
   return request<Assignment[]>("/admin/assignments");
 }
 
-export function fetchMalariaMasterData(): Promise<MalariaMasterData> {
-  return request<MalariaMasterData>("/malaria/master-data/");
+export function fetchMalariaMasterData(options?: { includeVillages?: boolean }): Promise<MalariaMasterData> {
+  const includeVillages = options?.includeVillages ?? true;
+  return request<MalariaMasterData>(`/malaria/master-data/?include_villages=${includeVillages ? "1" : "0"}`);
+}
+
+export function fetchVillagesByUnion(unionId: string | number): Promise<MasterVillage[]> {
+  return request<MasterVillage[]>(`/malaria/villages/?union_id=${unionId}&_fields=id,name,ward_no,union_id&limit=200`);
 }
 
 export function assignVillage(skUserId: string, villageId: string): Promise<{ success: boolean; message: string }> {

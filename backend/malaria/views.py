@@ -1834,19 +1834,29 @@ class MalariaMasterDataView(APIView):
     permission_classes = [IsAuthenticated, HasMalariaAccess]
 
     def get(self, request):
+        include_villages = str(request.query_params.get("include_villages", "1")).strip().lower() not in {"0", "false", "no"}
         payload = {
             "districts": DistrictSerializer(District.objects.all(), many=True).data,
             "upazilas": UpazilaSerializer(Upazila.objects.select_related("district").all(), many=True).data,
             "unions": UnionSerializer(Union.objects.select_related("upazila", "upazila__district").all(), many=True).data,
-            "villages": VillageSerializer(Village.objects.select_related("union", "union__upazila", "union__upazila__district").all(), many=True).data,
+            "villages": (
+                VillageSerializer(
+                    Village.objects.select_related("union", "union__upazila", "union__upazila__district").all(),
+                    many=True,
+                ).data
+                if include_villages
+                else []
+            ),
         }
         return Response(payload)
 
 
 class MalariaAdminWriteMixin:
     def get_permissions(self):
-        if self.action in {"create", "update", "partial_update", "destroy"}:
+        if self.action in {"update", "partial_update", "destroy"}:
             return [IsAuthenticated(), IsMalariaAdmin()]
+        if self.action == "create":
+            return [IsAuthenticated(), HasMalariaAccess()]
         return [IsAuthenticated(), HasMalariaAccess()]
 
 
@@ -1994,10 +2004,18 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             else:
                 queryset = queryset.filter(sk_user=self.request.user)
 
+        reporting_year_value = (self.request.query_params.get("reporting_year") or "").strip().lower()
+        exact_fields = ["id", "reporting_year", "sk_user_id", "village_id"]
+        if reporting_year_value == "latest":
+            latest_year = queryset.aggregate(max_year=Max("reporting_year")).get("max_year")
+            if latest_year is not None:
+                queryset = queryset.filter(reporting_year=latest_year)
+            exact_fields = ["id", "sk_user_id", "village_id"]
+
         queryset = _apply_filters(
             queryset,
             self.request,
-            exact_fields=["id", "reporting_year", "sk_user_id", "village_id"],
+            exact_fields=exact_fields,
             in_fields=["id", "sk_user_id"],
         )
 
@@ -2042,6 +2060,22 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             reporting_year=reporting_year,
             defaults=defaults,
         )
+        if not is_malaria_admin(request.user):
+            submitted_month_fields = [
+                field
+                for field in MONTH_COLUMNS
+                if validated.get(field, 0)
+            ]
+            month_fields_for_approval = (
+                submitted_month_fields
+                if submitted_month_fields
+                else sorted(_get_open_month_fields(reporting_year))
+            )
+            _sync_monthly_approvals_for_user_submission(
+                MonthlyApproval.RECORD_TYPE_LOCAL,
+                record,
+                month_fields_for_approval,
+            )
         out = self.get_serializer(record)
         return Response(out.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
@@ -2099,12 +2133,20 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         queryset = NonLocalRecord.objects.select_related("sk_user").all()
         if not is_malaria_admin(self.request.user):
             queryset = queryset.filter(sk_user=self.request.user)
-        return _apply_filters(
+        reporting_year_value = (self.request.query_params.get("reporting_year") or "").strip().lower()
+        exact_fields = ["id", "reporting_year", "sk_user_id", "country", "district_or_state"]
+        if reporting_year_value == "latest":
+            latest_year = queryset.aggregate(max_year=Max("reporting_year")).get("max_year")
+            if latest_year is not None:
+                queryset = queryset.filter(reporting_year=latest_year)
+            exact_fields = ["id", "sk_user_id", "country", "district_or_state"]
+        queryset = _apply_filters(
             queryset,
             self.request,
-            exact_fields=["id", "reporting_year", "sk_user_id", "country", "district_or_state"],
+            exact_fields=exact_fields,
             in_fields=["id", "sk_user_id"],
         )
+        return queryset
 
     def create(self, request, *args, **kwargs):
         payload = request.data.copy()
@@ -2240,7 +2282,7 @@ class MonthlyApprovalViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         return [IsAuthenticated(), IsMalariaAdmin()]
 
     def get_queryset(self):
-        queryset = MonthlyApproval.objects.select_related("approved_by", "local_record", "non_local_record").all()
+        queryset = MonthlyApproval.objects.all()
         if not is_malaria_admin(self.request.user):
             profile = getattr(self.request.user, "profile", None)
             local_scope_q = _profile_local_approval_scope_q(profile)

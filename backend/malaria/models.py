@@ -135,6 +135,10 @@ class LocalRecord(TimestampedModel, MonthlyCasesMixin):
 
     class Meta:
         ordering = ("-reporting_year", "village__name")
+        indexes = [
+            models.Index(fields=["reporting_year"], name="malaria_local_year_idx"),
+            models.Index(fields=["sk_user", "reporting_year"], name="malaria_local_user_year_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=("village", "reporting_year"), name="malaria_unique_local_record_per_village_year"),
         ]
@@ -154,6 +158,10 @@ class NonLocalRecord(TimestampedModel, MonthlyCasesMixin):
 
     class Meta:
         ordering = ("-reporting_year", "-updated_at")
+        indexes = [
+            models.Index(fields=["reporting_year"], name="malaria_nonlocal_year_idx"),
+            models.Index(fields=["sk_user", "reporting_year"], name="malaria_nonlocal_user_year_idx"),
+        ]
 
     def __str__(self):
         return f"{self.country} - {self.village_name or self.district_or_state} - {self.reporting_year}"
@@ -223,6 +231,10 @@ class MonthlyApproval(TimestampedModel):
 
     class Meta:
         ordering = ("reporting_year", "month")
+        indexes = [
+            models.Index(fields=["reporting_year"], name="malaria_approval_year_idx"),
+            models.Index(fields=["reporting_year", "status", "month"], name="mal_appr_year_stat_mon_idx"),
+        ]
         constraints = [
             models.CheckConstraint(
                 check=(

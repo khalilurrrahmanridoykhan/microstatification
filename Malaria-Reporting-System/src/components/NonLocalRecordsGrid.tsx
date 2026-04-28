@@ -17,11 +17,12 @@ import {
   getDhakaYear,
   getMonthTotal,
 } from "@/lib/monthUtils";
-import { Plus, Trash2, RefreshCw, Save } from "lucide-react";
+import { Maximize2, Minimize2, Plus, Trash2, RefreshCw, Save } from "lucide-react";
 import {
   createNonLocalRecord,
   deleteNonLocalRecord,
   fetchMalariaMasterData,
+  fetchVillagesByUnion,
   fetchMonthlyApprovals,
   fetchMonthAccessSettings,
   fetchNonLocalRecords,
@@ -48,6 +49,17 @@ type NonLocalEditableField =
 
 const COUNTRIES = ["Bangladesh", "India", "Myanmar"];
 const OTHER_OPTION = "__other__";
+const NON_LOCAL_HEADER_LABELS = [
+  "",
+  "Country",
+  "District/State",
+  "Upazila/Township",
+  "Union",
+  "Ward No",
+  "Village",
+  ...MONTH_LABELS,
+  "Total",
+];
 
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -128,6 +140,8 @@ const NonLocalRecordsGrid = () => {
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [openMonthNumbers, setOpenMonthNumbers] = useState<Set<number>>(new Set([currentMonth]));
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
+  const [isExpandedToHeaderWidth, setIsExpandedToHeaderWidth] = useState(false);
+  const previousColumnWidthsRef = useRef<Record<number, number> | null>(null);
   const [approvalRows, setApprovalRows] = useState<ApprovalRow[]>([]);
   const [recordView, setRecordView] = useState<"all" | "pending">("all");
   const [masterData, setMasterData] = useState<MalariaMasterData>({
@@ -210,11 +224,10 @@ const NonLocalRecordsGrid = () => {
       let effectiveYear = year;
 
       if (data.length === 0) {
-        const allRecords = await fetchNonLocalRecords();
-        if (allRecords.length > 0) {
-          const latestYear = Math.max(...allRecords.map((record) => record.reporting_year));
-          data = allRecords.filter((record) => record.reporting_year === latestYear);
-          effectiveYear = latestYear;
+        const latestRecords = await fetchNonLocalRecords("latest");
+        if (latestRecords.length > 0) {
+          data = latestRecords;
+          effectiveYear = latestRecords[0].reporting_year;
         }
       }
 
@@ -250,7 +263,7 @@ const NonLocalRecordsGrid = () => {
     let mounted = true;
     const loadMasterData = async () => {
       try {
-        const data = await fetchMalariaMasterData();
+        const data = await fetchMalariaMasterData({ includeVillages: false });
         if (mounted) setMasterData(data);
       } catch (_error) {
         if (mounted) {
@@ -319,6 +332,29 @@ const NonLocalRecordsGrid = () => {
     resizeStartXRef.current = event.clientX;
     resizeStartWidthRef.current = th.getBoundingClientRect().width;
     event.preventDefault();
+  };
+
+  const estimateHeaderWidth = (label: string) => {
+    if (!label) {
+      return 36;
+    }
+    return Math.min(320, Math.max(80, label.length * 7 + 24));
+  };
+
+  const toggleExpandToHeaderWidth = () => {
+    if (!isExpandedToHeaderWidth) {
+      previousColumnWidthsRef.current = { ...columnWidths };
+      const expandedWidths: Record<number, number> = {};
+      NON_LOCAL_HEADER_LABELS.forEach((label, index) => {
+        expandedWidths[index] = estimateHeaderWidth(label);
+      });
+      setColumnWidths(expandedWidths);
+      setIsExpandedToHeaderWidth(true);
+      return;
+    }
+
+    setColumnWidths(previousColumnWidthsRef.current || {});
+    setIsExpandedToHeaderWidth(false);
   };
 
   const renderHeaderCell = (label: React.ReactNode, index: number, className: string) => (
@@ -463,6 +499,21 @@ const NonLocalRecordsGrid = () => {
       .sort((a, b) => a.localeCompare(b));
   };
 
+  const ensureVillagesForUnion = async (unionName: string) => {
+    const union = masterData.unions.find((item) => item.name === unionName);
+    if (!union) return;
+    const alreadyLoaded = masterData.villages.some((item) => item.union_id === union.id);
+    if (alreadyLoaded) return;
+    const villages = await fetchVillagesByUnion(union.id);
+    setMasterData((prev) => ({
+      ...prev,
+      villages: [
+        ...prev.villages,
+        ...villages.filter((item) => !prev.villages.some((existing) => existing.id === item.id)),
+      ],
+    }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -543,6 +594,9 @@ const NonLocalRecordsGrid = () => {
         <Button variant="outline" size="sm" onClick={addRow}>
           <Plus className="h-4 w-4 mr-1" /> Add Row
         </Button>
+        <Button variant="outline" size="icon" onClick={toggleExpandToHeaderWidth} title="Toggle full-width columns">
+          {isExpandedToHeaderWidth ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
         {isAdmin && (
           <Select value={recordView} onValueChange={(value) => setRecordView(value as "all" | "pending")}>
             <SelectTrigger className="w-[180px]">
@@ -599,7 +653,13 @@ const NonLocalRecordsGrid = () => {
               {renderHeaderCell("Ward No", 5, "grid-th min-w-[10px]")}
               {renderHeaderCell("Village", 6, "grid-th min-w-[10px]")}
               {MONTH_LABELS.map((m, idx) => (
-                renderHeaderCell(<span className="month-th-label">{m}</span>, 7 + idx, "grid-th month-th min-w-[10px]")
+                renderHeaderCell(
+                  <span className={`month-th-label${isExpandedToHeaderWidth ? " month-th-label-horizontal" : ""}`}>
+                    {m}
+                  </span>,
+                  7 + idx,
+                  `grid-th min-w-[10px]${isExpandedToHeaderWidth ? " month-th-horizontal" : " month-th"}`,
+                )
               ))}
               {renderHeaderCell("Total", 19, "grid-th min-w-[10px] font-bold")}
             </tr>
@@ -745,6 +805,7 @@ const NonLocalRecordsGrid = () => {
                         handleCellChange(row.id, "union_name", e.target.value);
                         handleCellChange(row.id, "village_name", "");
                         setWardByRow((prev) => ({ ...prev, [row.id]: "" }));
+                        void ensureVillagesForUnion(e.target.value);
                       }}
                     >
                       <option value="">Select Union</option>
@@ -863,7 +924,7 @@ const NonLocalRecordsGrid = () => {
                           className={`grid-input bg-transparent ${
                             editable ? "" : "text-muted-foreground"
                           }`}
-                          value={value}
+                          value={value === 0 ? "" : value}
                           onChange={(e) => handleCellChange(row.id, col, e.target.value)}
                           disabled={!editable}
                         />

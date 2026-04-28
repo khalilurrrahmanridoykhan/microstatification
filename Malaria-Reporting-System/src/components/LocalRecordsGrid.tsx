@@ -3,6 +3,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -17,9 +27,17 @@ import {
   getDhakaYear,
   getMonthTotal,
 } from "@/lib/monthUtils";
-import { RefreshCw, Save } from "lucide-react";
+import { Maximize2, Minimize2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
+  createDistrict,
+  createLocalRecord,
+  createUnion,
+  createUpazila,
+  createVillage,
+  fetchVillagesByUnion,
+  deleteLocalRecord,
+  fetchMalariaMasterData,
   fetchMonthlyApprovals,
   fetchLocalRecords,
   fetchMonthAccessSettings,
@@ -29,7 +47,9 @@ import {
   updateUnion,
   updateUpazila,
   updateVillage,
+  type MalariaMasterData,
   type LocalRecord,
+  type LocalRecordCreatePayload,
   type LocalRecordUpdate,
   type ApprovalRow,
   type VillageUpdatePayload,
@@ -37,8 +57,37 @@ import {
 
 type CellStatus = "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
 type LocalEditableField = keyof LocalRecordUpdate;
+type LocalGridRow = LocalRecord & { _isNew?: boolean };
 
 const itnColumns = ["itn_2026", "itn_2025", "itn_2024"] as const;
+const OTHER_OPTION = "__other__";
+const LOCAL_HEADER_LABELS = [
+  "SL",
+  "Country",
+  "Division",
+  "District",
+  "Upazila",
+  "Union",
+  "Ward No",
+  "Name of SK/SHW",
+  "Desig.",
+  "Name of SS",
+  "Village Name (English)",
+  "Village Name (Bangla)",
+  "Village Code",
+  "Latitude",
+  "Longitute",
+  "Population",
+  "HH Number",
+  "2026 (Active LLINs)",
+  "2025 (Active LLINs)",
+  "2024 (Active LLINs)",
+  ...MONTH_LABELS,
+  "Name of MMW, Health post & CHW(C)",
+  "Village Distance from upazila office (KM)",
+  "Name of Border with others country",
+  "Others Activities (TDA/Dev care)",
+];
 
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -125,7 +174,7 @@ const LocalRecordsGrid = () => {
   const currentYear = getDhakaYear();
 
   const [year, setYear] = useState(currentYear);
-  const [rows, setRows] = useState<LocalRecord[]>([]);
+  const [rows, setRows] = useState<LocalGridRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
@@ -138,8 +187,20 @@ const LocalRecordsGrid = () => {
   const [pageSize, setPageSize] = useState(100);
   const [openMonthNumbers, setOpenMonthNumbers] = useState<Set<number>>(new Set([currentMonth]));
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
+  const [isExpandedToHeaderWidth, setIsExpandedToHeaderWidth] = useState(false);
+  const previousColumnWidthsRef = useRef<Record<number, number> | null>(null);
   const [approvalRows, setApprovalRows] = useState<ApprovalRow[]>([]);
   const [recordView, setRecordView] = useState<"all" | "pending">("all");
+  const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
+  const [masterData, setMasterData] = useState<MalariaMasterData>({
+    districts: [],
+    upazilas: [],
+    unions: [],
+    villages: [],
+  });
+  const [otherModeByRow, setOtherModeByRow] = useState<
+    Record<string, Partial<Record<"district" | "upazila" | "union" | "ward", boolean>>>
+  >({});
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
@@ -214,11 +275,10 @@ const LocalRecordsGrid = () => {
       let effectiveYear = year;
 
       if (data.length === 0) {
-        const allRecords = await fetchLocalRecords();
-        if (allRecords.length > 0) {
-          const latestYear = Math.max(...allRecords.map((record) => record.reporting_year));
-          data = allRecords.filter((record) => record.reporting_year === latestYear);
-          effectiveYear = latestYear;
+        const latestRecords = await fetchLocalRecords("latest");
+        if (latestRecords.length > 0) {
+          data = latestRecords;
+          effectiveYear = latestRecords[0].reporting_year;
         }
       }
 
@@ -251,6 +311,31 @@ const LocalRecordsGrid = () => {
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadMasterData = async () => {
+      try {
+        const data = await fetchMalariaMasterData({ includeVillages: false });
+        if (mounted) {
+          setMasterData(data);
+        }
+      } catch (_error) {
+        if (mounted) {
+          setMasterData({
+            districts: [],
+            upazilas: [],
+            unions: [],
+            villages: [],
+          });
+        }
+      }
+    };
+    void loadMasterData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isAdmin) return;
@@ -330,7 +415,14 @@ const LocalRecordsGrid = () => {
   }, [rows, isAdmin, user, profile]);
 
   const districtOptions = useMemo(
-    () => Array.from(new Set(scopeFilteredRows.map((row) => row.district_name))).sort((a, b) => a.localeCompare(b)),
+    () =>
+      Array.from(
+        new Set(
+          scopeFilteredRows
+            .map((row) => row.district_name)
+            .filter((value) => String(value || "").trim() !== ""),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
     [scopeFilteredRows],
   );
 
@@ -339,7 +431,9 @@ const LocalRecordsGrid = () => {
       selectedDistrict === "all"
         ? scopeFilteredRows
         : scopeFilteredRows.filter((row) => row.district_name === selectedDistrict);
-    return Array.from(new Set(scoped.map((row) => row.upazila_name))).sort((a, b) => a.localeCompare(b));
+    return Array.from(
+      new Set(scoped.map((row) => row.upazila_name).filter((value) => String(value || "").trim() !== "")),
+    ).sort((a, b) => a.localeCompare(b));
   }, [scopeFilteredRows, selectedDistrict]);
 
   const unionOptions = useMemo(() => {
@@ -348,7 +442,9 @@ const LocalRecordsGrid = () => {
       if (selectedUpazila !== "all" && row.upazila_name !== selectedUpazila) return false;
       return true;
     });
-    return Array.from(new Set(scoped.map((row) => row.union_name))).sort((a, b) => a.localeCompare(b));
+    return Array.from(
+      new Set(scoped.map((row) => row.union_name).filter((value) => String(value || "").trim() !== "")),
+    ).sort((a, b) => a.localeCompare(b));
   }, [scopeFilteredRows, selectedDistrict, selectedUpazila]);
 
   const wardOptions = useMemo(() => {
@@ -371,7 +467,9 @@ const LocalRecordsGrid = () => {
       if (selectedWard !== "all" && (row.ward_no || "") !== selectedWard) return false;
       return true;
     });
-    return Array.from(new Set(scoped.map((row) => row.village_name))).sort((a, b) => a.localeCompare(b));
+    return Array.from(
+      new Set(scoped.map((row) => row.village_name).filter((value) => String(value || "").trim() !== "")),
+    ).sort((a, b) => a.localeCompare(b));
   }, [scopeFilteredRows, selectedDistrict, selectedUpazila, selectedUnion, selectedWard]);
 
   const pendingRecordIds = useMemo(() => {
@@ -455,6 +553,26 @@ const LocalRecordsGrid = () => {
     event.preventDefault();
   };
 
+  const estimateHeaderWidth = (label: string) => {
+    return Math.min(360, Math.max(80, label.length * 7 + 24));
+  };
+
+  const toggleExpandToHeaderWidth = () => {
+    if (!isExpandedToHeaderWidth) {
+      previousColumnWidthsRef.current = { ...columnWidths };
+      const expandedWidths: Record<number, number> = {};
+      LOCAL_HEADER_LABELS.forEach((label, index) => {
+        expandedWidths[index] = estimateHeaderWidth(label);
+      });
+      setColumnWidths(expandedWidths);
+      setIsExpandedToHeaderWidth(true);
+      return;
+    }
+
+    setColumnWidths(previousColumnWidthsRef.current || {});
+    setIsExpandedToHeaderWidth(false);
+  };
+
   const renderHeaderCell = (label: React.ReactNode, index: number, className: string) => (
     <th key={index} className={`${className} relative`}>
       {label}
@@ -485,6 +603,214 @@ const LocalRecordsGrid = () => {
     });
   };
 
+  const setOtherMode = (
+    rowId: string,
+    field: "district" | "upazila" | "union" | "ward",
+    enabled: boolean,
+  ) => {
+    setOtherModeByRow((prev) => ({
+      ...prev,
+      [rowId]: {
+        ...(prev[rowId] || {}),
+        [field]: enabled,
+      },
+    }));
+  };
+
+  const getUpazilaOptionsForRow = (row: LocalGridRow) => {
+    const district = masterData.districts.find((d) => d.name === row.district_name);
+    if (!district) return [];
+    return masterData.upazilas
+      .filter((u) => u.district_id === district.id)
+      .map((u) => u.name)
+      .sort((a, b) => a.localeCompare(b));
+  };
+
+  const getUnionOptionsForRow = (row: LocalGridRow) => {
+    const upazila = masterData.upazilas.find((u) => u.name === row.upazila_name);
+    if (!upazila) return [];
+    return masterData.unions
+      .filter((u) => u.upazila_id === upazila.id)
+      .map((u) => u.name)
+      .sort((a, b) => a.localeCompare(b));
+  };
+
+  const getWardOptionsForRow = (row: LocalGridRow) => {
+    const union = masterData.unions.find((u) => u.name === row.union_name);
+    if (!union) return [];
+    return Array.from(
+      new Set(
+        masterData.villages
+          .filter((v) => v.union_id === union.id && v.ward_no)
+          .map((v) => String(v.ward_no)),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  };
+
+  const ensureVillagesForUnion = async (unionName: string) => {
+    const union = masterData.unions.find((u) => u.name === unionName);
+    if (!union) return;
+    const alreadyLoaded = masterData.villages.some((v) => v.union_id === union.id);
+    if (alreadyLoaded) return;
+    const villages = await fetchVillagesByUnion(union.id);
+    setMasterData((prev) => ({
+      ...prev,
+      villages: [
+        ...prev.villages,
+        ...villages.filter((item) => !prev.villages.some((existing) => existing.id === item.id)),
+      ],
+    }));
+  };
+
+  const addRow = () => {
+    if (!user) return;
+    const newRow: LocalGridRow = {
+      id: `new-${crypto.randomUUID()}`,
+      village_id: "",
+      sk_user_id: user.id,
+      district_id: "",
+      upazila_id: "",
+      union_id: "",
+      reporting_year: year,
+      sk_user_display_name: "",
+      sk_user_designation: "",
+      sk_user_ss_name: "",
+      district_name: "",
+      upazila_name: "",
+      union_name: "",
+      village_name: "",
+      village_name_bn: "",
+      village_code: "",
+      village_latitude: null,
+      village_longitude: null,
+      village_population: null,
+      village_sk_shw_name: "",
+      village_ss_name: "",
+      village_mmw_hp_chwc_name: "",
+      village_distance_from_upazila_office_km: null,
+      village_bordering_country_name: "",
+      village_other_activities: "",
+      ward_no: "",
+      hh: 0,
+      population: 0,
+      itn_2023: 0,
+      itn_2024: 0,
+      itn_2025: 0,
+      itn_2026: 0,
+      jan_cases: 0,
+      feb_cases: 0,
+      mar_cases: 0,
+      apr_cases: 0,
+      may_cases: 0,
+      jun_cases: 0,
+      jul_cases: 0,
+      aug_cases: 0,
+      sep_cases: 0,
+      oct_cases: 0,
+      nov_cases: 0,
+      dec_cases: 0,
+      _isNew: true,
+    };
+    setRows((prev) => [newRow, ...prev]);
+    setDirtyIds((prev) => new Set(prev).add(newRow.id));
+    // Ensure the newly added draft row is immediately visible at the top.
+    setPage(1);
+    setSelectedDistrict("all");
+    setSelectedUpazila("all");
+    setSelectedUnion("all");
+    setSelectedWard("all");
+    setSelectedVillage("all");
+    setRecordView("all");
+  };
+
+  const buildCreatePayload = (row: LocalGridRow, villageId: string): LocalRecordCreatePayload => ({
+    village: villageId,
+    reporting_year: row.reporting_year || year,
+    hh: row.hh || 0,
+    population: row.population || 0,
+    itn_2023: row.itn_2023 || 0,
+    itn_2024: row.itn_2024 || 0,
+    itn_2025: row.itn_2025 || 0,
+    itn_2026: row.itn_2026 || 0,
+    jan_cases: row.jan_cases || 0,
+    feb_cases: row.feb_cases || 0,
+    mar_cases: row.mar_cases || 0,
+    apr_cases: row.apr_cases || 0,
+    may_cases: row.may_cases || 0,
+    jun_cases: row.jun_cases || 0,
+    jul_cases: row.jul_cases || 0,
+    aug_cases: row.aug_cases || 0,
+    sep_cases: row.sep_cases || 0,
+    oct_cases: row.oct_cases || 0,
+    nov_cases: row.nov_cases || 0,
+    dec_cases: row.dec_cases || 0,
+  });
+
+  const resolveVillageIdForNewRow = async (row: LocalGridRow): Promise<string> => {
+    const districtName = String(row.district_name || "").trim();
+    const upazilaName = String(row.upazila_name || "").trim();
+    const unionName = String(row.union_name || "").trim();
+    const wardNo = String(row.ward_no || "").trim();
+    const villageName = String(row.village_name || "").trim();
+    if (!districtName || !upazilaName || !unionName || !villageName) {
+      throw new Error("District, Upazila, Union and Village are required for a new Local row.");
+    }
+
+    const findByName = <T extends { id: number; name: string }>(items: T[], name: string) =>
+      items.find((item) => item.name.trim().toLowerCase() === name.trim().toLowerCase());
+
+    let districtId = findByName(masterData.districts, districtName)?.id;
+    if (!districtId) {
+      const created = await createDistrict({ name: districtName });
+      districtId = Number(created.id);
+    }
+
+    let upazilaId = masterData.upazilas.find(
+      (item) => item.district_id === districtId && item.name.trim().toLowerCase() === upazilaName.toLowerCase(),
+    )?.id;
+    if (!upazilaId) {
+      const created = await createUpazila({ name: upazilaName, district: districtId });
+      upazilaId = Number(created.id);
+    }
+
+    let unionId = masterData.unions.find(
+      (item) => item.upazila_id === upazilaId && item.name.trim().toLowerCase() === unionName.toLowerCase(),
+    )?.id;
+    if (!unionId) {
+      const created = await createUnion({ name: unionName, upazila: upazilaId });
+      unionId = Number(created.id);
+    }
+
+    const existingVillage = masterData.villages.find(
+      (item) =>
+        item.union_id === unionId &&
+        item.name.trim().toLowerCase() === villageName.toLowerCase() &&
+        String(item.ward_no || "").trim() === wardNo,
+    );
+    if (existingVillage) {
+      return String(existingVillage.id);
+    }
+
+    const sanitized = villageName.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "VLG";
+    const villageCode = `${sanitized.slice(0, 6)}${Date.now().toString().slice(-6)}`;
+    const createdVillage = await createVillage({
+      union: unionId,
+      name: villageName,
+      name_bn: row.village_name_bn || "",
+      village_code: villageCode,
+      latitude: row.village_latitude,
+      longitude: row.village_longitude,
+      ward_no: wardNo || null,
+      sk_shw_name: row.village_sk_shw_name || "",
+      ss_name: row.village_ss_name || "",
+      mmw_hp_chwc_name: row.village_mmw_hp_chwc_name || "",
+      distance_from_upazila_office_km: row.village_distance_from_upazila_office_km,
+      bordering_country_name: row.village_bordering_country_name || "",
+      other_activities: row.village_other_activities || "",
+    });
+    return String(createdVillage.id);
+  };
+
   const handleDecimalCellChange = (rowId: string, field: keyof LocalRecord, value: string) => {
     const normalized = value.trim();
     if (normalized === "") {
@@ -508,6 +834,11 @@ const LocalRecordsGrid = () => {
       const dirty = rows.filter((r) => dirtyIds.has(r.id));
 
       for (const r of dirty) {
+        if (r._isNew) {
+          const villageId = await resolveVillageIdForNewRow(r);
+          await createLocalRecord(buildCreatePayload(r, villageId));
+          continue;
+        }
         if (isAdmin) {
           await updateDistrict(r.district_id, { name: r.district_name });
           await updateUpazila(r.upazila_id, { name: r.upazila_name });
@@ -519,6 +850,9 @@ const LocalRecordsGrid = () => {
         }
       }
 
+      const refreshedMaster = await fetchMalariaMasterData({ includeVillages: false });
+      setMasterData(refreshedMaster);
+      await fetchData();
       setDirtyIds(new Set());
       toast({ title: "Saved successfully" });
     } catch (error) {
@@ -530,6 +864,41 @@ const LocalRecordsGrid = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDeleteRow = async (rowId: string) => {
+    if (!isAdmin) return;
+    const row = rows.find((item) => item.id === rowId);
+    if (!row) return;
+
+    try {
+      if (!row._isNew) {
+        await deleteLocalRecord(row.id);
+      }
+      setRows((prev) => prev.filter((item) => item.id !== rowId));
+      setDirtyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(rowId);
+        return next;
+      });
+      setOtherModeByRow((prev) => {
+        const next = { ...prev };
+        delete next[rowId];
+        return next;
+      });
+      toast({ title: "Row deleted" });
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: error instanceof Error ? error.message : "Failed to delete row.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const requestDeleteRow = (rowId: string) => {
+    if (!isAdmin) return;
+    setPendingDeleteRowId(rowId);
   };
 
   const isMonthEditable = (monthIndex: number) => {
@@ -610,6 +979,10 @@ const LocalRecordsGrid = () => {
 
         <Button size="sm" onClick={handleSave} disabled={saving || dirtyIds.size === 0}>
           <Save className="h-4 w-4 mr-1" /> Save {dirtyIds.size > 0 && `(${dirtyIds.size})`}
+        </Button>
+
+        <Button variant="outline" size="sm" onClick={addRow}>
+          <Plus className="h-4 w-4 mr-1" /> Add Row
         </Button>
 
         <Select
@@ -731,6 +1104,10 @@ const LocalRecordsGrid = () => {
           Download Data
         </Button>
 
+        <Button variant="outline" size="icon" onClick={toggleExpandToHeaderWidth} title="Toggle full-width columns">
+          {isExpandedToHeaderWidth ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
+
         {isAdmin && (
           <Select value={recordView} onValueChange={(value: "all" | "pending") => setRecordView(value)}>
             <SelectTrigger className="w-[180px]">
@@ -798,46 +1175,53 @@ const LocalRecordsGrid = () => {
         )}
         <table className="w-full text-[10px] border-collapse table-fixed">
           <colgroup>
-            {Array.from({ length: 36 }).map((_, index) => (
+            {Array.from({ length: 37 }).map((_, index) => (
               <col key={index} style={columnWidths[index] ? { width: `${columnWidths[index]}px` } : undefined} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-10 bg-gray-50 border-b">
             <tr>
-              {renderHeaderCell("SL", 0, "grid-th min-w-[10px] sticky left-0 bg-gray-50 z-20")}
-              {renderHeaderCell("Country", 1, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Division", 2, "grid-th min-w-[10px]")}
-              {renderHeaderCell("District", 3, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Upazila", 4, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Union", 5, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Ward No", 6, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Name of SK/SHW", 7, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Desig.", 8, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Name of SS", 9, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Village Name (English)", 10, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Village Name (Bangla)", 11, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Village Code", 12, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Latitude", 13, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Longitute", 14, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Population", 15, "grid-th min-w-[10px]")}
-              {renderHeaderCell("HH Number", 16, "grid-th min-w-[10px]")}
-              {renderHeaderCell("2026 (Active LLINs)", 17, "grid-th min-w-[10px]")}
-              {renderHeaderCell("2025 (Active LLINs)", 18, "grid-th min-w-[10px]")}
-              {renderHeaderCell("2024 (Active LLINs)", 19, "grid-th min-w-[10px]")}
+              {renderHeaderCell("", 0, "grid-th min-w-[10px]")}
+              {renderHeaderCell("SL", 1, "grid-th min-w-[10px] sticky left-0 bg-gray-50 z-20")}
+              {renderHeaderCell("Country", 2, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Division", 3, "grid-th min-w-[10px]")}
+              {renderHeaderCell("District", 4, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Upazila", 5, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Union", 6, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Ward No", 7, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Name of SK/SHW", 8, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Desig.", 9, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Name of SS", 10, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village Name (English)", 11, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village Name (Bangla)", 12, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village Code", 13, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Latitude", 14, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Longitute", 15, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Population", 16, "grid-th min-w-[10px]")}
+              {renderHeaderCell("HH Number", 17, "grid-th min-w-[10px]")}
+              {renderHeaderCell("2026 (Active LLINs)", 18, "grid-th min-w-[10px]")}
+              {renderHeaderCell("2025 (Active LLINs)", 19, "grid-th min-w-[10px]")}
+              {renderHeaderCell("2024 (Active LLINs)", 20, "grid-th min-w-[10px]")}
               {MONTH_LABELS.map((m, idx) => (
-                renderHeaderCell(<span className="month-th-label">{m}</span>, 20 + idx, "grid-th month-th min-w-[10px]")
+                renderHeaderCell(
+                  <span className={`month-th-label${isExpandedToHeaderWidth ? " month-th-label-horizontal" : ""}`}>
+                    {m}
+                  </span>,
+                  21 + idx,
+                  `grid-th min-w-[10px]${isExpandedToHeaderWidth ? " month-th-horizontal" : " month-th"}`,
+                )
               ))}
-              {renderHeaderCell("Name of MMW, Health post & CHW(C)", 32, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Village Distance from upazila office (KM)", 33, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Name of Border with others country", 34, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Others Activities (TDA/Dev care)", 35, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Name of MMW, Health post & CHW(C)", 33, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village Distance from upazila office (KM)", 34, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Name of Border with others country", 35, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Others Activities (TDA/Dev care)", 36, "grid-th min-w-[10px]")}
             </tr>
           </thead>
 
           <tbody>
             {filteredRows.length === 0 && !loading && (
               <tr>
-                <td colSpan={36} className="text-center py-8 text-muted-foreground">
+                <td colSpan={37} className="text-center py-8 text-muted-foreground">
                   No records found for current filters
                 </td>
               </tr>
@@ -845,6 +1229,17 @@ const LocalRecordsGrid = () => {
 
             {paginatedRows.map((row, index) => (
               <tr key={row.id} className="hover:bg-gray-50">
+                <td className="grid-td p-1 text-center">
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => requestDeleteRow(row.id)}
+                      className="text-destructive hover:text-destructive/80 p-0.5"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </td>
                 <td className="grid-td sticky left-0 bg-white z-[5] font-medium">
                   {(page - 1) * pageSize + index + 1}
                 </td>
@@ -853,7 +1248,41 @@ const LocalRecordsGrid = () => {
                   Chattogram
                 </td>
                 <td className="grid-td p-0">
-                  {isAdmin ? (
+                  {row._isNew ? (
+                    otherModeByRow[row.id]?.district ? (
+                      <input
+                        className="grid-input"
+                        placeholder="District"
+                        value={row.district_name}
+                        onChange={(e) => handleTextCellChange(row.id, "district_name", e.target.value)}
+                      />
+                    ) : (
+                      <select
+                        className="grid-input bg-transparent"
+                        value={row.district_name}
+                        onChange={(e) => {
+                          if (e.target.value === OTHER_OPTION) {
+                            setOtherMode(row.id, "district", true);
+                            handleTextCellChange(row.id, "district_name", "");
+                            return;
+                          }
+                          setOtherMode(row.id, "district", false);
+                          handleTextCellChange(row.id, "district_name", e.target.value);
+                          handleTextCellChange(row.id, "upazila_name", "");
+                          handleTextCellChange(row.id, "union_name", "");
+                          handleTextCellChange(row.id, "ward_no", "");
+                        }}
+                      >
+                        <option value="">Select District</option>
+                        {masterData.districts.map((district) => (
+                          <option key={district.id} value={district.name}>
+                            {district.name}
+                          </option>
+                        ))}
+                        <option value={OTHER_OPTION}>Other</option>
+                      </select>
+                    )
+                  ) : isAdmin ? (
                     <input
                       className="grid-input"
                       value={row.district_name}
@@ -864,7 +1293,40 @@ const LocalRecordsGrid = () => {
                   )}
                 </td>
                 <td className="grid-td p-0">
-                  {isAdmin ? (
+                  {row._isNew ? (
+                    otherModeByRow[row.id]?.upazila ? (
+                      <input
+                        className="grid-input"
+                        placeholder="Upazila"
+                        value={row.upazila_name}
+                        onChange={(e) => handleTextCellChange(row.id, "upazila_name", e.target.value)}
+                      />
+                    ) : (
+                      <select
+                        className="grid-input bg-transparent"
+                        value={row.upazila_name}
+                        onChange={(e) => {
+                          if (e.target.value === OTHER_OPTION) {
+                            setOtherMode(row.id, "upazila", true);
+                            handleTextCellChange(row.id, "upazila_name", "");
+                            return;
+                          }
+                          setOtherMode(row.id, "upazila", false);
+                          handleTextCellChange(row.id, "upazila_name", e.target.value);
+                          handleTextCellChange(row.id, "union_name", "");
+                          handleTextCellChange(row.id, "ward_no", "");
+                        }}
+                      >
+                        <option value="">Select Upazila</option>
+                        {getUpazilaOptionsForRow(row).map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                        <option value={OTHER_OPTION}>Other</option>
+                      </select>
+                    )
+                  ) : isAdmin ? (
                     <input
                       className="grid-input"
                       value={row.upazila_name}
@@ -875,7 +1337,40 @@ const LocalRecordsGrid = () => {
                   )}
                 </td>
                 <td className="grid-td p-0">
-                  {isAdmin ? (
+                  {row._isNew ? (
+                    otherModeByRow[row.id]?.union ? (
+                      <input
+                        className="grid-input"
+                        placeholder="Union"
+                        value={row.union_name}
+                        onChange={(e) => handleTextCellChange(row.id, "union_name", e.target.value)}
+                      />
+                    ) : (
+                      <select
+                        className="grid-input bg-transparent"
+                        value={row.union_name}
+                        onChange={(e) => {
+                          if (e.target.value === OTHER_OPTION) {
+                            setOtherMode(row.id, "union", true);
+                            handleTextCellChange(row.id, "union_name", "");
+                            return;
+                          }
+                          setOtherMode(row.id, "union", false);
+                          handleTextCellChange(row.id, "union_name", e.target.value);
+                          handleTextCellChange(row.id, "ward_no", "");
+                          void ensureVillagesForUnion(e.target.value);
+                        }}
+                      >
+                        <option value="">Select Union</option>
+                        {getUnionOptionsForRow(row).map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                        <option value={OTHER_OPTION}>Other</option>
+                      </select>
+                    )
+                  ) : isAdmin ? (
                     <input
                       className="grid-input"
                       value={row.union_name}
@@ -886,11 +1381,35 @@ const LocalRecordsGrid = () => {
                   )}
                 </td>
                 <td className="grid-td p-0">
-                  <input
-                    className="grid-input"
-                    value={row.ward_no || ""}
-                    onChange={(e) => handleTextCellChange(row.id, "ward_no", e.target.value)}
-                  />
+                  {row._isNew && !otherModeByRow[row.id]?.ward ? (
+                    <select
+                      className="grid-input bg-transparent"
+                      value={row.ward_no || ""}
+                      onChange={(e) => {
+                        if (e.target.value === OTHER_OPTION) {
+                          setOtherMode(row.id, "ward", true);
+                          handleTextCellChange(row.id, "ward_no", "");
+                          return;
+                        }
+                        setOtherMode(row.id, "ward", false);
+                        handleTextCellChange(row.id, "ward_no", e.target.value);
+                      }}
+                    >
+                      <option value="">Select Ward</option>
+                      {getWardOptionsForRow(row).map((ward) => (
+                        <option key={ward} value={ward}>
+                          {ward}
+                        </option>
+                      ))}
+                      <option value={OTHER_OPTION}>Other</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="grid-input"
+                      value={row.ward_no || ""}
+                      onChange={(e) => handleTextCellChange(row.id, "ward_no", e.target.value)}
+                    />
+                  )}
                 </td>
                 <td className="grid-td p-0">
                   <input
@@ -1011,7 +1530,7 @@ const LocalRecordsGrid = () => {
                           className={`grid-input bg-transparent ${
                             editable ? "" : "text-muted-foreground"
                           }`}
-                          value={value}
+                          value={value === 0 ? "" : value}
                           onChange={(e) => handleCellChange(row.id, col, e.target.value)}
                           disabled={!editable}
                         />
@@ -1075,6 +1594,30 @@ const LocalRecordsGrid = () => {
           </tbody>
         </table>
       </div>
+      <AlertDialog open={pendingDeleteRowId !== null} onOpenChange={(open) => !open && setPendingDeleteRowId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete row?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will permanently remove the selected row from the table.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingDeleteRowId) {
+                  void handleDeleteRow(pendingDeleteRowId);
+                }
+                setPendingDeleteRowId(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
