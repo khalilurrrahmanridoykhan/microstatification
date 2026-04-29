@@ -25,10 +25,10 @@ const Dashboard = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate("/admin")}
+                onClick={() => window.location.assign("/dashboard")}
                 className="h-8 px-3 border-gray-200 bg-white text-gray-800 hover:bg-gray-50 shadow-sm"
               >
-                <Shield className="h-4 w-4 mr-2" /> Admin
+                <Shield className="h-4 w-4 mr-2" /> Data Summary
               </Button>
             )}
 

@@ -178,7 +178,7 @@ const LocalRecordsGrid = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
-  const [selectedDistrict, setSelectedDistrict] = useState("all");
+  const [selectedDistrict, setSelectedDistrict] = useState("Bandarban");
   const [selectedUpazila, setSelectedUpazila] = useState("all");
   const [selectedUnion, setSelectedUnion] = useState("all");
   const [selectedVillage, setSelectedVillage] = useState("all");
