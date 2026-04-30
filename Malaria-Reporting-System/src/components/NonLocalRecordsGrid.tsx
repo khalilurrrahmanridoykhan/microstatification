@@ -13,6 +13,8 @@ import {
   MONTH_COLUMNS,
   MONTH_LABELS,
   type MonthColumn,
+  estimateMonthColumnWithActionsWidth,
+  estimateVerticalMonthHeaderWidth,
   getDhakaMonth,
   getDhakaYear,
   getMonthTotal,
@@ -60,6 +62,15 @@ const NON_LOCAL_HEADER_LABELS = [
   ...MONTH_LABELS,
   "Total",
 ];
+
+const NON_LOCAL_MONTH_COLUMN_START_INDEX = 7;
+const NON_LOCAL_MONTH_COLUMN_END_INDEX = 18;
+
+function formatHeaderLabel(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return words[0] || "";
+  return `${words[0]} ${words[1]}`;
+}
 
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -154,6 +165,7 @@ const NonLocalRecordsGrid = () => {
   const [otherModeByRow, setOtherModeByRow] = useState<
     Record<string, Partial<Record<"country" | "district" | "upazila" | "union" | "ward" | "village", boolean>>>
   >({});
+  const touchedColumnIndexesRef = useRef<Set<number>>(new Set());
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
@@ -193,6 +205,21 @@ const NonLocalRecordsGrid = () => {
         return "bg-red-50 border-red-200";
     }
   };
+
+  const pendingRecordIds = useMemo(() => {
+    const ids = new Set<string>();
+    approvalRows.forEach((approval) => {
+      if (approval.status === "PENDING") {
+        ids.add(approval.record_id);
+      }
+    });
+    return ids;
+  }, [approvalRows]);
+
+  const displayedRows = useMemo(() => {
+    if (!isAdmin || recordView === "all") return rows;
+    return rows.filter((row) => pendingRecordIds.has(row.id));
+  }, [rows, isAdmin, recordView, pendingRecordIds]);
 
   const handleApprovalAction = async (recordId: string, month: number, status: "APPROVED" | "REJECTED") => {
     try {
@@ -328,6 +355,7 @@ const NonLocalRecordsGrid = () => {
   const startColumnResize = (index: number, event: React.MouseEvent<HTMLSpanElement>) => {
     const th = event.currentTarget.parentElement as HTMLElement | null;
     if (!th) return;
+    touchedColumnIndexesRef.current.add(index);
     resizingColumnRef.current = index;
     resizeStartXRef.current = event.clientX;
     resizeStartWidthRef.current = th.getBoundingClientRect().width;
@@ -335,11 +363,84 @@ const NonLocalRecordsGrid = () => {
   };
 
   const estimateHeaderWidth = (label: string) => {
+    const formattedLabel = formatHeaderLabel(label);
     if (!label) {
       return 36;
     }
-    return Math.min(320, Math.max(80, label.length * 7 + 24));
+    if (typeof document === "undefined") {
+      return Math.min(320, Math.max(36, formattedLabel.length * 7 + 18));
+    }
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return Math.min(320, Math.max(36, formattedLabel.length * 7 + 18));
+    }
+    context.font = "600 9px Inter, ui-sans-serif, system-ui, sans-serif";
+    const textWidth = context.measureText(formattedLabel).width;
+    return Math.min(320, Math.ceil(textWidth + 18));
   };
+
+  const pendingActionMonthColumnIndexes = useMemo(() => {
+    if (!isAdmin) {
+      return new Set<number>();
+    }
+    const set = new Set<number>();
+    displayedRows.forEach((row) => {
+      MONTH_COLUMNS.forEach((col, idx) => {
+        const value = row[col as MonthColumn];
+        if (!value || value === 0) return;
+        const monthNumber = idx + 1;
+        if (approvalByKey.get(`${row.id}:${monthNumber}`) === "PENDING") {
+          set.add(NON_LOCAL_MONTH_COLUMN_START_INDEX + idx);
+        }
+      });
+    });
+    return set;
+  }, [displayedRows, isAdmin, approvalByKey]);
+
+  useEffect(() => {
+    setColumnWidths((prev) => {
+      if (Object.keys(prev).length > 0) {
+        return prev;
+      }
+      const next: Record<number, number> = {};
+      NON_LOCAL_HEADER_LABELS.forEach((label, index) => {
+        next[index] = estimateHeaderWidth(label);
+      });
+      for (let index = NON_LOCAL_MONTH_COLUMN_START_INDEX; index <= NON_LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        const monthLabel = MONTH_LABELS[index - NON_LOCAL_MONTH_COLUMN_START_INDEX] || "";
+        next[index] = pendingActionMonthColumnIndexes.has(index)
+          ? estimateMonthColumnWithActionsWidth(monthLabel)
+          : estimateVerticalMonthHeaderWidth(monthLabel);
+      }
+      return next;
+    });
+  }, [pendingActionMonthColumnIndexes]);
+
+  useEffect(() => {
+    setColumnWidths((prev) => {
+      if (Object.keys(prev).length === 0) {
+        return prev;
+      }
+      const next = { ...prev };
+      let changed = false;
+      for (let index = NON_LOCAL_MONTH_COLUMN_START_INDEX; index <= NON_LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        if (touchedColumnIndexesRef.current.has(index)) {
+          continue;
+        }
+        const width = next[index] || 0;
+        const monthLabel = MONTH_LABELS[index - NON_LOCAL_MONTH_COLUMN_START_INDEX] || "";
+        const targetWidth = pendingActionMonthColumnIndexes.has(index)
+          ? estimateMonthColumnWithActionsWidth(monthLabel)
+          : estimateVerticalMonthHeaderWidth(monthLabel);
+        if (targetWidth !== width) {
+          next[index] = targetWidth;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [pendingActionMonthColumnIndexes]);
 
   const toggleExpandToHeaderWidth = () => {
     if (!isExpandedToHeaderWidth) {
@@ -393,7 +494,7 @@ const NonLocalRecordsGrid = () => {
       _isNew: true,
     };
 
-    setRows((prev) => [...prev, newRow]);
+    setRows((prev) => [newRow, ...prev]);
     setDirtyIds((prev) => {
       const next = new Set(prev);
       next.add(newRow.id);
@@ -553,19 +654,6 @@ const NonLocalRecordsGrid = () => {
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
   const hasDirty = dirtyIds.size > 0 || deletedIds.length > 0;
-  const pendingRecordIds = useMemo(() => {
-    const ids = new Set<string>();
-    approvalRows.forEach((approval) => {
-      if (approval.status === "PENDING") {
-        ids.add(approval.record_id);
-      }
-    });
-    return ids;
-  }, [approvalRows]);
-  const displayedRows = useMemo(() => {
-    if (!isAdmin || recordView === "all") return rows;
-    return rows.filter((row) => pendingRecordIds.has(row.id));
-  }, [rows, isAdmin, recordView, pendingRecordIds]);
 
   return (
     <div className="space-y-3">

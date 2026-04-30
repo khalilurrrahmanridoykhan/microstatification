@@ -23,6 +23,8 @@ import {
   MONTH_COLUMNS,
   MONTH_LABELS,
   type MonthColumn,
+  estimateMonthColumnWithActionsWidth,
+  estimateVerticalMonthHeaderWidth,
   getDhakaMonth,
   getDhakaYear,
   getMonthTotal,
@@ -88,6 +90,15 @@ const LOCAL_HEADER_LABELS = [
   "Name of Border with others country",
   "Others Activities (TDA/Dev care)",
 ];
+
+const LOCAL_MONTH_COLUMN_START_INDEX = 21;
+const LOCAL_MONTH_COLUMN_END_INDEX = 32;
+
+function formatHeaderLabel(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return words[0] || "";
+  return `${words[0]} ${words[1]}`;
+}
 
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -201,6 +212,7 @@ const LocalRecordsGrid = () => {
   const [otherModeByRow, setOtherModeByRow] = useState<
     Record<string, Partial<Record<"district" | "upazila" | "union" | "ward", boolean>>>
   >({});
+  const touchedColumnIndexesRef = useRef<Set<number>>(new Set());
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
@@ -380,6 +392,10 @@ const LocalRecordsGrid = () => {
     }
 
     return rows.filter((row) => {
+      // Keep newly added drafts visible for the current SK/SHW so they can fill hierarchy fields.
+      if (row._isNew && String(row.sk_user_id) === String(user.id)) {
+        return true;
+      }
       if (villageScopes.size > 0) {
         const rowVillageId = String(row.village_id);
         const rowVillageName = normalize(row.village_name);
@@ -547,6 +563,7 @@ const LocalRecordsGrid = () => {
   const startColumnResize = (index: number, event: React.MouseEvent<HTMLSpanElement>) => {
     const th = (event.currentTarget.parentElement as HTMLElement | null);
     if (!th) return;
+    touchedColumnIndexesRef.current.add(index);
     resizingColumnRef.current = index;
     resizeStartXRef.current = event.clientX;
     resizeStartWidthRef.current = th.getBoundingClientRect().width;
@@ -554,8 +571,85 @@ const LocalRecordsGrid = () => {
   };
 
   const estimateHeaderWidth = (label: string) => {
-    return Math.min(360, Math.max(80, label.length * 7 + 24));
+    const formattedLabel = formatHeaderLabel(label);
+    if (!formattedLabel) {
+      return 30;
+    }
+    if (typeof document === "undefined") {
+      return Math.min(360, Math.max(36, formattedLabel.length * 7 + 18));
+    }
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return Math.min(360, Math.max(36, formattedLabel.length * 7 + 18));
+    }
+    context.font = "600 9px Inter, ui-sans-serif, system-ui, sans-serif";
+    const textWidth = context.measureText(formattedLabel).width;
+    return Math.min(360, Math.ceil(textWidth + 18));
   };
+
+  /** Colgroup indexes where admin sees A/R (approval row PENDING + non-zero month value). */
+  const pendingActionMonthColumnIndexes = useMemo(() => {
+    if (!isAdmin) {
+      return new Set<number>();
+    }
+    const set = new Set<number>();
+    filteredRows.forEach((row) => {
+      MONTH_COLUMNS.forEach((col, idx) => {
+        const value = row[col as MonthColumn];
+        if (!value || value === 0) return;
+        const monthNumber = idx + 1;
+        if (approvalByKey.get(`${row.id}:${monthNumber}`) === "PENDING") {
+          set.add(LOCAL_MONTH_COLUMN_START_INDEX + idx);
+        }
+      });
+    });
+    return set;
+  }, [filteredRows, isAdmin, approvalByKey]);
+
+  useEffect(() => {
+    setColumnWidths((prev) => {
+      if (Object.keys(prev).length > 0) {
+        return prev;
+      }
+      const next: Record<number, number> = {};
+      LOCAL_HEADER_LABELS.forEach((label, index) => {
+        next[index] = estimateHeaderWidth(label);
+      });
+      for (let index = LOCAL_MONTH_COLUMN_START_INDEX; index <= LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        const monthLabel = MONTH_LABELS[index - LOCAL_MONTH_COLUMN_START_INDEX] || "";
+        next[index] = pendingActionMonthColumnIndexes.has(index)
+          ? estimateMonthColumnWithActionsWidth(monthLabel)
+          : estimateVerticalMonthHeaderWidth(monthLabel);
+      }
+      return next;
+    });
+  }, [pendingActionMonthColumnIndexes]);
+
+  useEffect(() => {
+    setColumnWidths((prev) => {
+      if (Object.keys(prev).length === 0) {
+        return prev;
+      }
+      const next = { ...prev };
+      let changed = false;
+      for (let index = LOCAL_MONTH_COLUMN_START_INDEX; index <= LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        if (touchedColumnIndexesRef.current.has(index)) {
+          continue;
+        }
+        const width = next[index] || 0;
+        const monthLabel = MONTH_LABELS[index - LOCAL_MONTH_COLUMN_START_INDEX] || "";
+        const targetWidth = pendingActionMonthColumnIndexes.has(index)
+          ? estimateMonthColumnWithActionsWidth(monthLabel)
+          : estimateVerticalMonthHeaderWidth(monthLabel);
+        if (targetWidth !== width) {
+          next[index] = targetWidth;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [pendingActionMonthColumnIndexes]);
 
   const toggleExpandToHeaderWidth = () => {
     if (!isExpandedToHeaderWidth) {
