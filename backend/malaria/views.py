@@ -3,18 +3,21 @@ import csv
 from collections import defaultdict
 from copy import copy
 from datetime import date, datetime
+import hashlib
 from io import BytesIO, StringIO
 import json
 import math
 from pathlib import Path
 import re
 from tempfile import TemporaryFile
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 import zipfile
 from xml.etree import ElementTree as ET
 
 from django.contrib.auth.models import User
 from django.core import signing
+from django.core.paginator import EmptyPage, Paginator
 from django.core.signing import BadSignature, SignatureExpired
 from django.http import FileResponse, HttpResponse
 from django.db.models import Count, Max, Prefetch, Q, Sum, Value
@@ -325,6 +328,68 @@ def _get_requested_serializer_fields(request):
             fields.append(field_name)
 
     return fields or None
+
+
+def _pagination_requested(request):
+    params = request.query_params
+    paginate_flag = (params.get("paginate") or "").strip().lower()
+    if paginate_flag in {"1", "true", "yes", "on"}:
+        return True
+    return (params.get("page") or "").strip().isdigit()
+
+
+def _build_page_url(request, page_number):
+    params = request.query_params.copy()
+    params["paginate"] = "1"
+    params["page"] = str(page_number)
+    return f"{request.path}?{urlencode(params, doseq=True)}"
+
+
+def _paginate_queryset_if_requested(request, queryset, default_page_size=100, max_page_size=500):
+    if not _pagination_requested(request):
+        return None
+
+    raw_page = (request.query_params.get("page") or "1").strip()
+    raw_size = (request.query_params.get("page_size") or str(default_page_size)).strip()
+    page_number = int(raw_page) if raw_page.isdigit() else 1
+    page_size = int(raw_size) if raw_size.isdigit() else default_page_size
+    page_size = max(1, min(page_size, max_page_size))
+
+    paginator = Paginator(queryset, page_size)
+    try:
+        page_obj = paginator.page(page_number)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages if paginator.num_pages > 0 else 1)
+
+    next_url = _build_page_url(request, page_obj.next_page_number()) if page_obj.has_next() else None
+    prev_url = _build_page_url(request, page_obj.previous_page_number()) if page_obj.has_previous() else None
+    return {
+        "count": paginator.count,
+        "next": next_url,
+        "previous": prev_url,
+        "results": page_obj.object_list,
+    }
+
+
+def _build_list_cache_tag(request, queryset, scope_key):
+    max_updated = queryset.aggregate(max_updated=Max("updated_at")).get("max_updated")
+    max_updated_iso = max_updated.isoformat() if max_updated else ""
+    payload = f"{scope_key}|{request.get_full_path()}|{max_updated_iso}|{queryset.count()}"
+    return f"\"{hashlib.md5(payload.encode('utf-8')).hexdigest()}\""
+
+
+def _cache_headers_for_queryset(request, queryset, scope_key):
+    etag = _build_list_cache_tag(request, queryset, scope_key)
+    max_updated = queryset.aggregate(max_updated=Max("updated_at")).get("max_updated")
+    last_modified = max_updated.strftime("%a, %d %b %Y %H:%M:%S GMT") if max_updated else None
+    return etag, last_modified
+
+
+def _set_list_cache_headers(response, etag, last_modified):
+    response["Cache-Control"] = "private, max-age=30, stale-while-revalidate=30"
+    response["ETag"] = etag
+    if last_modified:
+        response["Last-Modified"] = last_modified
 
 
 def _current_dhaka_month():
@@ -2037,6 +2102,33 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
 
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        etag, last_modified = _cache_headers_for_queryset(request, queryset, "local-records")
+        if request.headers.get("If-None-Match") == etag:
+            response = Response(status=status.HTTP_304_NOT_MODIFIED)
+            _set_list_cache_headers(response, etag, last_modified)
+            return response
+
+        page_payload = _paginate_queryset_if_requested(request, queryset)
+        if page_payload is not None:
+            serializer = self.get_serializer(page_payload["results"], many=True)
+            response = Response(
+                {
+                    "count": page_payload["count"],
+                    "next": page_payload["next"],
+                    "previous": page_payload["previous"],
+                    "results": serializer.data,
+                }
+            )
+            _set_list_cache_headers(response, etag, last_modified)
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        response = Response(serializer.data)
+        _set_list_cache_headers(response, etag, last_modified)
+        return response
+
     def create(self, request, *args, **kwargs):
         payload = request.data.copy()
         if not is_malaria_admin(request.user):
@@ -2147,6 +2239,33 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             in_fields=["id", "sk_user_id"],
         )
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        etag, last_modified = _cache_headers_for_queryset(request, queryset, "non-local-records")
+        if request.headers.get("If-None-Match") == etag:
+            response = Response(status=status.HTTP_304_NOT_MODIFIED)
+            _set_list_cache_headers(response, etag, last_modified)
+            return response
+
+        page_payload = _paginate_queryset_if_requested(request, queryset)
+        if page_payload is not None:
+            serializer = self.get_serializer(page_payload["results"], many=True)
+            response = Response(
+                {
+                    "count": page_payload["count"],
+                    "next": page_payload["next"],
+                    "previous": page_payload["previous"],
+                    "results": serializer.data,
+                }
+            )
+            _set_list_cache_headers(response, etag, last_modified)
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        response = Response(serializer.data)
+        _set_list_cache_headers(response, etag, last_modified)
+        return response
 
     def create(self, request, *args, **kwargs):
         payload = request.data.copy()

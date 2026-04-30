@@ -27,7 +27,7 @@ import {
   fetchVillagesByUnion,
   fetchMonthlyApprovals,
   fetchMonthAccessSettings,
-  fetchNonLocalRecords,
+  fetchNonLocalRecordsPage,
   upsertMonthlyApproval,
   updateNonLocalRecord,
   type ApprovalRow,
@@ -61,6 +61,17 @@ const NON_LOCAL_HEADER_LABELS = [
   "Village",
   ...MONTH_LABELS,
   "Total",
+];
+const NON_LOCAL_LIST_FIELDS = [
+  "id",
+  "sk_user_id",
+  "reporting_year",
+  "country",
+  "district_or_state",
+  "upazila_or_township",
+  "union_name",
+  "village_name",
+  ...MONTH_COLUMNS,
 ];
 
 const NON_LOCAL_MONTH_COLUMN_START_INDEX = 7;
@@ -241,14 +252,25 @@ const NonLocalRecordsGrid = () => {
     if (!user) return;
     setLoading(true);
     try {
-      let data = await fetchNonLocalRecords(year);
+      const requestPageSize = 100;
+      let firstPage = await fetchNonLocalRecordsPage({
+        year,
+        page: 1,
+        pageSize: requestPageSize,
+        fields: NON_LOCAL_LIST_FIELDS,
+      });
       let effectiveYear = year;
 
-      if (data.length === 0) {
-        const latestRecords = await fetchNonLocalRecords("latest");
-        if (latestRecords.length > 0) {
-          data = latestRecords;
-          effectiveYear = latestRecords[0].reporting_year;
+      if (firstPage.results.length === 0) {
+        const latestPage = await fetchNonLocalRecordsPage({
+          year: "latest",
+          page: 1,
+          pageSize: requestPageSize,
+          fields: NON_LOCAL_LIST_FIELDS,
+        });
+        if (latestPage.results.length > 0) {
+          firstPage = latestPage;
+          effectiveYear = latestPage.results[0].reporting_year;
         }
       }
 
@@ -256,7 +278,9 @@ const NonLocalRecordsGrid = () => {
         setYear(effectiveYear);
       }
 
-      const visibleRows = isAdmin ? data : data.filter((row) => row.sk_user_id === user.id);
+      const visibleRows = isAdmin
+        ? firstPage.results
+        : firstPage.results.filter((row) => row.sk_user_id === user.id);
       setRows(visibleRows);
       const approvals = await fetchMonthlyApprovals({
         recordType: "non_local",
@@ -265,6 +289,33 @@ const NonLocalRecordsGrid = () => {
       setApprovalRows(approvals);
       setDirtyIds(new Set());
       setDeletedIds([]);
+
+      // Load remaining pages in the background to keep first paint fast.
+      void (async () => {
+        let nextUrl = firstPage.next;
+        const seen = new Set(visibleRows.map((row) => row.id));
+        while (nextUrl) {
+          const nextPageParam = new URL(nextUrl, window.location.origin).searchParams.get("page");
+          const pageNumber = Number(nextPageParam || "0");
+          if (!Number.isFinite(pageNumber) || pageNumber < 2) break;
+          const pageData = await fetchNonLocalRecordsPage({
+            year: effectiveYear,
+            page: pageNumber,
+            pageSize: requestPageSize,
+            fields: NON_LOCAL_LIST_FIELDS,
+          });
+          const pageRows = isAdmin ? pageData.results : pageData.results.filter((row) => row.sk_user_id === user.id);
+          setRows((prev) => [
+            ...prev,
+            ...pageRows.filter((row) => {
+              if (seen.has(row.id)) return false;
+              seen.add(row.id);
+              return true;
+            }),
+          ]);
+          nextUrl = pageData.next;
+        }
+      })();
     } catch (error) {
       toast({
         title: "Load error",

@@ -110,6 +110,13 @@ export interface ReviewResponse {
   approvals: ApprovalRow[];
 }
 
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 export interface AdminUser {
   id: string;
   full_name: string;
@@ -253,6 +260,8 @@ const legacyMalariaTokenKey = "malaria_auth_token";
 const mainSessionTokenKey = "authToken";
 const mainSessionUserKey = "userInfo";
 const requestTimeoutMs = 8000;
+const getRequestCacheTtlMs = 30_000;
+const getRequestCache = new Map<string, { expiresAt: number; data: unknown }>();
 
 export function getAuthToken(): string | null {
   const primary = window.localStorage.getItem(authTokenStorageKey);
@@ -396,6 +405,30 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+function clearGetRequestCache(prefix?: string): void {
+  if (!prefix) {
+    getRequestCache.clear();
+    return;
+  }
+  for (const key of getRequestCache.keys()) {
+    if (key.includes(prefix)) {
+      getRequestCache.delete(key);
+    }
+  }
+}
+
+async function requestCached<T>(path: string, ttlMs: number = getRequestCacheTtlMs): Promise<T> {
+  const now = Date.now();
+  const cacheKey = path;
+  const cached = getRequestCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.data as T;
+  }
+  const data = await request<T>(path);
+  getRequestCache.set(cacheKey, { data, expiresAt: now + ttlMs });
+  return data;
+}
+
 export function login(email: string, password: string): Promise<LoginResponse> {
   return request<LoginResponse>("/auth/login", {
     method: "POST",
@@ -419,10 +452,32 @@ export function fetchLocalRecords(year?: number | "latest"): Promise<LocalRecord
       : Number.isFinite(year)
       ? `?reporting_year=${year}`
       : "";
-  return request<LocalRecord[]>(`/malaria/local-records/${query}`);
+  return requestCached<LocalRecord[]>(`/malaria/local-records/${query}`);
+}
+
+export function fetchLocalRecordsPage(params: {
+  year?: number | "latest";
+  page?: number;
+  pageSize?: number;
+  fields?: string[];
+}): Promise<PaginatedResponse<LocalRecord>> {
+  const query = new URLSearchParams();
+  if (params.year === "latest") {
+    query.set("reporting_year", "latest");
+  } else if (Number.isFinite(params.year)) {
+    query.set("reporting_year", String(params.year));
+  }
+  query.set("paginate", "1");
+  query.set("page", String(params.page || 1));
+  query.set("page_size", String(params.pageSize || 100));
+  if (params.fields?.length) {
+    query.set("_fields", params.fields.join(","));
+  }
+  return requestCached<PaginatedResponse<LocalRecord>>(`/malaria/local-records/?${query.toString()}`);
 }
 
 export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promise<{ success: boolean }> {
+  clearGetRequestCache("/malaria/local-records/");
   return request<{ success: boolean }>(`/malaria/local-records/${id}/`, {
     method: "PUT",
     body: JSON.stringify(payload),
@@ -430,6 +485,7 @@ export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promi
 }
 
 export function deleteLocalRecord(id: string): Promise<void> {
+  clearGetRequestCache("/malaria/local-records/");
   return request<void>(`/malaria/local-records/${id}/`, {
     method: "DELETE",
   });
@@ -498,7 +554,7 @@ export function createUnion(payload: { name: string; upazila: string | number })
 }
 
 export function fetchMonthAccessSettings(year: number): Promise<MonthAccessSetting[]> {
-  return request<MonthAccessSetting[]>(`/malaria/month-access-settings/?reporting_year=${year}`);
+  return requestCached<MonthAccessSetting[]>(`/malaria/month-access-settings/?reporting_year=${year}`);
 }
 
 export function fetchNonLocalRecords(year?: number | "latest"): Promise<NonLocalRecord[]> {
@@ -508,10 +564,32 @@ export function fetchNonLocalRecords(year?: number | "latest"): Promise<NonLocal
       : Number.isFinite(year)
       ? `?reporting_year=${year}`
       : "";
-  return request<NonLocalRecord[]>(`/malaria/non-local-records/${query}`);
+  return requestCached<NonLocalRecord[]>(`/malaria/non-local-records/${query}`);
+}
+
+export function fetchNonLocalRecordsPage(params: {
+  year?: number | "latest";
+  page?: number;
+  pageSize?: number;
+  fields?: string[];
+}): Promise<PaginatedResponse<NonLocalRecord>> {
+  const query = new URLSearchParams();
+  if (params.year === "latest") {
+    query.set("reporting_year", "latest");
+  } else if (Number.isFinite(params.year)) {
+    query.set("reporting_year", String(params.year));
+  }
+  query.set("paginate", "1");
+  query.set("page", String(params.page || 1));
+  query.set("page_size", String(params.pageSize || 100));
+  if (params.fields?.length) {
+    query.set("_fields", params.fields.join(","));
+  }
+  return requestCached<PaginatedResponse<NonLocalRecord>>(`/malaria/non-local-records/?${query.toString()}`);
 }
 
 export function createNonLocalRecord(payload: NonLocalRecordPayload): Promise<NonLocalRecord> {
+  clearGetRequestCache("/malaria/non-local-records/");
   return request<NonLocalRecord>("/malaria/non-local-records/", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -519,6 +597,7 @@ export function createNonLocalRecord(payload: NonLocalRecordPayload): Promise<No
 }
 
 export function updateNonLocalRecord(id: string, payload: NonLocalRecordPayload): Promise<{ success: boolean }> {
+  clearGetRequestCache("/malaria/non-local-records/");
   return request<{ success: boolean }>(`/malaria/non-local-records/${id}/`, {
     method: "PUT",
     body: JSON.stringify(payload),
@@ -526,6 +605,7 @@ export function updateNonLocalRecord(id: string, payload: NonLocalRecordPayload)
 }
 
 export function createLocalRecord(payload: LocalRecordCreatePayload): Promise<LocalRecord> {
+  clearGetRequestCache("/malaria/local-records/");
   return request<LocalRecord>("/malaria/local-records/", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -533,6 +613,7 @@ export function createLocalRecord(payload: LocalRecordCreatePayload): Promise<Lo
 }
 
 export function deleteNonLocalRecord(id: string): Promise<void> {
+  clearGetRequestCache("/malaria/non-local-records/");
   return request<void>(`/malaria/non-local-records/${id}/`, {
     method: "DELETE",
   });
@@ -549,6 +630,7 @@ export function upsertMonthlyApproval(payload: {
   month: number;
   status: ApprovalStatus;
 }): Promise<{ success: boolean }> {
+  clearGetRequestCache("/malaria/monthly-approvals/");
   return request<{ success: boolean }>("/malaria/monthly-approvals/", {
     method: "POST",
     body: JSON.stringify({
@@ -574,7 +656,7 @@ export function fetchMonthlyApprovals(params: {
     query.set("status", params.status);
   }
   query.set("_fields", "record_id,month,status");
-  return request<ApprovalRow[]>(`/malaria/monthly-approvals/?${query.toString()}`);
+  return requestCached<ApprovalRow[]>(`/malaria/monthly-approvals/?${query.toString()}`);
 }
 
 export function fetchUsers(): Promise<AdminUser[]> {
@@ -611,11 +693,11 @@ export function fetchAssignments(): Promise<Assignment[]> {
 
 export function fetchMalariaMasterData(options?: { includeVillages?: boolean }): Promise<MalariaMasterData> {
   const includeVillages = options?.includeVillages ?? true;
-  return request<MalariaMasterData>(`/malaria/master-data/?include_villages=${includeVillages ? "1" : "0"}`);
+  return requestCached<MalariaMasterData>(`/malaria/master-data/?include_villages=${includeVillages ? "1" : "0"}`);
 }
 
 export function fetchVillagesByUnion(unionId: string | number): Promise<MasterVillage[]> {
-  return request<MasterVillage[]>(`/malaria/villages/?union_id=${unionId}&_fields=id,name,ward_no,union_id&limit=200`);
+  return requestCached<MasterVillage[]>(`/malaria/villages/?union_id=${unionId}&_fields=id,name,ward_no,union_id&limit=200`);
 }
 
 export function assignVillage(skUserId: string, villageId: string): Promise<{ success: boolean; message: string }> {

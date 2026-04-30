@@ -41,7 +41,7 @@ import {
   deleteLocalRecord,
   fetchMalariaMasterData,
   fetchMonthlyApprovals,
-  fetchLocalRecords,
+  fetchLocalRecordsPage,
   fetchMonthAccessSettings,
   upsertMonthlyApproval,
   updateDistrict,
@@ -89,6 +89,41 @@ const LOCAL_HEADER_LABELS = [
   "Village Distance from upazila office (KM)",
   "Name of Border with others country",
   "Others Activities (TDA/Dev care)",
+];
+const LOCAL_LIST_FIELDS = [
+  "id",
+  "village_id",
+  "sk_user_id",
+  "district_id",
+  "upazila_id",
+  "union_id",
+  "reporting_year",
+  "sk_user_display_name",
+  "sk_user_designation",
+  "sk_user_ss_name",
+  "district_name",
+  "upazila_name",
+  "union_name",
+  "ward_no",
+  "village_name",
+  "village_name_bn",
+  "village_code",
+  "village_latitude",
+  "village_longitude",
+  "village_population",
+  "village_sk_shw_name",
+  "village_ss_name",
+  "village_mmw_hp_chwc_name",
+  "village_distance_from_upazila_office_km",
+  "village_bordering_country_name",
+  "village_other_activities",
+  "hh",
+  "population",
+  "itn_2023",
+  "itn_2024",
+  "itn_2025",
+  "itn_2026",
+  ...MONTH_COLUMNS,
 ];
 
 const LOCAL_MONTH_COLUMN_START_INDEX = 21;
@@ -277,14 +312,25 @@ const LocalRecordsGrid = () => {
     if (!user) return;
     setLoading(true);
     try {
-      let data = await fetchLocalRecords(year);
+      const requestPageSize = Math.max(100, pageSize || 100);
+      let firstPage = await fetchLocalRecordsPage({
+        year,
+        page: 1,
+        pageSize: requestPageSize,
+        fields: LOCAL_LIST_FIELDS,
+      });
       let effectiveYear = year;
 
-      if (data.length === 0) {
-        const latestRecords = await fetchLocalRecords("latest");
-        if (latestRecords.length > 0) {
-          data = latestRecords;
-          effectiveYear = latestRecords[0].reporting_year;
+      if (firstPage.results.length === 0) {
+        const latestPage = await fetchLocalRecordsPage({
+          year: "latest",
+          page: 1,
+          pageSize: requestPageSize,
+          fields: LOCAL_LIST_FIELDS,
+        });
+        if (latestPage.results.length > 0) {
+          firstPage = latestPage;
+          effectiveYear = latestPage.results[0].reporting_year;
         }
       }
 
@@ -292,7 +338,7 @@ const LocalRecordsGrid = () => {
         setYear(effectiveYear);
       }
 
-      setRows(data);
+      setRows(firstPage.results);
       if (isAdmin) {
         const approvals = await fetchMonthlyApprovals({
           recordType: "local",
@@ -303,6 +349,32 @@ const LocalRecordsGrid = () => {
         setApprovalRows([]);
       }
       setDirtyIds(new Set());
+
+      // Load remaining pages in the background for smoother initial paint.
+      void (async () => {
+        let nextUrl = firstPage.next;
+        const seen = new Set(firstPage.results.map((row) => row.id));
+        while (nextUrl) {
+          const nextPageParam = new URL(nextUrl, window.location.origin).searchParams.get("page");
+          const pageNumber = Number(nextPageParam || "0");
+          if (!Number.isFinite(pageNumber) || pageNumber < 2) break;
+          const pageData = await fetchLocalRecordsPage({
+            year: effectiveYear,
+            page: pageNumber,
+            pageSize: requestPageSize,
+            fields: LOCAL_LIST_FIELDS,
+          });
+          setRows((prev) => [
+            ...prev,
+            ...pageData.results.filter((row) => {
+              if (seen.has(row.id)) return false;
+              seen.add(row.id);
+              return true;
+            }),
+          ]);
+          nextUrl = pageData.next;
+        }
+      })();
     } catch (error) {
       toast({
         title: "Load error",
@@ -312,7 +384,7 @@ const LocalRecordsGrid = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, year, isAdmin, toast]);
+  }, [user, year, isAdmin, toast, pageSize]);
 
   useEffect(() => {
     void fetchData();
@@ -995,7 +1067,7 @@ const LocalRecordsGrid = () => {
     return openMonthNumbers.has(monthIndex + 1);
   };
 
-  const isSkOrShw = role === "sk" || role === "shw";
+  const isSkOrShw = role === "sk";
   const canSkEditOnlyWhenEmptyText = (value: unknown) => {
     if (isAdmin || !isSkOrShw) return true;
     return String(value ?? "").trim() === "";
