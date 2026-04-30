@@ -109,7 +109,16 @@ All colors MUST be HSL.
   width: auto;
   min-width: 0 !important;
   max-width: none;
-  @apply px-1 py-1 text-left text-[9px] font-semibold uppercase tracking-tight text-muted-foreground border-b border-r last:border-r-0 select-none whitespace-nowrap overflow-hidden text-ellipsis;
+  @apply px-1 py-0.5 text-left text-[9px] font-semibold uppercase tracking-tight text-muted-foreground border-b border-r last:border-r-0 select-none whitespace-normal break-words overflow-hidden leading-tight align-top;
+}
+
+.grid-th-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.05;
+  max-height: 6.3em;
 }
 
 .grid-td {

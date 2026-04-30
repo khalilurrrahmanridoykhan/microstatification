@@ -94,12 +94,6 @@ const LOCAL_HEADER_LABELS = [
 const LOCAL_MONTH_COLUMN_START_INDEX = 21;
 const LOCAL_MONTH_COLUMN_END_INDEX = 32;
 
-function formatHeaderLabel(label: string): string {
-  const words = label.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return words[0] || "";
-  return `${words[0]} ${words[1]}`;
-}
-
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Dhaka",
@@ -571,20 +565,20 @@ const LocalRecordsGrid = () => {
   };
 
   const estimateHeaderWidth = (label: string) => {
-    const formattedLabel = formatHeaderLabel(label);
-    if (!formattedLabel) {
+    const headerLabel = String(label || "").trim();
+    if (!headerLabel) {
       return 30;
     }
     if (typeof document === "undefined") {
-      return Math.min(360, Math.max(36, formattedLabel.length * 7 + 18));
+      return Math.min(360, Math.max(36, headerLabel.length * 7 + 18));
     }
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
     if (!context) {
-      return Math.min(360, Math.max(36, formattedLabel.length * 7 + 18));
+      return Math.min(360, Math.max(36, headerLabel.length * 7 + 18));
     }
     context.font = "600 9px Inter, ui-sans-serif, system-ui, sans-serif";
-    const textWidth = context.measureText(formattedLabel).width;
+    const textWidth = context.measureText(headerLabel).width;
     return Math.min(360, Math.ceil(textWidth + 18));
   };
 
@@ -669,9 +663,9 @@ const LocalRecordsGrid = () => {
 
   const renderHeaderCell = (label: React.ReactNode, index: number, className: string) => (
     <th key={index} className={`${className} relative`}>
-      {label}
+      {typeof label === "string" ? <span className="grid-th-label">{label}</span> : label}
       <span
-        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-primary/20"
+        className="absolute right-0 top-0 z-20 h-full w-2 cursor-col-resize bg-transparent hover:bg-primary/20"
         onMouseDown={(event) => startColumnResize(index, event)}
       />
     </th>
@@ -1001,7 +995,16 @@ const LocalRecordsGrid = () => {
     return openMonthNumbers.has(monthIndex + 1);
   };
 
-  const isITNEditable = true;
+  const isSkOrShw = role === "sk" || role === "shw";
+  const canSkEditOnlyWhenEmptyText = (value: unknown) => {
+    if (isAdmin || !isSkOrShw) return true;
+    return String(value ?? "").trim() === "";
+  };
+  const canSkEditOnlyWhenEmptyNumber = (value: number | null | undefined) => {
+    if (isAdmin || !isSkOrShw) return true;
+    return value === null || value === undefined || Number(value) === 0;
+  };
+
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   const handleDownloadXlsx = () => {
@@ -1479,6 +1482,7 @@ const LocalRecordsGrid = () => {
                     <select
                       className="grid-input bg-transparent"
                       value={row.ward_no || ""}
+                      disabled={!isAdmin}
                       onChange={(e) => {
                         if (e.target.value === OTHER_OPTION) {
                           setOtherMode(row.id, "ward", true);
@@ -1501,6 +1505,7 @@ const LocalRecordsGrid = () => {
                     <input
                       className="grid-input"
                       value={row.ward_no || ""}
+                      disabled={!isAdmin}
                       onChange={(e) => handleTextCellChange(row.id, "ward_no", e.target.value)}
                     />
                   )}
@@ -1510,6 +1515,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_sk_shw_name || ""}
                     onChange={(e) => handleTextCellChange(row.id, "village_sk_shw_name", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyText(row.village_sk_shw_name)}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1517,6 +1523,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.sk_user_designation || ""}
                     onChange={(e) => handleTextCellChange(row.id, "sk_user_designation", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyText(row.sk_user_designation)}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1524,6 +1531,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_ss_name || ""}
                     onChange={(e) => handleTextCellChange(row.id, "village_ss_name", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyText(row.village_ss_name)}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1531,6 +1539,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_name}
                     onChange={(e) => handleTextCellChange(row.id, "village_name", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyText(row.village_name)}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1538,6 +1547,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_name_bn || ""}
                     onChange={(e) => handleTextCellChange(row.id, "village_name_bn", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyText(row.village_name_bn)}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1545,6 +1555,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_code || ""}
                     onChange={(e) => handleTextCellChange(row.id, "village_code", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyText(row.village_code)}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1552,6 +1563,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_latitude ?? ""}
                     onChange={(e) => handleDecimalCellChange(row.id, "village_latitude", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyText(row.village_latitude)}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1559,6 +1571,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_longitude ?? ""}
                     onChange={(e) => handleDecimalCellChange(row.id, "village_longitude", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyText(row.village_longitude)}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1568,6 +1581,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.population}
                     onChange={(e) => handleCellChange(row.id, "population", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyNumber(row.population)}
                   />
                 </td>
 
@@ -1578,6 +1592,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.hh === 0 ? "" : row.hh}
                     onChange={(e) => handleCellChange(row.id, "hh", e.target.value)}
+                    disabled={!canSkEditOnlyWhenEmptyNumber(row.hh)}
                   />
                 </td>
 
@@ -1586,10 +1601,10 @@ const LocalRecordsGrid = () => {
                     <input
                       type="number"
                       min={0}
-                      className={`grid-input ${isITNEditable ? "" : "bg-muted/30 text-muted-foreground"}`}
+                      className={`grid-input ${canSkEditOnlyWhenEmptyNumber(row[itnCol]) ? "" : "bg-muted/30 text-muted-foreground"}`}
                       value={row[itnCol] === 0 ? "" : row[itnCol]}
                       onChange={(e) => handleCellChange(row.id, itnCol, e.target.value)}
-                      disabled={!isITNEditable}
+                      disabled={!canSkEditOnlyWhenEmptyNumber(row[itnCol])}
                     />
                   </td>
                 ))}

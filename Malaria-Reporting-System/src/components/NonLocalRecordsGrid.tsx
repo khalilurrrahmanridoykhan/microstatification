@@ -66,12 +66,6 @@ const NON_LOCAL_HEADER_LABELS = [
 const NON_LOCAL_MONTH_COLUMN_START_INDEX = 7;
 const NON_LOCAL_MONTH_COLUMN_END_INDEX = 18;
 
-function formatHeaderLabel(label: string): string {
-  const words = label.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return words[0] || "";
-  return `${words[0]} ${words[1]}`;
-}
-
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Dhaka",
@@ -363,20 +357,20 @@ const NonLocalRecordsGrid = () => {
   };
 
   const estimateHeaderWidth = (label: string) => {
-    const formattedLabel = formatHeaderLabel(label);
-    if (!label) {
+    const headerLabel = String(label || "").trim();
+    if (!headerLabel) {
       return 36;
     }
     if (typeof document === "undefined") {
-      return Math.min(320, Math.max(36, formattedLabel.length * 7 + 18));
+      return Math.min(320, Math.max(36, headerLabel.length * 7 + 18));
     }
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
     if (!context) {
-      return Math.min(320, Math.max(36, formattedLabel.length * 7 + 18));
+      return Math.min(320, Math.max(36, headerLabel.length * 7 + 18));
     }
     context.font = "600 9px Inter, ui-sans-serif, system-ui, sans-serif";
-    const textWidth = context.measureText(formattedLabel).width;
+    const textWidth = context.measureText(headerLabel).width;
     return Math.min(320, Math.ceil(textWidth + 18));
   };
 
@@ -460,9 +454,9 @@ const NonLocalRecordsGrid = () => {
 
   const renderHeaderCell = (label: React.ReactNode, index: number, className: string) => (
     <th key={index} className={`${className} relative`}>
-      {label}
+      {typeof label === "string" ? <span className="grid-th-label">{label}</span> : label}
       <span
-        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-primary/20"
+        className="absolute right-0 top-0 z-20 h-full w-2 cursor-col-resize bg-transparent hover:bg-primary/20"
         onMouseDown={(event) => startColumnResize(index, event)}
       />
     </th>
