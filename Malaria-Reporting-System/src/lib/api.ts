@@ -5,6 +5,7 @@ export type RecordType = "local" | "non_local";
 export interface SessionUser {
   id: string;
   email: string;
+  username?: string;
 }
 
 export interface AuthProfile {
@@ -216,7 +217,7 @@ export interface LocalRecordCreatePayload extends MonthlyValues {
 }
 
 export interface NonLocalRecordPayload extends MonthlyValues {
-  sk_user_id?: string;
+  sk_user?: string | number;
   reporting_year: number;
   country: string;
   district_or_state: string;
@@ -246,6 +247,15 @@ export interface MonthAccessSetting {
   month: number;
   is_open: boolean;
   close_date: string | null;
+}
+
+export type MalariaGridLayoutKey = "local_records" | "non_local_records";
+
+export interface MalariaGridColumnLayoutResponse {
+  grid_key: string;
+  column_widths: Record<string, number>;
+  is_expanded_to_header_width: boolean;
+  updated_at: string | null;
 }
 
 export interface UserPayload {
@@ -387,9 +397,31 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     let message = "Request failed.";
 
     try {
-      const errorPayload = (await response.json()) as { error?: string };
-      if (errorPayload.error) {
-        message = errorPayload.error;
+      const errorPayload = (await response.json()) as
+        | { error?: string; detail?: string; [key: string]: unknown }
+        | string
+        | null;
+      if (typeof errorPayload === "string" && errorPayload.trim()) {
+        message = errorPayload;
+      } else if (errorPayload && typeof errorPayload === "object") {
+        const directMessage =
+          (typeof errorPayload.error === "string" && errorPayload.error) ||
+          (typeof errorPayload.detail === "string" && errorPayload.detail);
+        if (directMessage) {
+          message = directMessage;
+        } else {
+          const firstFieldError = Object.values(errorPayload).find((value) => {
+            if (Array.isArray(value) && value.length > 0) {
+              return typeof value[0] === "string";
+            }
+            return typeof value === "string";
+          });
+          if (Array.isArray(firstFieldError) && typeof firstFieldError[0] === "string") {
+            message = firstFieldError[0];
+          } else if (typeof firstFieldError === "string") {
+            message = firstFieldError;
+          }
+        }
       }
     } catch (_error) {
       message = response.statusText || message;
@@ -398,11 +430,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new Error(message);
   }
 
-  if (response.status === 204) {
+  if (response.status === 204 || response.status === 205) {
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  const rawText = await response.text();
+  if (!rawText.trim()) {
+    return undefined as T;
+  }
+
+  return JSON.parse(rawText) as T;
 }
 
 function clearGetRequestCache(prefix?: string): void {
@@ -478,6 +515,7 @@ export function fetchLocalRecordsPage(params: {
 
 export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promise<{ success: boolean }> {
   clearGetRequestCache("/malaria/local-records/");
+  clearGetRequestCache("/malaria/monthly-approvals/");
   return request<{ success: boolean }>(`/malaria/local-records/${id}/`, {
     method: "PUT",
     body: JSON.stringify(payload),
@@ -486,6 +524,7 @@ export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promi
 
 export function deleteLocalRecord(id: string): Promise<void> {
   clearGetRequestCache("/malaria/local-records/");
+  clearGetRequestCache("/malaria/monthly-approvals/");
   return request<void>(`/malaria/local-records/${id}/`, {
     method: "DELETE",
   });
@@ -557,6 +596,27 @@ export function fetchMonthAccessSettings(year: number): Promise<MonthAccessSetti
   return requestCached<MonthAccessSetting[]>(`/malaria/month-access-settings/?reporting_year=${year}`);
 }
 
+export function fetchMalariaGridColumnLayout(gridKey: MalariaGridLayoutKey): Promise<MalariaGridColumnLayoutResponse> {
+  return request<MalariaGridColumnLayoutResponse>(`/malaria/grid-column-layout/${gridKey}/`);
+}
+
+export function saveMalariaGridColumnLayout(
+  gridKey: MalariaGridLayoutKey,
+  payload: { column_widths: Record<number, number>; is_expanded_to_header_width: boolean },
+): Promise<MalariaGridColumnLayoutResponse> {
+  const column_widths: Record<string, number> = {};
+  for (const [key, value] of Object.entries(payload.column_widths)) {
+    column_widths[String(key)] = value;
+  }
+  return request<MalariaGridColumnLayoutResponse>(`/malaria/grid-column-layout/${gridKey}/`, {
+    method: "PUT",
+    body: JSON.stringify({
+      column_widths,
+      is_expanded_to_header_width: payload.is_expanded_to_header_width,
+    }),
+  });
+}
+
 export function fetchNonLocalRecords(year?: number | "latest"): Promise<NonLocalRecord[]> {
   const query =
     year === "latest"
@@ -572,6 +632,7 @@ export function fetchNonLocalRecordsPage(params: {
   page?: number;
   pageSize?: number;
   fields?: string[];
+  skUserId?: string;
 }): Promise<PaginatedResponse<NonLocalRecord>> {
   const query = new URLSearchParams();
   if (params.year === "latest") {
@@ -582,6 +643,9 @@ export function fetchNonLocalRecordsPage(params: {
   query.set("paginate", "1");
   query.set("page", String(params.page || 1));
   query.set("page_size", String(params.pageSize || 100));
+  if (params.skUserId) {
+    query.set("sk_user_id", params.skUserId);
+  }
   if (params.fields?.length) {
     query.set("_fields", params.fields.join(","));
   }
@@ -606,6 +670,7 @@ export function updateNonLocalRecord(id: string, payload: NonLocalRecordPayload)
 
 export function createLocalRecord(payload: LocalRecordCreatePayload): Promise<LocalRecord> {
   clearGetRequestCache("/malaria/local-records/");
+  clearGetRequestCache("/malaria/monthly-approvals/");
   return request<LocalRecord>("/malaria/local-records/", {
     method: "POST",
     body: JSON.stringify(payload),

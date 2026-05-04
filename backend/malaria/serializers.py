@@ -1,9 +1,12 @@
+import math
+
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import (
     District,
     LocalRecord,
+    MalariaGridColumnLayout,
     MalariaUserRole,
     MicrostatificationDataUpload,
     MonthAccessSetting,
@@ -470,3 +473,47 @@ class MicrostatificationDataUploadSerializer(serializers.ModelSerializer):
 class MicrostatificationDataUploadFileSerializer(serializers.Serializer):
     excel_file = serializers.FileField()
     district = serializers.CharField(max_length=255)
+
+
+MALARIA_GRID_COLUMN_INDEX_MAX = 36
+MALARIA_GRID_COLUMN_WIDTH_MIN = 10
+MALARIA_GRID_COLUMN_WIDTH_MAX = 800
+
+
+class MalariaGridColumnLayoutPayloadSerializer(serializers.Serializer):
+    """Validate body for PUT /malaria/grid-column-layout/<grid_key>/."""
+
+    column_widths = serializers.JSONField()
+    is_expanded_to_header_width = serializers.BooleanField(default=False)
+
+    def validate_column_widths(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("column_widths must be an object.")
+        normalized = {}
+        for raw_key, raw_w in value.items():
+            try:
+                idx = int(raw_key)
+            except (TypeError, ValueError) as exc:
+                raise serializers.ValidationError(f"Invalid column key: {raw_key!r}") from exc
+            if idx < 0 or idx > MALARIA_GRID_COLUMN_INDEX_MAX:
+                raise serializers.ValidationError(f"Column index out of range: {idx}")
+            try:
+                w = float(raw_w)
+            except (TypeError, ValueError) as exc:
+                raise serializers.ValidationError(f"Invalid width for column {idx}: {raw_w!r}") from exc
+            if not math.isfinite(w):
+                raise serializers.ValidationError(f"Invalid width for column {idx}")
+            w = int(round(w))
+            if w < MALARIA_GRID_COLUMN_WIDTH_MIN or w > MALARIA_GRID_COLUMN_WIDTH_MAX:
+                raise serializers.ValidationError(
+                    f"Width for column {idx} must be between "
+                    f"{MALARIA_GRID_COLUMN_WIDTH_MIN} and {MALARIA_GRID_COLUMN_WIDTH_MAX}."
+                )
+            normalized[str(idx)] = w
+        return normalized
+
+
+class MalariaGridColumnLayoutResponseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MalariaGridColumnLayout
+        fields = ("grid_key", "column_widths", "is_expanded_to_header_width", "updated_at")

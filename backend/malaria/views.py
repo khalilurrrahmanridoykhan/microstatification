@@ -33,6 +33,7 @@ from rest_framework.views import APIView
 from .models import (
     District,
     LocalRecord,
+    MalariaGridColumnLayout,
     MalariaUserRole,
     MicrostatificationDataUpload,
     MonthAccessSetting,
@@ -47,6 +48,8 @@ from .permissions import HasMalariaAccess, IsMalariaAdmin, get_malaria_role, has
 from .serializers import (
     DistrictSerializer,
     LocalRecordSerializer,
+    MalariaGridColumnLayoutPayloadSerializer,
+    MalariaGridColumnLayoutResponseSerializer,
     MalariaSessionSerializer,
     MalariaUserCreateSerializer,
     MalariaUserRoleSerializer,
@@ -1698,6 +1701,53 @@ class MalariaMeView(MalariaSessionView):
     pass
 
 
+MALARIA_GRID_LAYOUT_KEYS = frozenset(
+    {
+        MalariaGridColumnLayout.GRID_LOCAL_RECORDS,
+        MalariaGridColumnLayout.GRID_NON_LOCAL_RECORDS,
+    }
+)
+
+
+class MalariaGridColumnLayoutView(APIView):
+    """GET: shared column layout for all malaria users. PUT: malaria admin publishes layout."""
+
+    def get_permissions(self):
+        if self.request.method == "PUT":
+            return [IsAuthenticated(), IsMalariaAdmin()]
+        return [IsAuthenticated(), HasMalariaAccess()]
+
+    def get(self, request, grid_key):
+        if grid_key not in MALARIA_GRID_LAYOUT_KEYS:
+            return Response({"detail": "Unknown grid_key."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            obj = MalariaGridColumnLayout.objects.get(grid_key=grid_key)
+        except MalariaGridColumnLayout.DoesNotExist:
+            return Response(
+                {
+                    "grid_key": grid_key,
+                    "column_widths": {},
+                    "is_expanded_to_header_width": False,
+                    "updated_at": None,
+                }
+            )
+        return Response(MalariaGridColumnLayoutResponseSerializer(obj).data)
+
+    def put(self, request, grid_key):
+        if grid_key not in MALARIA_GRID_LAYOUT_KEYS:
+            return Response({"detail": "Unknown grid_key."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = MalariaGridColumnLayoutPayloadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj, _ = MalariaGridColumnLayout.objects.update_or_create(
+            grid_key=grid_key,
+            defaults={
+                "column_widths": serializer.validated_data["column_widths"],
+                "is_expanded_to_header_width": serializer.validated_data["is_expanded_to_header_width"],
+            },
+        )
+        return Response(MalariaGridColumnLayoutResponseSerializer(obj).data)
+
+
 class MalariaLogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -2269,6 +2319,10 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         payload = request.data.copy()
+        # Ensure sk_user is always set to avoid DB NOT NULL failures.
+        # Non-admin users are always bound to themselves.
+        if not payload.get("sk_user"):
+            payload["sk_user"] = request.user.id
         if not is_malaria_admin(request.user):
             payload["sk_user"] = request.user.id
         serializer = self.get_serializer(data=payload)

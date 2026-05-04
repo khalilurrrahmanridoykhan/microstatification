@@ -17,17 +17,18 @@ import {
   estimateVerticalMonthHeaderWidth,
   getDhakaMonth,
   getDhakaYear,
-  getMonthTotal,
 } from "@/lib/monthUtils";
-import { Maximize2, Minimize2, Plus, Trash2, RefreshCw, Save } from "lucide-react";
+import { Columns3, Loader2, Maximize2, Minimize2, Plus, Trash2, RefreshCw, Save } from "lucide-react";
 import {
   createNonLocalRecord,
   deleteNonLocalRecord,
   fetchMalariaMasterData,
   fetchVillagesByUnion,
   fetchMonthlyApprovals,
+  fetchMalariaGridColumnLayout,
   fetchMonthAccessSettings,
   fetchNonLocalRecordsPage,
+  saveMalariaGridColumnLayout,
   upsertMonthlyApproval,
   updateNonLocalRecord,
   type ApprovalRow,
@@ -48,19 +49,54 @@ type NonLocalEditableField =
   | "union_name"
   | "village_name"
   | MonthColumn;
+type NonLocalExtraEditableField =
+  | "division_name"
+  | "name_of_sk_shw"
+  | "designation"
+  | "name_of_ss"
+  | "village_name_bn"
+  | "village_code"
+  | "latitude"
+  | "longitude"
+  | "population_text"
+  | "hh_text"
+  | "itn_2026_text"
+  | "itn_2025_text"
+  | "itn_2024_text"
+  | "mmw_hp_chwc_name"
+  | "village_distance_km"
+  | "border_country_name"
+  | "other_activities";
 
 const COUNTRIES = ["Bangladesh", "India", "Myanmar"];
 const OTHER_OPTION = "__other__";
 const NON_LOCAL_HEADER_LABELS = [
   "",
+  "SL",
   "Country",
-  "District/State",
-  "Upazila/Township",
+  "Division",
+  "District",
+  "Upazila",
   "Union",
   "Ward No",
-  "Village",
+  "Name of SK/SHW",
+  "Desig.",
+  "Name of SS",
+  "Village Name (English)",
+  "Village Name (Bangla)",
+  "Village Code",
+  "Latitude",
+  "Longitute",
+  "Population",
+  "HH Number",
+  "2026 (Active LLINs)",
+  "2025 (Active LLINs)",
+  "2024 (Active LLINs)",
   ...MONTH_LABELS,
-  "Total",
+  "Name of MMW, Health post & CHW(C)",
+  "Village Distance from upazila office (KM)",
+  "Name of Border with others country",
+  "Others  Activities (TDA/Dev care)",
 ];
 const NON_LOCAL_LIST_FIELDS = [
   "id",
@@ -74,8 +110,8 @@ const NON_LOCAL_LIST_FIELDS = [
   ...MONTH_COLUMNS,
 ];
 
-const NON_LOCAL_MONTH_COLUMN_START_INDEX = 7;
-const NON_LOCAL_MONTH_COLUMN_END_INDEX = 18;
+const NON_LOCAL_MONTH_COLUMN_START_INDEX = 21;
+const NON_LOCAL_MONTH_COLUMN_END_INDEX = 32;
 
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -119,9 +155,8 @@ function isMonthField(field: NonLocalEditableField): field is MonthColumn {
 
 function buildPayload(row: NonLocalRow): NonLocalRecordPayload {
   return {
-    sk_user_id: row.sk_user_id,
     reporting_year: row.reporting_year,
-    country: row.country,
+    country: row.country.trim() || "Bangladesh",
     district_or_state: row.district_or_state,
     upazila_or_township: row.upazila_or_township,
     union_name: row.union_name,
@@ -145,6 +180,7 @@ const NonLocalRecordsGrid = () => {
   const { user, role } = useAuth();
   const { toast } = useToast();
   const isAdmin = role === "admin";
+  const isSkOrShw = role === "sk";
   const currentMonth = getDhakaMonth();
   const currentYear = getDhakaYear();
 
@@ -158,6 +194,8 @@ const NonLocalRecordsGrid = () => {
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const [isExpandedToHeaderWidth, setIsExpandedToHeaderWidth] = useState(false);
   const previousColumnWidthsRef = useRef<Record<number, number> | null>(null);
+  const appliedServerLayoutRef = useRef(false);
+  const [savingLayout, setSavingLayout] = useState(false);
   const [approvalRows, setApprovalRows] = useState<ApprovalRow[]>([]);
   const [recordView, setRecordView] = useState<"all" | "pending">("all");
   const [masterData, setMasterData] = useState<MalariaMasterData>({
@@ -253,11 +291,13 @@ const NonLocalRecordsGrid = () => {
     setLoading(true);
     try {
       const requestPageSize = 100;
+      const skUserId = isAdmin ? undefined : user.id;
       let firstPage = await fetchNonLocalRecordsPage({
         year,
         page: 1,
         pageSize: requestPageSize,
         fields: NON_LOCAL_LIST_FIELDS,
+        skUserId,
       });
       let effectiveYear = year;
 
@@ -267,6 +307,7 @@ const NonLocalRecordsGrid = () => {
           page: 1,
           pageSize: requestPageSize,
           fields: NON_LOCAL_LIST_FIELDS,
+          skUserId,
         });
         if (latestPage.results.length > 0) {
           firstPage = latestPage;
@@ -278,10 +319,7 @@ const NonLocalRecordsGrid = () => {
         setYear(effectiveYear);
       }
 
-      const visibleRows = isAdmin
-        ? firstPage.results
-        : firstPage.results.filter((row) => row.sk_user_id === user.id);
-      setRows(visibleRows);
+      setRows(firstPage.results);
       const approvals = await fetchMonthlyApprovals({
         recordType: "non_local",
         reportingYear: effectiveYear,
@@ -293,7 +331,7 @@ const NonLocalRecordsGrid = () => {
       // Load remaining pages in the background to keep first paint fast.
       void (async () => {
         let nextUrl = firstPage.next;
-        const seen = new Set(visibleRows.map((row) => row.id));
+        const seen = new Set(firstPage.results.map((row) => row.id));
         while (nextUrl) {
           const nextPageParam = new URL(nextUrl, window.location.origin).searchParams.get("page");
           const pageNumber = Number(nextPageParam || "0");
@@ -303,11 +341,11 @@ const NonLocalRecordsGrid = () => {
             page: pageNumber,
             pageSize: requestPageSize,
             fields: NON_LOCAL_LIST_FIELDS,
+            skUserId,
           });
-          const pageRows = isAdmin ? pageData.results : pageData.results.filter((row) => row.sk_user_id === user.id);
           setRows((prev) => [
             ...prev,
-            ...pageRows.filter((row) => {
+            ...pageData.results.filter((row) => {
               if (seen.has(row.id)) return false;
               seen.add(row.id);
               return true;
@@ -445,6 +483,9 @@ const NonLocalRecordsGrid = () => {
 
   useEffect(() => {
     setColumnWidths((prev) => {
+      if (appliedServerLayoutRef.current) {
+        return prev;
+      }
       if (Object.keys(prev).length > 0) {
         return prev;
       }
@@ -464,6 +505,9 @@ const NonLocalRecordsGrid = () => {
 
   useEffect(() => {
     setColumnWidths((prev) => {
+      if (appliedServerLayoutRef.current) {
+        return prev;
+      }
       if (Object.keys(prev).length === 0) {
         return prev;
       }
@@ -486,6 +530,65 @@ const NonLocalRecordsGrid = () => {
       return changed ? next : prev;
     });
   }, [pendingActionMonthColumnIndexes]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await fetchMalariaGridColumnLayout("non_local_records");
+        if (cancelled) return;
+        const raw = data.column_widths || {};
+        const hasSaved = Object.keys(raw).some((k) => {
+          const v = raw[k];
+          return typeof v === "number" && Number.isFinite(v) && v >= 10;
+        });
+        if (!hasSaved) return;
+        appliedServerLayoutRef.current = true;
+        setIsExpandedToHeaderWidth(Boolean(data.is_expanded_to_header_width));
+        setColumnWidths((prev) => {
+          const next: Record<number, number> = { ...prev };
+          for (let i = 0; i <= 36; i += 1) {
+            const sv = raw[String(i)] ?? (raw as Record<number, number>)[i];
+            if (typeof sv === "number" && Number.isFinite(sv) && sv >= 10) {
+              next[i] = Math.round(sv);
+            } else if (next[i] == null) {
+              next[i] = 72;
+            }
+          }
+          return next;
+        });
+      } catch (_error) {
+        // No saved layout or network error — keep heuristic widths.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const handleSaveColumnLayoutForEveryone = async () => {
+    try {
+      setSavingLayout(true);
+      await saveMalariaGridColumnLayout("non_local_records", {
+        column_widths: columnWidths,
+        is_expanded_to_header_width: isExpandedToHeaderWidth,
+      });
+      appliedServerLayoutRef.current = true;
+      toast({
+        title: "Column layout saved",
+        description: "All users will see this table width on their next visit or refresh.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not save layout",
+        description: error instanceof Error ? error.message : "Only malaria admins can publish column layouts.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingLayout(false);
+    }
+  };
 
   const toggleExpandToHeaderWidth = () => {
     if (!isExpandedToHeaderWidth) {
@@ -547,20 +650,56 @@ const NonLocalRecordsGrid = () => {
     });
   };
 
-  const deleteRow = (id: string) => {
-    const row = rows.find((r) => r.id === id);
-    if (!row) return;
-
-    if (!row._isNew) {
-      setDeletedIds((prev) => [...prev, id]);
+  const deleteRow = async (id: string) => {
+    const row = rows.find((r) => String(r.id) === String(id));
+    if (!row) {
+      toast({
+        title: "Delete failed",
+        description: "Could not find that row. Try reloading the table.",
+        variant: "destructive",
+      });
+      return;
     }
 
-    setRows((prev) => prev.filter((r) => r.id !== id));
+    if (isAdmin && !row._isNew) {
+      try {
+        await deleteNonLocalRecord(String(row.id));
+      } catch (error) {
+        toast({
+          title: "Delete failed",
+          description: error instanceof Error ? error.message : "Failed to delete record.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (!row._isNew) {
+      setDeletedIds((prev) => [...prev, String(id)]);
+    }
+
+    setRows((prev) => prev.filter((r) => String(r.id) !== String(id)));
     setDirtyIds((prev) => {
       const next = new Set(prev);
-      next.delete(id);
+      for (const dirtyId of prev) {
+        if (String(dirtyId) === String(id)) {
+          next.delete(dirtyId);
+        }
+      }
       return next;
     });
+    setWardByRow((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setOtherModeByRow((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+
+    if (isAdmin && !row._isNew) {
+      toast({ title: "Row deleted" });
+    }
   };
 
   const handleCellChange = (
@@ -586,6 +725,11 @@ const NonLocalRecordsGrid = () => {
       next.add(rowId);
       return next;
     });
+  };
+
+  const handleExtraFieldChange = (rowId: string, field: NonLocalExtraEditableField, value: string) => {
+    setRows((prev) => prev.map((row) => (row.id === rowId ? ({ ...row, [field]: value } as NonLocalRow) : row)));
+    setDirtyIds((prev) => new Set(prev).add(rowId));
   };
 
   const setOtherMode = (
@@ -696,6 +840,9 @@ const NonLocalRecordsGrid = () => {
     if (year !== currentYear) return false;
     return openMonthNumbers.has(monthIndex + 1);
   };
+  const canEditOwnNewRow = (row: NonLocalRow) =>
+    isSkOrShw && !!user && row._isNew && String(row.sk_user_id) === String(user.id);
+  const canEditLocationField = (row: NonLocalRow) => isAdmin || canEditOwnNewRow(row);
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
   const hasDirty = dirtyIds.size > 0 || deletedIds.length > 0;
@@ -730,6 +877,18 @@ const NonLocalRecordsGrid = () => {
         <Button variant="outline" size="icon" onClick={toggleExpandToHeaderWidth} title="Toggle full-width columns">
           {isExpandedToHeaderWidth ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
+        {isAdmin && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => void handleSaveColumnLayoutForEveryone()}
+            disabled={savingLayout || loading}
+            title="Save current column widths for all users"
+            aria-label="Save column layout for all users"
+          >
+            {savingLayout ? <Loader2 className="h-4 w-4 animate-spin" /> : <Columns3 className="h-4 w-4" />}
+          </Button>
+        )}
         {isAdmin && (
           <Select value={recordView} onValueChange={(value) => setRecordView(value as "all" | "pending")}>
             <SelectTrigger className="w-[180px]">
@@ -772,50 +931,72 @@ const NonLocalRecordsGrid = () => {
         )}
         <table className="w-full text-[10px] border-collapse table-fixed">
           <colgroup>
-            {Array.from({ length: 20 }).map((_, index) => (
+            {Array.from({ length: 37 }).map((_, index) => (
               <col key={index} style={columnWidths[index] ? { width: `${columnWidths[index]}px` } : undefined} />
             ))}
           </colgroup>
           <thead className="sticky top-0 z-10 bg-gray-50 border-b">
             <tr>
               {renderHeaderCell("", 0, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Country", 1, "grid-th min-w-[10px]")}
-              {renderHeaderCell("District/State", 2, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Upazila/Township", 3, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Union", 4, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Ward No", 5, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Village", 6, "grid-th min-w-[10px]")}
+              {renderHeaderCell("SL", 1, "grid-th min-w-[10px] sticky left-0 bg-gray-50 z-20")}
+              {renderHeaderCell("Country", 2, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Division", 3, "grid-th min-w-[10px]")}
+              {renderHeaderCell("District", 4, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Upazila", 5, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Union", 6, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Ward No", 7, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Name of SK/SHW", 8, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Desig.", 9, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Name of SS", 10, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village Name (English)", 11, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village Name (Bangla)", 12, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village Code", 13, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Latitude", 14, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Longitute", 15, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Population", 16, "grid-th min-w-[10px]")}
+              {renderHeaderCell("HH Number", 17, "grid-th min-w-[10px]")}
+              {renderHeaderCell("2026 (Active LLINs)", 18, "grid-th min-w-[10px]")}
+              {renderHeaderCell("2025 (Active LLINs)", 19, "grid-th min-w-[10px]")}
+              {renderHeaderCell("2024 (Active LLINs)", 20, "grid-th min-w-[10px]")}
               {MONTH_LABELS.map((m, idx) => (
                 renderHeaderCell(
                   <span className={`month-th-label${isExpandedToHeaderWidth ? " month-th-label-horizontal" : ""}`}>
                     {m}
                   </span>,
-                  7 + idx,
+                  21 + idx,
                   `grid-th min-w-[10px]${isExpandedToHeaderWidth ? " month-th-horizontal" : " month-th"}`,
                 )
               ))}
-              {renderHeaderCell("Total", 19, "grid-th min-w-[10px] font-bold")}
+              {renderHeaderCell("Name of MMW, Health post & CHW(C)", 33, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Village Distance from upazila office (KM)", 34, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Name of Border with others country", 35, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Others  Activities (TDA/Dev care)", 36, "grid-th min-w-[10px]")}
             </tr>
           </thead>
 
           <tbody>
             {displayedRows.length === 0 && !loading && (
               <tr>
-                <td colSpan={20} className="text-center py-8 text-muted-foreground">
+                <td colSpan={37} className="text-center py-8 text-muted-foreground">
                   {isAdmin && recordView === "pending" ? "No pending records for current filters" : `No records for ${year}`}
                 </td>
               </tr>
             )}
 
-            {displayedRows.map((row) => (
-              <tr key={row.id} className="hover:bg-gray-50">
+            {displayedRows.map((row, index) => (
+              <tr key={row.id} className={row._isNew ? "bg-sky-50/70 hover:bg-sky-100/70" : "hover:bg-gray-50"}>
                 <td className="grid-td p-1 text-center">
-                  <button
-                    onClick={() => deleteRow(row.id)}
-                    className="text-destructive hover:text-destructive/80 p-0.5"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => deleteRow(row.id)}
+                      className="text-destructive hover:text-destructive/80 p-0.5"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </td>
+                <td className={`grid-td sticky left-0 z-[5] font-medium ${row._isNew ? "bg-sky-50/70" : "bg-white"}`}>
+                  {index + 1}
                 </td>
 
                 <td className="grid-td p-0">
@@ -825,15 +1006,17 @@ const NonLocalRecordsGrid = () => {
                       placeholder="Enter country"
                       value={row.country}
                       onChange={(e) => handleCellChange(row.id, "country", e.target.value)}
+                      disabled={!canEditLocationField(row)}
                     />
                   ) : (
                     <select
                       className="grid-input bg-transparent"
                       value={row.country}
+                      disabled={!canEditLocationField(row)}
                       onChange={(e) => {
                         if (e.target.value === OTHER_OPTION) {
                           setOtherMode(row.id, "country", true);
-                          handleCellChange(row.id, "country", "");
+                          handleCellChange(row.id, "country", row.country.trim() || "Other");
                           return;
                         }
                         setOtherMode(row.id, "country", false);
@@ -851,10 +1034,23 @@ const NonLocalRecordsGrid = () => {
                 </td>
 
                 <td className="grid-td p-0">
+                  {isAdmin ? (
+                    <input
+                      className="grid-input"
+                      value={(row as unknown as Record<string, string>).division_name || (row.country === "Bangladesh" ? "Chattogram" : "")}
+                      onChange={(e) => handleExtraFieldChange(row.id, "division_name", e.target.value)}
+                    />
+                  ) : (
+                    <span>{"Bangladesh" === row.country ? "Chattogram" : "-"}</span>
+                  )}
+                </td>
+
+                <td className="grid-td p-0">
                   {row.country === "Bangladesh" && !otherModeByRow[row.id]?.district ? (
                     <select
                       className="grid-input bg-transparent"
                       value={row.district_or_state}
+                      disabled={!canEditLocationField(row)}
                       onChange={(e) => {
                         if (e.target.value === OTHER_OPTION) {
                           setOtherMode(row.id, "district", true);
@@ -883,6 +1079,7 @@ const NonLocalRecordsGrid = () => {
                       placeholder="District/State"
                       value={row.district_or_state}
                       onChange={(e) => handleCellChange(row.id, "district_or_state", e.target.value)}
+                      disabled={!canEditLocationField(row)}
                     />
                   )}
                 </td>
@@ -892,6 +1089,7 @@ const NonLocalRecordsGrid = () => {
                     <select
                       className="grid-input bg-transparent"
                       value={row.upazila_or_township}
+                      disabled={!canEditLocationField(row)}
                       onChange={(e) => {
                         if (e.target.value === OTHER_OPTION) {
                           setOtherMode(row.id, "upazila", true);
@@ -919,15 +1117,21 @@ const NonLocalRecordsGrid = () => {
                       placeholder="Upazila/Township"
                       value={row.upazila_or_township}
                       onChange={(e) => handleCellChange(row.id, "upazila_or_township", e.target.value)}
+                      disabled={!canEditLocationField(row)}
                     />
                   )}
                 </td>
+
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).name_of_sk_shw || ""} onChange={(e) => handleExtraFieldChange(row.id, "name_of_sk_shw", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).designation || ""} onChange={(e) => handleExtraFieldChange(row.id, "designation", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).name_of_ss || ""} onChange={(e) => handleExtraFieldChange(row.id, "name_of_ss", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
 
                 <td className="grid-td p-0">
                   {row.country === "Bangladesh" && !otherModeByRow[row.id]?.union ? (
                     <select
                       className="grid-input bg-transparent"
                       value={row.union_name}
+                      disabled={!canEditLocationField(row)}
                       onChange={(e) => {
                         if (e.target.value === OTHER_OPTION) {
                           setOtherMode(row.id, "union", true);
@@ -955,6 +1159,7 @@ const NonLocalRecordsGrid = () => {
                       placeholder="Union"
                       value={row.union_name}
                       onChange={(e) => handleCellChange(row.id, "union_name", e.target.value)}
+                      disabled={!canEditLocationField(row)}
                     />
                   )}
                 </td>
@@ -964,6 +1169,7 @@ const NonLocalRecordsGrid = () => {
                     <select
                       className="grid-input bg-transparent"
                       value={wardByRow[row.id] || ""}
+                      disabled={!canEditLocationField(row)}
                       onChange={(e) => {
                         if (e.target.value === OTHER_OPTION) {
                           setOtherMode(row.id, "ward", true);
@@ -990,6 +1196,7 @@ const NonLocalRecordsGrid = () => {
                       placeholder="Ward No"
                       value={wardByRow[row.id] || ""}
                       onChange={(e) => setWardByRow((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                      disabled={!canEditLocationField(row)}
                     />
                   )}
                 </td>
@@ -999,6 +1206,7 @@ const NonLocalRecordsGrid = () => {
                     <select
                       className="grid-input bg-transparent"
                       value={row.village_name}
+                      disabled={!canEditLocationField(row)}
                       onChange={(e) => {
                         if (e.target.value === OTHER_OPTION) {
                           setOtherMode(row.id, "village", true);
@@ -1023,14 +1231,25 @@ const NonLocalRecordsGrid = () => {
                       placeholder="Village"
                       value={row.village_name}
                       onChange={(e) => handleCellChange(row.id, "village_name", e.target.value)}
+                      disabled={!canEditLocationField(row)}
                     />
                   )}
                 </td>
 
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).village_name_bn || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_name_bn", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).village_code || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_code", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).latitude || ""} onChange={(e) => handleExtraFieldChange(row.id, "latitude", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).longitude || ""} onChange={(e) => handleExtraFieldChange(row.id, "longitude", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).population_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "population_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).hh_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "hh_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).itn_2026_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2026_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).itn_2025_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2025_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).itn_2024_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2024_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+
                 {MONTH_COLUMNS.map((col, idx) => {
                   const value = row[col as MonthColumn];
                   const status = getMonthStatus(row, value, idx);
-                  const editable = isMonthEditable(idx);
+                  const editable = canEditOwnNewRow(row) || isMonthEditable(idx);
                   const monthNumber = idx + 1;
                   const isPendingCell = status === "PENDING";
 
@@ -1086,9 +1305,10 @@ const NonLocalRecordsGrid = () => {
                   );
                 })}
 
-                <td className="grid-td font-bold text-center bg-gray-50">
-                  {getMonthTotal(row)}
-                </td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).mmw_hp_chwc_name || ""} onChange={(e) => handleExtraFieldChange(row.id, "mmw_hp_chwc_name", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).village_distance_km || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_distance_km", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).border_country_name || ""} onChange={(e) => handleExtraFieldChange(row.id, "border_country_name", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).other_activities || ""} onChange={(e) => handleExtraFieldChange(row.id, "other_activities", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
               </tr>
             ))}
           </tbody>

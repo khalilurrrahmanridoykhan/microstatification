@@ -12,6 +12,7 @@ from api.auth_views import enketo_login, logout_enketo
 from api.views import debug_auth, debug_enketo_auth, test_cookie, get_csrf_token, submit_form
 from django.middleware.csrf import get_token
 from api import views
+from malaria.views import MalariaGridColumnLayoutView
 
 
 router = DefaultRouter()
@@ -26,8 +27,15 @@ router.register(r'trash', TrashBinViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include(router.urls)),
+    # Registered here (before the broad `api/` include) so this URL always resolves even if
+    # an older `malaria.urls` is deployed or URL ordering differs on the server.
+    path(
+        'api/malaria/grid-column-layout/<str:grid_key>/',
+        MalariaGridColumnLayoutView.as_view(),
+        name='malaria-grid-column-layout',
+    ),
     path('api/malaria/', include('malaria.urls')),
+    path('api/', include(router.urls)),
     path('api/auth/login/', CustomAuthToken.as_view(), name='api_token_auth'),
     path('api/auth/register/', RegisterUser.as_view(), name='api_register'),
     path('api/csrf-token/', get_csrf_token, name='csrf_token'),  # Add this line

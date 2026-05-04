@@ -298,3 +298,24 @@ class MicrostatificationDataUpload(TimestampedModel):
     
     def __str__(self):
         return f"{self.district} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class MalariaGridColumnLayout(TimestampedModel):
+    """Site-wide saved column widths for malaria SPA datagrids (one row per grid)."""
+
+    GRID_LOCAL_RECORDS = "local_records"
+    GRID_NON_LOCAL_RECORDS = "non_local_records"
+    GRID_KEY_CHOICES = (
+        (GRID_LOCAL_RECORDS, "Local records grid"),
+        (GRID_NON_LOCAL_RECORDS, "Non-local records grid"),
+    )
+
+    grid_key = models.CharField(max_length=32, unique=True, choices=GRID_KEY_CHOICES)
+    column_widths = models.JSONField(default=dict, help_text='Map of column index (string "0".."36") to width in px')
+    is_expanded_to_header_width = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ("grid_key",)
+
+    def __str__(self):
+        return self.grid_key

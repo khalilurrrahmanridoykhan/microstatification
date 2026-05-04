@@ -29,7 +29,18 @@ import {
   getDhakaYear,
   getMonthTotal,
 } from "@/lib/monthUtils";
-import { Maximize2, Minimize2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  Columns3,
+  Loader2,
+  MapPin,
+  Maximize2,
+  Minimize2,
+  Plus,
+  RefreshCw,
+  Save,
+  Trash2,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   createDistrict,
@@ -42,7 +53,9 @@ import {
   fetchMalariaMasterData,
   fetchMonthlyApprovals,
   fetchLocalRecordsPage,
+  fetchMalariaGridColumnLayout,
   fetchMonthAccessSettings,
+  saveMalariaGridColumnLayout,
   upsertMonthlyApproval,
   updateDistrict,
   updateLocalRecord,
@@ -62,6 +75,60 @@ type LocalEditableField = keyof LocalRecordUpdate;
 type LocalGridRow = LocalRecord & { _isNew?: boolean };
 
 const itnColumns = ["itn_2026", "itn_2025", "itn_2024"] as const;
+
+/** Server snapshot for SK “edit only when initially empty” columns (compare baseline, not live value). */
+type SkRestrictedBaseline = {
+  village_sk_shw_name: string;
+  sk_user_designation: string;
+  village_ss_name: string;
+  village_name: string;
+  village_name_bn: string;
+  village_code: string;
+  village_latitude: string;
+  village_longitude: string;
+  population: number;
+  hh: number;
+  itn_2026: number;
+  itn_2025: number;
+  itn_2024: number;
+};
+
+type SkRestrictedTextKey = keyof Pick<
+  SkRestrictedBaseline,
+  | "village_sk_shw_name"
+  | "sk_user_designation"
+  | "village_ss_name"
+  | "village_name"
+  | "village_name_bn"
+  | "village_code"
+  | "village_latitude"
+  | "village_longitude"
+>;
+
+type SkRestrictedNumberKey = "population" | "hh" | (typeof itnColumns)[number];
+
+function extractSkBaseline(row: LocalGridRow): SkRestrictedBaseline {
+  return {
+    village_sk_shw_name: String(row.village_sk_shw_name ?? "").trim(),
+    sk_user_designation: String(row.sk_user_designation ?? "").trim(),
+    village_ss_name: String(row.village_ss_name ?? "").trim(),
+    village_name: String(row.village_name ?? "").trim(),
+    village_name_bn: String(row.village_name_bn ?? "").trim(),
+    village_code: String(row.village_code ?? "").trim(),
+    village_latitude: String(row.village_latitude ?? "").trim(),
+    village_longitude: String(row.village_longitude ?? "").trim(),
+    population: row.population ?? 0,
+    hh: row.hh ?? 0,
+    itn_2026: row.itn_2026 ?? 0,
+    itn_2025: row.itn_2025 ?? 0,
+    itn_2024: row.itn_2024 ?? 0,
+  };
+}
+
+function skBaselineNumberIsEmpty(value: number | null | undefined): boolean {
+  return value === null || value === undefined || Number(value) === 0;
+}
+
 const OTHER_OPTION = "__other__";
 const LOCAL_HEADER_LABELS = [
   "SL",
@@ -88,7 +155,7 @@ const LOCAL_HEADER_LABELS = [
   "Name of MMW, Health post & CHW(C)",
   "Village Distance from upazila office (KM)",
   "Name of Border with others country",
-  "Others Activities (TDA/Dev care)",
+  "Others  Activities (TDA/Dev care)",
 ];
 const LOCAL_LIST_FIELDS = [
   "id",
@@ -128,6 +195,11 @@ const LOCAL_LIST_FIELDS = [
 
 const LOCAL_MONTH_COLUMN_START_INDEX = 21;
 const LOCAL_MONTH_COLUMN_END_INDEX = 32;
+
+/** API may return numeric `id`; JS Set uses strict equality — normalize for dirtyIds / lookups. */
+function rowIdKey(id: unknown): string {
+  return String(id);
+}
 
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -189,6 +261,27 @@ function buildUpdatePayload(row: LocalRecord): LocalRecordUpdate {
   };
 }
 
+/** Thrown when a new local row cannot be saved until geography fields are filled. */
+class LocalSaveValidationError extends Error {
+  readonly missing: string[];
+
+  constructor(missing: string[]) {
+    super(
+      missing.length
+        ? `Please complete: ${missing.join(", ")}.`
+        : "District, Upazila, Union and Village are required for a new Local row.",
+    );
+    this.name = "LocalSaveValidationError";
+    this.missing = missing;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+type SaveErrorAlertState =
+  | null
+  | { variant: "location"; missing: string[] }
+  | { variant: "generic"; title: string; message: string };
+
 function buildVillageUpdatePayload(row: LocalRecord): VillageUpdatePayload {
   return {
     name: row.village_name || "",
@@ -229,9 +322,12 @@ const LocalRecordsGrid = () => {
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const [isExpandedToHeaderWidth, setIsExpandedToHeaderWidth] = useState(false);
   const previousColumnWidthsRef = useRef<Record<number, number> | null>(null);
+  const appliedServerLayoutRef = useRef(false);
+  const [savingLayout, setSavingLayout] = useState(false);
   const [approvalRows, setApprovalRows] = useState<ApprovalRow[]>([]);
   const [recordView, setRecordView] = useState<"all" | "pending">("all");
   const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
+  const [saveErrorAlert, setSaveErrorAlert] = useState<SaveErrorAlertState>(null);
   const [masterData, setMasterData] = useState<MalariaMasterData>({
     districts: [],
     upazilas: [],
@@ -242,6 +338,7 @@ const LocalRecordsGrid = () => {
     Record<string, Partial<Record<"district" | "upazila" | "union" | "ward", boolean>>>
   >({});
   const touchedColumnIndexesRef = useRef<Set<number>>(new Set());
+  const skRestrictedBaselineRef = useRef<Map<string, SkRestrictedBaseline>>(new Map());
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
@@ -253,7 +350,7 @@ const LocalRecordsGrid = () => {
   const approvalByKey = useMemo(() => {
     const map = new Map<string, ApprovalRow["status"]>();
     for (const approval of approvalRows) {
-      map.set(`${approval.record_id}:${approval.month}`, approval.status);
+      map.set(`${rowIdKey(approval.record_id)}:${approval.month}`, approval.status);
     }
     return map;
   }, [approvalRows]);
@@ -261,7 +358,7 @@ const LocalRecordsGrid = () => {
   const getMonthStatus = (row: LocalRecord, value: number, monthIndex: number): CellStatus => {
     if (!value || value === 0) return "NOT_SUBMITTED";
     const monthNumber = monthIndex + 1;
-    const approvalStatus = approvalByKey.get(`${row.id}:${monthNumber}`);
+    const approvalStatus = approvalByKey.get(`${rowIdKey(row.id)}:${monthNumber}`);
     if (approvalStatus === "PENDING") return "PENDING";
     if (approvalStatus === "APPROVED") return "APPROVED";
     if (approvalStatus === "REJECTED") return "REJECTED";
@@ -286,18 +383,19 @@ const LocalRecordsGrid = () => {
     }
   };
 
-  const handleApprovalAction = async (recordId: string, month: number, status: "APPROVED" | "REJECTED") => {
+  const handleApprovalAction = async (recordId: string | number, month: number, status: "APPROVED" | "REJECTED") => {
+    const rid = rowIdKey(recordId);
     try {
       await upsertMonthlyApproval({
         recordType: "local",
-        recordId,
+        recordId: rid,
         reportingYear: year,
         month,
         status,
       });
       setApprovalRows((prev) => {
-        const filtered = prev.filter((a) => !(a.record_id === recordId && a.month === month));
-        return [...filtered, { record_id: recordId, month, status }];
+        const filtered = prev.filter((a) => !(rowIdKey(a.record_id) === rid && a.month === month));
+        return [...filtered, { record_id: rid, month, status }];
       });
     } catch (error) {
       toast({
@@ -338,22 +436,25 @@ const LocalRecordsGrid = () => {
         setYear(effectiveYear);
       }
 
-      setRows(firstPage.results);
-      if (isAdmin) {
-        const approvals = await fetchMonthlyApprovals({
-          recordType: "local",
-          reportingYear: effectiveYear,
-        });
-        setApprovalRows(approvals);
-      } else {
-        setApprovalRows([]);
+      skRestrictedBaselineRef.current.clear();
+      for (const row of firstPage.results) {
+        if (!row._isNew) {
+          skRestrictedBaselineRef.current.set(String(row.id), extractSkBaseline(row));
+        }
       }
+
+      setRows(firstPage.results);
+      const approvals = await fetchMonthlyApprovals({
+        recordType: "local",
+        reportingYear: effectiveYear,
+      });
+      setApprovalRows(approvals);
       setDirtyIds(new Set());
 
       // Load remaining pages in the background for smoother initial paint.
       void (async () => {
         let nextUrl = firstPage.next;
-        const seen = new Set(firstPage.results.map((row) => row.id));
+        const seen = new Set(firstPage.results.map((row) => rowIdKey(row.id)));
         while (nextUrl) {
           const nextPageParam = new URL(nextUrl, window.location.origin).searchParams.get("page");
           const pageNumber = Number(nextPageParam || "0");
@@ -367,8 +468,12 @@ const LocalRecordsGrid = () => {
           setRows((prev) => [
             ...prev,
             ...pageData.results.filter((row) => {
-              if (seen.has(row.id)) return false;
-              seen.add(row.id);
+              const idKey = rowIdKey(row.id);
+              if (seen.has(idKey)) return false;
+              seen.add(idKey);
+              if (!row._isNew) {
+                skRestrictedBaselineRef.current.set(String(row.id), extractSkBaseline(row));
+              }
               return true;
             }),
           ]);
@@ -384,7 +489,7 @@ const LocalRecordsGrid = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, year, isAdmin, toast, pageSize]);
+  }, [user, year, toast, pageSize]);
 
   useEffect(() => {
     void fetchData();
@@ -558,7 +663,7 @@ const LocalRecordsGrid = () => {
     const ids = new Set<string>();
     approvalRows.forEach((approval) => {
       if (approval.status === "PENDING") {
-        ids.add(approval.record_id);
+        ids.add(rowIdKey(approval.record_id));
       }
     });
     return ids;
@@ -572,7 +677,7 @@ const LocalRecordsGrid = () => {
         if (selectedUnion !== "all" && row.union_name !== selectedUnion) return false;
         if (selectedVillage !== "all" && row.village_name !== selectedVillage) return false;
         if (selectedWard !== "all" && (row.ward_no || "") !== selectedWard) return false;
-        if (isAdmin && recordView === "pending" && !pendingRecordIds.has(row.id)) return false;
+        if (isAdmin && recordView === "pending" && !pendingRecordIds.has(rowIdKey(row.id))) return false;
         return true;
       }),
     [
@@ -665,7 +770,7 @@ const LocalRecordsGrid = () => {
         const value = row[col as MonthColumn];
         if (!value || value === 0) return;
         const monthNumber = idx + 1;
-        if (approvalByKey.get(`${row.id}:${monthNumber}`) === "PENDING") {
+        if (approvalByKey.get(`${rowIdKey(row.id)}:${monthNumber}`) === "PENDING") {
           set.add(LOCAL_MONTH_COLUMN_START_INDEX + idx);
         }
       });
@@ -675,12 +780,17 @@ const LocalRecordsGrid = () => {
 
   useEffect(() => {
     setColumnWidths((prev) => {
+      if (appliedServerLayoutRef.current) {
+        return prev;
+      }
       if (Object.keys(prev).length > 0) {
         return prev;
       }
       const next: Record<number, number> = {};
+      // Column 0 is the delete/actions column; LOCAL_HEADER_LABELS[i] maps to table column i + 1.
+      next[0] = estimateHeaderWidth("");
       LOCAL_HEADER_LABELS.forEach((label, index) => {
-        next[index] = estimateHeaderWidth(label);
+        next[index + 1] = estimateHeaderWidth(label);
       });
       for (let index = LOCAL_MONTH_COLUMN_START_INDEX; index <= LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
         const monthLabel = MONTH_LABELS[index - LOCAL_MONTH_COLUMN_START_INDEX] || "";
@@ -694,6 +804,9 @@ const LocalRecordsGrid = () => {
 
   useEffect(() => {
     setColumnWidths((prev) => {
+      if (appliedServerLayoutRef.current) {
+        return prev;
+      }
       if (Object.keys(prev).length === 0) {
         return prev;
       }
@@ -717,12 +830,72 @@ const LocalRecordsGrid = () => {
     });
   }, [pendingActionMonthColumnIndexes]);
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await fetchMalariaGridColumnLayout("local_records");
+        if (cancelled) return;
+        const raw = data.column_widths || {};
+        const hasSaved = Object.keys(raw).some((k) => {
+          const v = raw[k];
+          return typeof v === "number" && Number.isFinite(v) && v >= 10;
+        });
+        if (!hasSaved) return;
+        appliedServerLayoutRef.current = true;
+        setIsExpandedToHeaderWidth(Boolean(data.is_expanded_to_header_width));
+        setColumnWidths((prev) => {
+          const next: Record<number, number> = { ...prev };
+          for (let i = 0; i <= 36; i += 1) {
+            const sv = raw[String(i)] ?? (raw as Record<number, number>)[i];
+            if (typeof sv === "number" && Number.isFinite(sv) && sv >= 10) {
+              next[i] = Math.round(sv);
+            } else if (next[i] == null) {
+              next[i] = 72;
+            }
+          }
+          return next;
+        });
+      } catch (_error) {
+        // No saved layout or network error — keep heuristic widths.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const handleSaveColumnLayoutForEveryone = async () => {
+    try {
+      setSavingLayout(true);
+      await saveMalariaGridColumnLayout("local_records", {
+        column_widths: columnWidths,
+        is_expanded_to_header_width: isExpandedToHeaderWidth,
+      });
+      appliedServerLayoutRef.current = true;
+      toast({
+        title: "Column layout saved",
+        description: "All users will see this table width on their next visit or refresh.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not save layout",
+        description: error instanceof Error ? error.message : "Only malaria admins can publish column layouts.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingLayout(false);
+    }
+  };
+
   const toggleExpandToHeaderWidth = () => {
     if (!isExpandedToHeaderWidth) {
       previousColumnWidthsRef.current = { ...columnWidths };
       const expandedWidths: Record<number, number> = {};
+      expandedWidths[0] = estimateHeaderWidth("");
       LOCAL_HEADER_LABELS.forEach((label, index) => {
-        expandedWidths[index] = estimateHeaderWidth(label);
+        expandedWidths[index + 1] = estimateHeaderWidth(label);
       });
       setColumnWidths(expandedWidths);
       setIsExpandedToHeaderWidth(true);
@@ -743,35 +916,38 @@ const LocalRecordsGrid = () => {
     </th>
   );
 
-  const handleCellChange = (rowId: string, field: LocalEditableField, value: string) => {
+  const handleCellChange = (rowId: string | number, field: LocalEditableField, value: string) => {
+    const id = rowIdKey(rowId);
     const num = value === "" ? 0 : parseInt(value, 10);
     if (isNaN(num) || num < 0) return;
-    setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, [field]: num } : r)));
+    setRows((prev) => prev.map((r) => (rowIdKey(r.id) === id ? { ...r, [field]: num } : r)));
     setDirtyIds((prev) => {
       const next = new Set(prev);
-      next.add(rowId);
+      next.add(id);
       return next;
     });
   };
 
-  const handleTextCellChange = (rowId: string, field: keyof LocalRecord, value: string) => {
-    setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r)));
+  const handleTextCellChange = (rowId: string | number, field: keyof LocalRecord, value: string) => {
+    const id = rowIdKey(rowId);
+    setRows((prev) => prev.map((r) => (rowIdKey(r.id) === id ? { ...r, [field]: value } : r)));
     setDirtyIds((prev) => {
       const next = new Set(prev);
-      next.add(rowId);
+      next.add(id);
       return next;
     });
   };
 
   const setOtherMode = (
-    rowId: string,
+    rowId: string | number,
     field: "district" | "upazila" | "union" | "ward",
     enabled: boolean,
   ) => {
+    const key = rowIdKey(rowId);
     setOtherModeByRow((prev) => ({
       ...prev,
-      [rowId]: {
-        ...(prev[rowId] || {}),
+      [key]: {
+        ...(prev[key] || {}),
         [field]: enabled,
       },
     }));
@@ -872,7 +1048,7 @@ const LocalRecordsGrid = () => {
       _isNew: true,
     };
     setRows((prev) => [newRow, ...prev]);
-    setDirtyIds((prev) => new Set(prev).add(newRow.id));
+    setDirtyIds((prev) => new Set(prev).add(rowIdKey(newRow.id)));
     // Ensure the newly added draft row is immediately visible at the top.
     setPage(1);
     setSelectedDistrict("all");
@@ -912,8 +1088,13 @@ const LocalRecordsGrid = () => {
     const unionName = String(row.union_name || "").trim();
     const wardNo = String(row.ward_no || "").trim();
     const villageName = String(row.village_name || "").trim();
-    if (!districtName || !upazilaName || !unionName || !villageName) {
-      throw new Error("District, Upazila, Union and Village are required for a new Local row.");
+    const missing: string[] = [];
+    if (!districtName) missing.push("District");
+    if (!upazilaName) missing.push("Upazila");
+    if (!unionName) missing.push("Union");
+    if (!villageName) missing.push("Village");
+    if (missing.length > 0) {
+      throw new LocalSaveValidationError(missing);
     }
 
     const findByName = <T extends { id: number; name: string }>(items: T[], name: string) =>
@@ -971,18 +1152,19 @@ const LocalRecordsGrid = () => {
     return String(createdVillage.id);
   };
 
-  const handleDecimalCellChange = (rowId: string, field: keyof LocalRecord, value: string) => {
+  const handleDecimalCellChange = (rowId: string | number, field: keyof LocalRecord, value: string) => {
+    const id = rowIdKey(rowId);
     const normalized = value.trim();
     if (normalized === "") {
-      setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, [field]: null } : r)));
+      setRows((prev) => prev.map((r) => (rowIdKey(r.id) === id ? { ...r, [field]: null } : r)));
     } else {
       const parsed = Number(normalized);
       if (Number.isNaN(parsed)) return;
-      setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, [field]: parsed } : r)));
+      setRows((prev) => prev.map((r) => (rowIdKey(r.id) === id ? { ...r, [field]: parsed } : r)));
     }
     setDirtyIds((prev) => {
       const next = new Set(prev);
-      next.add(rowId);
+      next.add(id);
       return next;
     });
   };
@@ -991,7 +1173,21 @@ const LocalRecordsGrid = () => {
     if (dirtyIds.size === 0) return;
     setSaving(true);
     try {
-      const dirty = rows.filter((r) => dirtyIds.has(r.id));
+      const dirty = rows.filter((r) => dirtyIds.has(rowIdKey(r.id)));
+      if (dirty.length === 0) {
+        toast({
+          title: "Save skipped",
+          description: "Could not match edited rows to save. Try Reload, then edit again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (dirty.length < dirtyIds.size) {
+        toast({
+          title: "Partial save",
+          description: "Some edited rows were not found in the current table; saving the rest.",
+        });
+      }
 
       for (const r of dirty) {
         if (r._isNew) {
@@ -1004,7 +1200,7 @@ const LocalRecordsGrid = () => {
           await updateUpazila(r.upazila_id, { name: r.upazila_name });
           await updateUnion(r.union_id, { name: r.union_name });
         }
-        await updateLocalRecord(r.id, buildUpdatePayload(r));
+        await updateLocalRecord(rowIdKey(r.id), buildUpdatePayload(r));
         if (isAdmin) {
           await updateVillage(r.village_id, buildVillageUpdatePayload(r));
         }
@@ -1016,11 +1212,15 @@ const LocalRecordsGrid = () => {
       setDirtyIds(new Set());
       toast({ title: "Saved successfully" });
     } catch (error) {
-      toast({
-        title: "Save error",
-        description: error instanceof Error ? error.message : "Failed to save records.",
-        variant: "destructive",
-      });
+      if (error instanceof LocalSaveValidationError) {
+        setSaveErrorAlert({ variant: "location", missing: error.missing });
+      } else {
+        setSaveErrorAlert({
+          variant: "generic",
+          title: "Save error",
+          message: error instanceof Error ? error.message : "Failed to save records.",
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -1028,24 +1228,38 @@ const LocalRecordsGrid = () => {
 
   const handleDeleteRow = async (rowId: string) => {
     if (!isAdmin) return;
-    const row = rows.find((item) => item.id === rowId);
-    if (!row) return;
+    const row = rows.find((item) => String(item.id) === String(rowId));
+    if (!row) {
+      toast({
+        title: "Delete failed",
+        description: "Could not find that row. Try reloading the table.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       if (!row._isNew) {
-        await deleteLocalRecord(row.id);
+        await deleteLocalRecord(String(row.id));
       }
-      setRows((prev) => prev.filter((item) => item.id !== rowId));
+      setRows((prev) => prev.filter((item) => String(item.id) !== String(rowId)));
       setDirtyIds((prev) => {
         const next = new Set(prev);
-        next.delete(rowId);
+        const deletedKey = rowIdKey(rowId);
+        for (const dirtyId of prev) {
+          if (rowIdKey(dirtyId) === deletedKey) {
+            next.delete(dirtyId);
+          }
+        }
         return next;
       });
       setOtherModeByRow((prev) => {
         const next = { ...prev };
-        delete next[rowId];
+        const key = rowIdKey(rowId);
+        delete next[key];
         return next;
       });
+      skRestrictedBaselineRef.current.delete(rowIdKey(rowId));
       toast({ title: "Row deleted" });
     } catch (error) {
       toast({
@@ -1068,13 +1282,23 @@ const LocalRecordsGrid = () => {
   };
 
   const isSkOrShw = role === "sk";
-  const canSkEditOnlyWhenEmptyText = (value: unknown) => {
+  const canEditOwnNewRow = (row: LocalGridRow) =>
+    isSkOrShw && !!user && row._isNew && String(row.sk_user_id) === String(user.id);
+
+  const canSkEditRestrictedText = (row: LocalGridRow, key: SkRestrictedTextKey) => {
     if (isAdmin || !isSkOrShw) return true;
-    return String(value ?? "").trim() === "";
+    if (canEditOwnNewRow(row)) return true;
+    const baseline = skRestrictedBaselineRef.current.get(String(row.id));
+    if (!baseline) return String(row[key] ?? "").trim() === "";
+    return String(baseline[key] ?? "").trim() === "";
   };
-  const canSkEditOnlyWhenEmptyNumber = (value: number | null | undefined) => {
+
+  const canSkEditRestrictedNumber = (row: LocalGridRow, key: SkRestrictedNumberKey) => {
     if (isAdmin || !isSkOrShw) return true;
-    return value === null || value === undefined || Number(value) === 0;
+    if (canEditOwnNewRow(row)) return true;
+    const baseline = skRestrictedBaselineRef.current.get(String(row.id));
+    if (!baseline) return skBaselineNumberIsEmpty(row[key]);
+    return skBaselineNumberIsEmpty(baseline[key]);
   };
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
@@ -1117,7 +1341,7 @@ const LocalRecordsGrid = () => {
       "Name of MMW, Health post & CHW(C)": row.village_mmw_hp_chwc_name || "",
       "Village Distance from upazila office (KM)": row.village_distance_from_upazila_office_km ?? "",
       "Name of Border with others country": row.village_bordering_country_name || "",
-      "Others Activities (TDA/Dev care)": row.village_other_activities || "",
+      "Others  Activities (TDA/Dev care)": row.village_other_activities || "",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
@@ -1278,6 +1502,19 @@ const LocalRecordsGrid = () => {
         </Button>
 
         {isAdmin && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => void handleSaveColumnLayoutForEveryone()}
+            disabled={savingLayout || loading}
+            title="Save current column widths for all users"
+            aria-label="Save column layout for all users"
+          >
+            {savingLayout ? <Loader2 className="h-4 w-4 animate-spin" /> : <Columns3 className="h-4 w-4" />}
+          </Button>
+        )}
+
+        {isAdmin && (
           <Select value={recordView} onValueChange={(value: "all" | "pending") => setRecordView(value)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Records View" />
@@ -1383,7 +1620,7 @@ const LocalRecordsGrid = () => {
               {renderHeaderCell("Name of MMW, Health post & CHW(C)", 33, "grid-th min-w-[10px]")}
               {renderHeaderCell("Village Distance from upazila office (KM)", 34, "grid-th min-w-[10px]")}
               {renderHeaderCell("Name of Border with others country", 35, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Others Activities (TDA/Dev care)", 36, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Others  Activities (TDA/Dev care)", 36, "grid-th min-w-[10px]")}
             </tr>
           </thead>
 
@@ -1397,7 +1634,7 @@ const LocalRecordsGrid = () => {
             )}
 
             {paginatedRows.map((row, index) => (
-              <tr key={row.id} className="hover:bg-gray-50">
+              <tr key={row.id} className={row._isNew ? "bg-sky-50/70 hover:bg-sky-100/70" : "hover:bg-gray-50"}>
                 <td className="grid-td p-1 text-center">
                   {isAdmin && (
                     <button
@@ -1409,7 +1646,7 @@ const LocalRecordsGrid = () => {
                     </button>
                   )}
                 </td>
-                <td className="grid-td sticky left-0 bg-white z-[5] font-medium">
+                <td className={`grid-td sticky left-0 z-[5] font-medium ${row._isNew ? "bg-sky-50/70" : "bg-white"}`}>
                   {(page - 1) * pageSize + index + 1}
                 </td>
                 <td className="grid-td">Bangladesh</td>
@@ -1418,7 +1655,7 @@ const LocalRecordsGrid = () => {
                 </td>
                 <td className="grid-td p-0">
                   {row._isNew ? (
-                    otherModeByRow[row.id]?.district ? (
+                    otherModeByRow[rowIdKey(row.id)]?.district ? (
                       <input
                         className="grid-input"
                         placeholder="District"
@@ -1463,7 +1700,7 @@ const LocalRecordsGrid = () => {
                 </td>
                 <td className="grid-td p-0">
                   {row._isNew ? (
-                    otherModeByRow[row.id]?.upazila ? (
+                    otherModeByRow[rowIdKey(row.id)]?.upazila ? (
                       <input
                         className="grid-input"
                         placeholder="Upazila"
@@ -1507,7 +1744,7 @@ const LocalRecordsGrid = () => {
                 </td>
                 <td className="grid-td p-0">
                   {row._isNew ? (
-                    otherModeByRow[row.id]?.union ? (
+                    otherModeByRow[rowIdKey(row.id)]?.union ? (
                       <input
                         className="grid-input"
                         placeholder="Union"
@@ -1550,11 +1787,11 @@ const LocalRecordsGrid = () => {
                   )}
                 </td>
                 <td className="grid-td p-0">
-                  {row._isNew && !otherModeByRow[row.id]?.ward ? (
+                  {row._isNew && !otherModeByRow[rowIdKey(row.id)]?.ward ? (
                     <select
                       className="grid-input bg-transparent"
                       value={row.ward_no || ""}
-                      disabled={!isAdmin}
+                      disabled={!isAdmin && !canEditOwnNewRow(row)}
                       onChange={(e) => {
                         if (e.target.value === OTHER_OPTION) {
                           setOtherMode(row.id, "ward", true);
@@ -1577,7 +1814,7 @@ const LocalRecordsGrid = () => {
                     <input
                       className="grid-input"
                       value={row.ward_no || ""}
-                      disabled={!isAdmin}
+                      disabled={!isAdmin && !canEditOwnNewRow(row)}
                       onChange={(e) => handleTextCellChange(row.id, "ward_no", e.target.value)}
                     />
                   )}
@@ -1587,7 +1824,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_sk_shw_name || ""}
                     onChange={(e) => handleTextCellChange(row.id, "village_sk_shw_name", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyText(row.village_sk_shw_name)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedText(row, "village_sk_shw_name")}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1595,7 +1832,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.sk_user_designation || ""}
                     onChange={(e) => handleTextCellChange(row.id, "sk_user_designation", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyText(row.sk_user_designation)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedText(row, "sk_user_designation")}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1603,7 +1840,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_ss_name || ""}
                     onChange={(e) => handleTextCellChange(row.id, "village_ss_name", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyText(row.village_ss_name)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedText(row, "village_ss_name")}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1611,7 +1848,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_name}
                     onChange={(e) => handleTextCellChange(row.id, "village_name", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyText(row.village_name)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedText(row, "village_name")}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1619,7 +1856,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_name_bn || ""}
                     onChange={(e) => handleTextCellChange(row.id, "village_name_bn", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyText(row.village_name_bn)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedText(row, "village_name_bn")}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1627,7 +1864,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_code || ""}
                     onChange={(e) => handleTextCellChange(row.id, "village_code", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyText(row.village_code)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedText(row, "village_code")}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1635,7 +1872,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_latitude ?? ""}
                     onChange={(e) => handleDecimalCellChange(row.id, "village_latitude", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyText(row.village_latitude)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedText(row, "village_latitude")}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1643,7 +1880,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.village_longitude ?? ""}
                     onChange={(e) => handleDecimalCellChange(row.id, "village_longitude", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyText(row.village_longitude)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedText(row, "village_longitude")}
                   />
                 </td>
                 <td className="grid-td p-0">
@@ -1653,7 +1890,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.population}
                     onChange={(e) => handleCellChange(row.id, "population", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyNumber(row.population)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedNumber(row, "population")}
                   />
                 </td>
 
@@ -1664,7 +1901,7 @@ const LocalRecordsGrid = () => {
                     className="grid-input"
                     value={row.hh === 0 ? "" : row.hh}
                     onChange={(e) => handleCellChange(row.id, "hh", e.target.value)}
-                    disabled={!canSkEditOnlyWhenEmptyNumber(row.hh)}
+                    disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedNumber(row, "hh")}
                   />
                 </td>
 
@@ -1673,10 +1910,14 @@ const LocalRecordsGrid = () => {
                     <input
                       type="number"
                       min={0}
-                      className={`grid-input ${canSkEditOnlyWhenEmptyNumber(row[itnCol]) ? "" : "bg-muted/30 text-muted-foreground"}`}
+                      className={`grid-input ${
+                        canEditOwnNewRow(row) || canSkEditRestrictedNumber(row, itnCol)
+                          ? ""
+                          : "bg-muted/30 text-muted-foreground"
+                      }`}
                       value={row[itnCol] === 0 ? "" : row[itnCol]}
                       onChange={(e) => handleCellChange(row.id, itnCol, e.target.value)}
-                      disabled={!canSkEditOnlyWhenEmptyNumber(row[itnCol])}
+                      disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedNumber(row, itnCol)}
                     />
                   </td>
                 ))}
@@ -1684,7 +1925,7 @@ const LocalRecordsGrid = () => {
                 {MONTH_COLUMNS.map((col, idx) => {
                   const value = row[col as MonthColumn];
                   const status = getMonthStatus(row, value, idx);
-                  const editable = isMonthEditable(idx);
+                  const editable = canEditOwnNewRow(row) || isMonthEditable(idx);
                   const monthNumber = idx + 1;
                   const isPendingCell = status === "PENDING";
 
@@ -1797,6 +2038,67 @@ const LocalRecordsGrid = () => {
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={saveErrorAlert !== null} onOpenChange={(open) => !open && setSaveErrorAlert(null)}>
+        <AlertDialogContent className="max-w-md border-border bg-background">
+          {saveErrorAlert?.variant === "location" ? (
+            <>
+              <AlertDialogHeader className="text-left space-y-0">
+                <div className="flex gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
+                    <MapPin className="h-6 w-6 text-primary" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+                    <AlertDialogTitle className="text-foreground">Complete the location first</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-3 text-sm leading-relaxed">
+                        <p>
+                          New rows must be linked to a real place. Fill in every required field, then try{" "}
+                          <span className="font-medium text-foreground">Save</span> again.
+                        </p>
+                        <ul className="space-y-2">
+                          {saveErrorAlert.missing.map((label) => (
+                            <li
+                              key={label}
+                              className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2"
+                            >
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
+                              <span className="font-medium text-foreground">{label}</span>
+                              <span className="text-xs text-muted-foreground">required</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </AlertDialogDescription>
+                  </div>
+                </div>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setSaveErrorAlert(null)}>Got it</AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : saveErrorAlert?.variant === "generic" ? (
+            <>
+              <AlertDialogHeader className="text-left space-y-0">
+                <div className="flex gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-destructive/10">
+                    <AlertCircle className="h-6 w-6 text-destructive" aria-hidden />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+                    <AlertDialogTitle className="text-foreground">{saveErrorAlert.title}</AlertDialogTitle>
+                    <AlertDialogDescription className="text-left whitespace-pre-wrap">
+                      {saveErrorAlert.message}
+                    </AlertDialogDescription>
+                  </div>
+                </div>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setSaveErrorAlert(null)}>Close</AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : null}
         </AlertDialogContent>
       </AlertDialog>
     </div>

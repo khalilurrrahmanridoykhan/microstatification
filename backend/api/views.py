@@ -6193,6 +6193,8 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'username'
+    # DefaultRouter uses [^/.]+ which rejects dots; usernames like "rana.khan" must match.
+    lookup_value_regex = r"[\w.@+-]+"
     pagination_class = None  # Disable pagination for now to return all users
 
     def get_queryset(self):

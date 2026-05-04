@@ -41,7 +41,8 @@ router.register(r"approvals", MonthlyApprovalViewSet, basename="malaria-approval
 
 
 urlpatterns = [
-    path("", include(router.urls)),
+    # Explicit paths before router.urls so they are never shadowed by viewset routes.
+    # Grid column layout URL is registered in backend/backend/urls.py (before `api/` router).
     path("me/", MalariaMeView.as_view(), name="malaria-me"),
     path("dashboard/", MalariaDashboardView.as_view(), name="malaria-dashboard"),
     path("auth/session/", MalariaSessionView.as_view(), name="malaria-session"),
@@ -58,4 +59,5 @@ urlpatterns = [
     path("download/microstatification/link/", MicrostatificationDataDownloadLinkView.as_view(), name="malaria-download-microstatification-link"),
     path("download/microstatification/file/", MicrostatificationDataDirectDownloadView.as_view(), name="malaria-download-microstatification-file"),
     path("download/microstatification/", MicrostatificationDataDownloadView.as_view(), name="malaria-download-microstatification"),
+    path("", include(router.urls)),
 ]
