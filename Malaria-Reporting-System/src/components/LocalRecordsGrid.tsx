@@ -234,6 +234,67 @@ function localRecordMetaCellBg(row: LocalGridRow): string {
   return "bg-white";
 }
 
+function profileScopeId(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+/** District name to pre-select in the local grid filter for SK/SHW from session geography. */
+function resolveProfileDistrictFilterName(
+  profile: AuthProfile | null | undefined,
+  masterData: MalariaMasterData,
+): string | null {
+  if (!profile) return null;
+
+  const did = profileScopeId(profile.micro_district);
+  if (did != null) {
+    const d = masterData.districts.find((x) => x.id === did);
+    return d?.name ?? null;
+  }
+
+  const upid = profileScopeId(profile.micro_upazila);
+  if (upid != null) {
+    const up = masterData.upazilas.find((x) => x.id === upid);
+    const dist = up ? masterData.districts.find((d) => d.id === up.district_id) : undefined;
+    return dist?.name ?? null;
+  }
+
+  const uid = profileScopeId(profile.micro_union);
+  if (uid != null) {
+    const u = masterData.unions.find((x) => x.id === uid);
+    const up = u ? masterData.upazilas.find((x) => x.id === u.upazila_id) : undefined;
+    const dist = up ? masterData.districts.find((d) => d.id === up.district_id) : undefined;
+    return dist?.name ?? null;
+  }
+
+  const vid = profileScopeId(profile.micro_village);
+  if (vid != null) {
+    const v = masterData.villages.find((x) => x.id === vid);
+    const u = v ? masterData.unions.find((x) => x.id === v.union_id) : undefined;
+    const up = u ? masterData.upazilas.find((x) => x.id === u.upazila_id) : undefined;
+    const dist = up ? masterData.districts.find((d) => d.id === up.district_id) : undefined;
+    return dist?.name ?? null;
+  }
+
+  const multiIds = (profile.micro_villages || [])
+    .map((id) => profileScopeId(id))
+    .filter((n): n is number => n != null);
+  if (multiIds.length > 0) {
+    const names = new Set<string>();
+    for (const id of multiIds) {
+      const v = masterData.villages.find((x) => x.id === id);
+      const u = v ? masterData.unions.find((x) => x.id === v.union_id) : undefined;
+      const up = u ? masterData.upazilas.find((x) => x.id === u.upazila_id) : undefined;
+      const dist = up ? masterData.districts.find((d) => d.id === up.district_id) : undefined;
+      if (dist?.name) names.add(dist.name);
+    }
+    if (names.size === 1) return [...names][0];
+  }
+
+  return null;
+}
+
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Dhaka",
@@ -478,7 +539,7 @@ const LocalRecordsGrid = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
-  const [selectedDistrict, setSelectedDistrict] = useState("Bandarban");
+  const [selectedDistrict, setSelectedDistrict] = useState("all");
   const [selectedUpazila, setSelectedUpazila] = useState("all");
   const [selectedUnion, setSelectedUnion] = useState("all");
   const [selectedVillage, setSelectedVillage] = useState("all");
@@ -509,6 +570,7 @@ const LocalRecordsGrid = () => {
   const skRestrictedBaselineRef = useRef<Map<string, SkRestrictedBaseline>>(new Map());
   const dirtyLocalMetadataRowIdsRef = useRef<Set<string>>(new Set());
   const fetchGenerationRef = useRef(0);
+  const profileDistrictFilterAppliedRef = useRef(false);
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
@@ -705,6 +767,19 @@ const LocalRecordsGrid = () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    profileDistrictFilterAppliedRef.current = false;
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (isAdmin || !isSkOrShw || !profile) return;
+    if (!masterData.districts.length) return;
+    if (profileDistrictFilterAppliedRef.current) return;
+    profileDistrictFilterAppliedRef.current = true;
+    const assignedDistrict = resolveProfileDistrictFilterName(profile, masterData);
+    if (assignedDistrict) setSelectedDistrict(assignedDistrict);
+  }, [isAdmin, isSkOrShw, profile, masterData]);
 
   useEffect(() => {
     if (isAdmin) return;
