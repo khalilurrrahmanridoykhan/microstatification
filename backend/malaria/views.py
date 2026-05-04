@@ -26,15 +26,30 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework import renderers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .metadata_approval import (
+    apply_local_metadata_pending_to_db,
+    apply_nonlocal_metadata_pending_to_db,
+    filter_nonlocal_metadata_submission,
+    local_metadata_submission_nonempty,
+    merge_local_metadata_pending,
+    merge_nonlocal_metadata_pending,
+    parse_local_metadata_from_request,
+    reject_local_metadata,
+    reject_nonlocal_metadata,
+)
 from .models import (
     District,
     LocalRecord,
     MalariaGridColumnLayout,
     MalariaUserRole,
+    METADATA_APPROVAL_APPROVED,
+    METADATA_APPROVAL_PENDING,
+    METADATA_APPROVAL_REJECTED,
     MicrostatificationDataUpload,
     MonthAccessSetting,
     MonthlyApproval,
@@ -519,21 +534,6 @@ def _get_open_month_fields(reporting_year):
         for month_number, is_open in access_lookup.items()
         if is_open and 1 <= month_number <= len(MONTH_COLUMNS)
     }
-
-
-def _ensure_field_user_month_create_editable(user, reporting_year, validated_data):
-    if is_malaria_admin(user):
-        return
-
-    open_month_fields = _get_open_month_fields(reporting_year)
-    changed_month_fields = [
-        field
-        for field in MONTH_COLUMNS
-        if field in validated_data and (validated_data[field] or 0) > 0
-    ]
-    disallowed = [field for field in changed_month_fields if field not in open_month_fields]
-    if disallowed:
-        raise ValueError("You can only submit data for months that are still open.")
 
 
 def _sync_monthly_approvals_for_user_submission(record_type, instance, changed_month_fields):
@@ -1624,6 +1624,46 @@ def _village_within_profile_scope(profile, instance):
     return False
 
 
+def _union_within_profile_scope(profile, union):
+    """True if a new village may be created under this Union for the given UserProfile scope."""
+    if not profile or not union:
+        return False
+
+    multi_village_ids = (
+        list(profile.micro_villages.values_list("id", flat=True)) if hasattr(profile, "micro_villages") else []
+    )
+    if multi_village_ids:
+        union_ids = set(
+            Village.objects.filter(id__in=multi_village_ids).values_list("union_id", flat=True).distinct()
+        )
+        return union.id in union_ids
+
+    if getattr(profile, "micro_village_id", None):
+        try:
+            anchor = Village.objects.only("union_id").get(pk=profile.micro_village_id)
+        except Village.DoesNotExist:
+            return False
+        return anchor.union_id == union.id
+
+    if getattr(profile, "micro_union_id", None):
+        return union.id == profile.micro_union_id
+
+    if getattr(profile, "micro_upazila_id", None):
+        return getattr(union, "upazila_id", None) == profile.micro_upazila_id
+
+    if getattr(profile, "micro_district_id", None):
+        district_id = getattr(getattr(union, "upazila", None), "district_id", None)
+        return district_id == profile.micro_district_id
+
+    return False
+
+
+def _village_allowed_for_profile(profile, village):
+    if not profile or not village:
+        return False
+    return _village_within_profile_scope(profile, village)
+
+
 def _ensure_local_record_editable(user, instance, validated_data):
     if is_malaria_admin(user):
         return
@@ -2019,9 +2059,37 @@ class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
     pagination_class = None
 
     def get_permissions(self):
-        if self.action in {"create", "destroy"}:
+        if self.action == "destroy":
             return [IsAuthenticated(), IsMalariaAdmin()]
         return [IsAuthenticated(), HasMalariaAccess()]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not is_malaria_admin(request.user):
+            profile = getattr(request.user, "profile", None)
+            union = serializer.validated_data.get("union")
+            if union is None:
+                return Response(
+                    {"detail": "Union is required to create a village."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not _union_within_profile_scope(profile, union):
+                return Response(
+                    {"detail": "You can only create villages within your assigned scope."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            ward_no_profile = (getattr(profile, "micro_ward_no", "") or "").strip()
+            if getattr(profile, "micro_union_id", None) and ward_no_profile:
+                incoming_ward = (serializer.validated_data.get("ward_no") or "").strip()
+                if incoming_ward.lower() != ward_no_profile.lower():
+                    return Response(
+                        {"detail": "You can only create villages within your assigned ward."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -2120,12 +2188,12 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                 queryset = queryset.filter(sk_user=self.request.user)
 
         reporting_year_value = (self.request.query_params.get("reporting_year") or "").strip().lower()
-        exact_fields = ["id", "reporting_year", "sk_user_id", "village_id"]
+        exact_fields = ["id", "reporting_year", "sk_user_id", "village_id", "metadata_approval_status"]
         if reporting_year_value == "latest":
             latest_year = queryset.aggregate(max_year=Max("reporting_year")).get("max_year")
             if latest_year is not None:
                 queryset = queryset.filter(reporting_year=latest_year)
-            exact_fields = ["id", "sk_user_id", "village_id"]
+            exact_fields = ["id", "sk_user_id", "village_id", "metadata_approval_status"]
 
         queryset = _apply_filters(
             queryset,
@@ -2189,10 +2257,22 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         validated = serializer.validated_data
         reporting_year = validated.get("reporting_year", timezone.now().year)
 
-        try:
-            _ensure_field_user_month_create_editable(request.user, reporting_year, validated)
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if not is_malaria_admin(request.user):
+            profile = getattr(request.user, "profile", None)
+            village_obj = validated.get("village")
+            if village_obj is not None and _profile_local_scope_q(profile) is not None:
+                village_scoped = (
+                    Village.objects.select_related("union", "union__upazila", "union__upazila__district")
+                    .filter(pk=village_obj.pk)
+                    .first()
+                )
+                if not village_scoped or not _village_allowed_for_profile(profile, village_scoped):
+                    return Response(
+                        {
+                            "detail": "You can only create local records for villages within your assigned scope.",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
 
         village = validated["village"]
         defaults = validated.copy()
@@ -2217,6 +2297,17 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                 MonthlyApproval.RECORD_TYPE_LOCAL,
                 record,
                 month_fields_for_approval,
+            )
+            meta_sub = parse_local_metadata_from_request(payload)
+            record.metadata_approval_status = METADATA_APPROVAL_PENDING
+            if local_metadata_submission_nonempty(meta_sub):
+                record.metadata_pending = merge_local_metadata_pending(record.metadata_pending, meta_sub)
+            record.save(
+                update_fields=[
+                    "metadata_approval_status",
+                    "metadata_pending",
+                    "updated_at",
+                ]
             )
         out = self.get_serializer(record)
         return Response(out.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
@@ -2246,12 +2337,28 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         self.perform_update(serializer)
-        if "sk_user_designation" in request.data:
-            designation = str(request.data.get("sk_user_designation") or "").strip()
-            profile = getattr(serializer.instance.sk_user, "profile", None)
-            if profile is not None:
-                profile.micro_designation = designation
-                profile.save(update_fields=["micro_designation"])
+        instance = serializer.instance
+        if is_malaria_admin(request.user):
+            if "sk_user_designation" in request.data:
+                designation = str(request.data.get("sk_user_designation") or "").strip()
+                profile = getattr(instance.sk_user, "profile", None)
+                if profile is not None:
+                    profile.micro_designation = designation
+                    profile.save(update_fields=["micro_designation"])
+        else:
+            meta_sub = parse_local_metadata_from_request(request.data)
+            if local_metadata_submission_nonempty(meta_sub):
+                instance.metadata_pending = merge_local_metadata_pending(instance.metadata_pending, meta_sub)
+                instance.metadata_approval_status = METADATA_APPROVAL_PENDING
+                instance.metadata_rejection_note = ""
+                instance.save(
+                    update_fields=[
+                        "metadata_pending",
+                        "metadata_approval_status",
+                        "metadata_rejection_note",
+                        "updated_at",
+                    ]
+                )
         if not is_malaria_admin(request.user) and (changed_month_fields or non_month_changes):
             month_fields_for_approval = (
                 changed_month_fields
@@ -2263,7 +2370,59 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                 serializer.instance,
                 month_fields_for_approval,
             )
-        return Response(serializer.data)
+        instance.refresh_from_db()
+        return Response(self.get_serializer(instance).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaAdmin])
+    def approve_metadata(self, request, pk=None):
+        instance = self.get_object()
+        pending = instance.metadata_pending if isinstance(instance.metadata_pending, dict) else {}
+        has_payload = bool(pending.get("village")) or bool(pending.get("profile"))
+
+        # Idempotent: already approved with nothing left to merge (e.g. double-click).
+        if instance.metadata_approval_status == METADATA_APPROVAL_APPROVED and not has_payload:
+            return Response(self.get_serializer(instance).data)
+
+        if instance.metadata_approval_status == METADATA_APPROVAL_REJECTED:
+            return Response(
+                {
+                    "detail": (
+                        "Metadata was rejected. The SK/SHW must save again to submit a new version before you can approve."
+                    ),
+                    "metadata_approval_status": instance.metadata_approval_status,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # PENDING (with or without payload), or APPROVED with orphaned pending JSON — apply.
+        if instance.metadata_approval_status == METADATA_APPROVAL_PENDING or has_payload:
+            apply_local_metadata_pending_to_db(instance, request.user)
+            instance.refresh_from_db()
+            return Response(self.get_serializer(instance).data)
+
+        return Response(
+            {
+                "detail": (
+                    "No pending metadata to approve. Save metadata changes as SK/SHW first, "
+                    "or refresh the table."
+                ),
+                "metadata_approval_status": instance.metadata_approval_status,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaAdmin])
+    def reject_metadata(self, request, pk=None):
+        instance = self.get_object()
+        if instance.metadata_approval_status != METADATA_APPROVAL_PENDING:
+            return Response(
+                {"detail": "Record is not pending metadata approval."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        note = str(request.data.get("note") or "")
+        reject_local_metadata(instance, request.user, note)
+        instance.refresh_from_db()
+        return Response(self.get_serializer(instance).data)
 
 
 class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
@@ -2276,12 +2435,19 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         if not is_malaria_admin(self.request.user):
             queryset = queryset.filter(sk_user=self.request.user)
         reporting_year_value = (self.request.query_params.get("reporting_year") or "").strip().lower()
-        exact_fields = ["id", "reporting_year", "sk_user_id", "country", "district_or_state"]
+        exact_fields = [
+            "id",
+            "reporting_year",
+            "sk_user_id",
+            "country",
+            "district_or_state",
+            "metadata_approval_status",
+        ]
         if reporting_year_value == "latest":
             latest_year = queryset.aggregate(max_year=Max("reporting_year")).get("max_year")
             if latest_year is not None:
                 queryset = queryset.filter(reporting_year=latest_year)
-            exact_fields = ["id", "sk_user_id", "country", "district_or_state"]
+            exact_fields = ["id", "sk_user_id", "country", "district_or_state", "metadata_approval_status"]
         queryset = _apply_filters(
             queryset,
             self.request,
@@ -2328,17 +2494,14 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
 
-        try:
-            _ensure_field_user_month_create_editable(
-                request.user,
-                serializer.validated_data.get("reporting_year", timezone.now().year),
-                serializer.validated_data,
-            )
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-
         self.perform_create(serializer)
-        if not is_malaria_admin(request.user):
+        instance = serializer.instance
+        if is_malaria_admin(request.user):
+            gm = payload.get("grid_metadata")
+            if isinstance(gm, dict):
+                instance.grid_metadata = {**(instance.grid_metadata or {}), **gm}
+                instance.save(update_fields=["grid_metadata", "updated_at"])
+        else:
             submitted_month_fields = [
                 field
                 for field in MONTH_COLUMNS
@@ -2347,14 +2510,26 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             month_fields_for_approval = (
                 submitted_month_fields
                 if submitted_month_fields
-                else sorted(_get_open_month_fields(serializer.instance.reporting_year))
+                else sorted(_get_open_month_fields(instance.reporting_year))
             )
             _sync_monthly_approvals_for_user_submission(
                 MonthlyApproval.RECORD_TYPE_NON_LOCAL,
-                serializer.instance,
+                instance,
                 month_fields_for_approval,
             )
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+            meta_sub = filter_nonlocal_metadata_submission(payload.get("metadata_submission"))
+            instance.metadata_approval_status = METADATA_APPROVAL_PENDING
+            if meta_sub:
+                instance.metadata_pending = merge_nonlocal_metadata_pending(instance.metadata_pending, meta_sub)
+            instance.save(
+                update_fields=[
+                    "metadata_approval_status",
+                    "metadata_pending",
+                    "updated_at",
+                ]
+            )
+        instance.refresh_from_db()
+        return Response(self.get_serializer(instance).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -2381,6 +2556,26 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         self.perform_update(serializer)
+        instance = serializer.instance
+        if is_malaria_admin(request.user):
+            gm = request.data.get("grid_metadata")
+            if isinstance(gm, dict):
+                instance.grid_metadata = {**(instance.grid_metadata or {}), **gm}
+                instance.save(update_fields=["grid_metadata", "updated_at"])
+        else:
+            meta_sub = filter_nonlocal_metadata_submission(request.data.get("metadata_submission"))
+            if meta_sub:
+                instance.metadata_pending = merge_nonlocal_metadata_pending(instance.metadata_pending, meta_sub)
+                instance.metadata_approval_status = METADATA_APPROVAL_PENDING
+                instance.metadata_rejection_note = ""
+                instance.save(
+                    update_fields=[
+                        "metadata_pending",
+                        "metadata_approval_status",
+                        "metadata_rejection_note",
+                        "updated_at",
+                    ]
+                )
         if not is_malaria_admin(request.user) and (changed_month_fields or non_month_changes):
             month_fields_for_approval = (
                 changed_month_fields
@@ -2392,7 +2587,54 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                 serializer.instance,
                 month_fields_for_approval,
             )
-        return Response(serializer.data)
+        instance.refresh_from_db()
+        return Response(self.get_serializer(instance).data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaAdmin])
+    def approve_metadata(self, request, pk=None):
+        instance = self.get_object()
+        pending = instance.metadata_pending if isinstance(instance.metadata_pending, dict) else {}
+        has_payload = bool(pending)
+
+        if instance.metadata_approval_status == METADATA_APPROVAL_APPROVED and not has_payload:
+            return Response(self.get_serializer(instance).data)
+
+        if instance.metadata_approval_status == METADATA_APPROVAL_REJECTED:
+            return Response(
+                {
+                    "detail": (
+                        "Metadata was rejected. Wait for the SK/SHW to save again before approving."
+                    ),
+                    "metadata_approval_status": instance.metadata_approval_status,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if instance.metadata_approval_status == METADATA_APPROVAL_PENDING or has_payload:
+            apply_nonlocal_metadata_pending_to_db(instance, request.user)
+            instance.refresh_from_db()
+            return Response(self.get_serializer(instance).data)
+
+        return Response(
+            {
+                "detail": "No pending metadata to approve. Refresh the table.",
+                "metadata_approval_status": instance.metadata_approval_status,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaAdmin])
+    def reject_metadata(self, request, pk=None):
+        instance = self.get_object()
+        if instance.metadata_approval_status != METADATA_APPROVAL_PENDING:
+            return Response(
+                {"detail": "Record is not pending metadata approval."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        note = str(request.data.get("note") or "")
+        reject_nonlocal_metadata(instance, request.user, note)
+        instance.refresh_from_db()
+        return Response(self.get_serializer(instance).data)
 
 
 class MonthAccessSettingViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):

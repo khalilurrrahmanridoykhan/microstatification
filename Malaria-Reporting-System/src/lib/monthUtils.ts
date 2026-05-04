@@ -34,12 +34,21 @@ export function estimateVerticalMonthHeaderWidth(monthLabel: string): number {
   return Math.ceil(Math.max(maxChar + 14, 30));
 }
 
-/** Min width when that month column shows value + A/R (admin + pending). */
+/** One width for every month col (Jan…Dec): matches the widest vertical header so columns stay even like Jun/Jul. */
+export function getUniformMonthColumnWidth(): number {
+  let w = 30;
+  for (const label of MONTH_LABELS) {
+    w = Math.max(w, estimateVerticalMonthHeaderWidth(label));
+  }
+  return w;
+}
+
+/** Width for a month col when admin has ≥1 pending A/R in that month (value + A/R on one row, no ellipsis). */
 export function estimateMonthColumnWithActionsWidth(monthLabel: string): number {
   const verticalHeader = estimateVerticalMonthHeaderWidth(monthLabel);
-  const twoButtons = 16 + 16 + 2 + 4;
-  const narrowInput = 30;
-  return Math.max(verticalHeader, twoButtons + narrowInput);
+  // Two 16px buttons + small gap + short number field + cell padding in one row under table-fixed.
+  const floorViablePendingPx = 94;
+  return Math.max(verticalHeader, floorViablePendingPx);
 }
 
 export function getDhakaMonth(): number {

@@ -24,13 +24,14 @@ import {
   MONTH_LABELS,
   type MonthColumn,
   estimateMonthColumnWithActionsWidth,
-  estimateVerticalMonthHeaderWidth,
+  getUniformMonthColumnWidth,
   getDhakaMonth,
   getDhakaYear,
   getMonthTotal,
 } from "@/lib/monthUtils";
 import {
   AlertCircle,
+  Check,
   Columns3,
   Loader2,
   MapPin,
@@ -40,6 +41,7 @@ import {
   RefreshCw,
   Save,
   Trash2,
+  X,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -49,12 +51,14 @@ import {
   createUpazila,
   createVillage,
   fetchVillagesByUnion,
+  approveLocalRecordMetadata,
   deleteLocalRecord,
   fetchMalariaMasterData,
   fetchMonthlyApprovals,
   fetchLocalRecordsPage,
   fetchMalariaGridColumnLayout,
   fetchMonthAccessSettings,
+  rejectLocalRecordMetadata,
   saveMalariaGridColumnLayout,
   upsertMonthlyApproval,
   updateDistrict,
@@ -62,9 +66,12 @@ import {
   updateUnion,
   updateUpazila,
   updateVillage,
+  type AuthProfile,
   type MalariaMasterData,
+  type MasterVillage,
   type LocalRecord,
   type LocalRecordCreatePayload,
+  type LocalRecordMetadataSubmission,
   type LocalRecordUpdate,
   type ApprovalRow,
   type VillageUpdatePayload,
@@ -191,14 +198,40 @@ const LOCAL_LIST_FIELDS = [
   "itn_2025",
   "itn_2026",
   ...MONTH_COLUMNS,
+  "metadata_approval_status",
+  "metadata_rejection_note",
 ];
 
 const LOCAL_MONTH_COLUMN_START_INDEX = 21;
 const LOCAL_MONTH_COLUMN_END_INDEX = 32;
 
+const LOCAL_METADATA_DIRTY_FIELDS = new Set<keyof LocalRecord>([
+  "village_sk_shw_name",
+  "sk_user_designation",
+  "village_ss_name",
+  "village_mmw_hp_chwc_name",
+  "village_distance_from_upazila_office_km",
+  "village_bordering_country_name",
+  "village_other_activities",
+]);
+
 /** API may return numeric `id`; JS Set uses strict equality — normalize for dirtyIds / lookups. */
 function rowIdKey(id: unknown): string {
   return String(id);
+}
+
+function localRecordRowMetaClasses(row: LocalGridRow): string {
+  if (row._isNew) return "bg-sky-50/70 hover:bg-sky-100/70";
+  if (row.metadata_approval_status === "PENDING") return "bg-amber-50/85 hover:bg-amber-100/75";
+  if (row.metadata_approval_status === "REJECTED") return "bg-fuchsia-50/75 hover:bg-fuchsia-100/70";
+  return "hover:bg-gray-50";
+}
+
+function localRecordMetaCellBg(row: LocalGridRow): string {
+  if (row._isNew) return "bg-sky-50/70";
+  if (row.metadata_approval_status === "PENDING") return "bg-amber-50/85";
+  if (row.metadata_approval_status === "REJECTED") return "bg-fuchsia-50/75";
+  return "bg-white";
 }
 
 function getDhakaTodayIso(): string {
@@ -237,8 +270,26 @@ function computeOpenMonthNumbers(
   return open;
 }
 
-function buildUpdatePayload(row: LocalRecord): LocalRecordUpdate {
+function buildLocalMetadataSubmission(row: LocalRecord): LocalRecordMetadataSubmission {
   return {
+    village: {
+      sk_shw_name: row.village_sk_shw_name || "",
+      ss_name: row.village_ss_name || "",
+      mmw_hp_chwc_name: row.village_mmw_hp_chwc_name || "",
+      distance_from_upazila_office_km: row.village_distance_from_upazila_office_km,
+      bordering_country_name: row.village_bordering_country_name || "",
+      other_activities: row.village_other_activities || "",
+    },
+    profile: {
+      micro_sk_shw_name: row.village_sk_shw_name || "",
+      micro_ss_name: row.village_ss_name || "",
+      micro_designation: row.sk_user_designation || "",
+    },
+  };
+}
+
+function buildUpdatePayload(row: LocalRecord, includeMetadataSubmission: boolean): LocalRecordUpdate {
+  const payload: LocalRecordUpdate = {
     hh: row.hh,
     population: row.population,
     itn_2026: row.itn_2026,
@@ -259,6 +310,10 @@ function buildUpdatePayload(row: LocalRecord): LocalRecordUpdate {
     nov_cases: row.nov_cases,
     dec_cases: row.dec_cases,
   };
+  if (includeMetadataSubmission) {
+    payload.metadata_submission = buildLocalMetadataSubmission(row);
+  }
+  return payload;
 }
 
 /** Thrown when a new local row cannot be saved until geography fields are filled. */
@@ -275,6 +330,117 @@ class LocalSaveValidationError extends Error {
     this.missing = missing;
     Object.setPrototypeOf(this, new.target.prototype);
   }
+}
+
+/** SK/SHW cannot auto-create district/upazila/union; hierarchy must already exist in master data. */
+class LocalHierarchyNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LocalHierarchyNotFoundError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+type SkGeographyLock = {
+  lockDistrict: boolean;
+  lockUpazila: boolean;
+  lockUnion: boolean;
+  district_id: string;
+  upazila_id: string;
+  union_id: string;
+  district_name: string;
+  upazila_name: string;
+  union_name: string;
+};
+
+function emptySkGeographyLock(): SkGeographyLock {
+  return {
+    lockDistrict: false,
+    lockUpazila: false,
+    lockUnion: false,
+    district_id: "",
+    upazila_id: "",
+    union_id: "",
+    district_name: "",
+    upazila_name: "",
+    union_name: "",
+  };
+}
+
+function toProfileGeoId(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Prefill + lock levels for SK/SHW new rows from session profile + master data. */
+function resolveSkGeographyLockAndPrefill(
+  profile: AuthProfile | null | undefined,
+  masterData: MalariaMasterData,
+): SkGeographyLock {
+  if (!profile) return emptySkGeographyLock();
+
+  const unionId = toProfileGeoId(profile.micro_union);
+  const upazilaId = toProfileGeoId(profile.micro_upazila);
+  const districtId = toProfileGeoId(profile.micro_district);
+
+  if (unionId !== null) {
+    const u = masterData.unions.find((x) => x.id === unionId);
+    if (!u) {
+      return {
+        ...emptySkGeographyLock(),
+        lockDistrict: true,
+        lockUpazila: true,
+        lockUnion: true,
+      };
+    }
+    const up = masterData.upazilas.find((x) => x.id === u.upazila_id);
+    const dist = up ? masterData.districts.find((d) => d.id === up.district_id) : undefined;
+    return {
+      lockDistrict: true,
+      lockUpazila: true,
+      lockUnion: true,
+      district_id: dist ? String(dist.id) : "",
+      district_name: dist?.name ?? "",
+      upazila_id: up ? String(up.id) : "",
+      upazila_name: up?.name ?? "",
+      union_id: String(u.id),
+      union_name: u.name,
+    };
+  }
+
+  if (upazilaId !== null) {
+    const up = masterData.upazilas.find((x) => x.id === upazilaId);
+    const dist = up ? masterData.districts.find((d) => d.id === up.district_id) : undefined;
+    return {
+      lockDistrict: true,
+      lockUpazila: true,
+      lockUnion: false,
+      district_id: dist ? String(dist.id) : "",
+      district_name: dist?.name ?? "",
+      upazila_id: up ? String(up.id) : "",
+      upazila_name: up?.name ?? "",
+      union_id: "",
+      union_name: "",
+    };
+  }
+
+  if (districtId !== null) {
+    const dist = masterData.districts.find((d) => d.id === districtId);
+    return {
+      lockDistrict: true,
+      lockUpazila: false,
+      lockUnion: false,
+      district_id: dist ? String(dist.id) : "",
+      district_name: dist?.name ?? "",
+      upazila_id: "",
+      upazila_name: "",
+      union_id: "",
+      union_name: "",
+    };
+  }
+
+  return emptySkGeographyLock();
 }
 
 type SaveErrorAlertState =
@@ -303,6 +469,7 @@ const LocalRecordsGrid = () => {
   const { user, role, profile } = useAuth();
   const { toast } = useToast();
   const isAdmin = role === "admin";
+  const isSkOrShw = role === "sk";
   const currentMonth = getDhakaMonth(); // 1..12
   const currentYear = getDhakaYear();
 
@@ -326,6 +493,7 @@ const LocalRecordsGrid = () => {
   const [savingLayout, setSavingLayout] = useState(false);
   const [approvalRows, setApprovalRows] = useState<ApprovalRow[]>([]);
   const [recordView, setRecordView] = useState<"all" | "pending">("all");
+  const [metadataActionBusyId, setMetadataActionBusyId] = useState<string | null>(null);
   const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
   const [saveErrorAlert, setSaveErrorAlert] = useState<SaveErrorAlertState>(null);
   const [masterData, setMasterData] = useState<MalariaMasterData>({
@@ -339,6 +507,8 @@ const LocalRecordsGrid = () => {
   >({});
   const touchedColumnIndexesRef = useRef<Set<number>>(new Set());
   const skRestrictedBaselineRef = useRef<Map<string, SkRestrictedBaseline>>(new Map());
+  const dirtyLocalMetadataRowIdsRef = useRef<Set<string>>(new Set());
+  const fetchGenerationRef = useRef(0);
   const resizingColumnRef = useRef<number | null>(null);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(0);
@@ -408,6 +578,8 @@ const LocalRecordsGrid = () => {
 
   const fetchData = useCallback(async () => {
     if (!user) return;
+    fetchGenerationRef.current += 1;
+    const fetchGen = fetchGenerationRef.current;
     setLoading(true);
     try {
       const requestPageSize = Math.max(100, pageSize || 100);
@@ -432,6 +604,18 @@ const LocalRecordsGrid = () => {
         }
       }
 
+      if (fetchGenerationRef.current !== fetchGen) {
+        return;
+      }
+
+      const approvals = await fetchMonthlyApprovals({
+        recordType: "local",
+        reportingYear: effectiveYear,
+      });
+      if (fetchGenerationRef.current !== fetchGen) {
+        return;
+      }
+
       if (effectiveYear !== year) {
         setYear(effectiveYear);
       }
@@ -444,10 +628,6 @@ const LocalRecordsGrid = () => {
       }
 
       setRows(firstPage.results);
-      const approvals = await fetchMonthlyApprovals({
-        recordType: "local",
-        reportingYear: effectiveYear,
-      });
       setApprovalRows(approvals);
       setDirtyIds(new Set());
 
@@ -456,6 +636,9 @@ const LocalRecordsGrid = () => {
         let nextUrl = firstPage.next;
         const seen = new Set(firstPage.results.map((row) => rowIdKey(row.id)));
         while (nextUrl) {
+          if (fetchGenerationRef.current !== fetchGen) {
+            return;
+          }
           const nextPageParam = new URL(nextUrl, window.location.origin).searchParams.get("page");
           const pageNumber = Number(nextPageParam || "0");
           if (!Number.isFinite(pageNumber) || pageNumber < 2) break;
@@ -465,6 +648,9 @@ const LocalRecordsGrid = () => {
             pageSize: requestPageSize,
             fields: LOCAL_LIST_FIELDS,
           });
+          if (fetchGenerationRef.current !== fetchGen) {
+            return;
+          }
           setRows((prev) => [
             ...prev,
             ...pageData.results.filter((row) => {
@@ -542,6 +728,11 @@ const LocalRecordsGrid = () => {
     };
   }, [year, isAdmin, currentMonth]);
 
+  const skGeoLock = useMemo(() => {
+    if (isAdmin || !isSkOrShw) return emptySkGeographyLock();
+    return resolveSkGeographyLockAndPrefill(profile, masterData);
+  }, [isAdmin, isSkOrShw, profile, masterData]);
+
   const scopeFilteredRows = useMemo(() => {
     if (isAdmin || !user) return rows;
 
@@ -565,6 +756,11 @@ const LocalRecordsGrid = () => {
     return rows.filter((row) => {
       // Keep newly added drafts visible for the current SK/SHW so they can fill hierarchy fields.
       if (row._isNew && String(row.sk_user_id) === String(user.id)) {
+        return true;
+      }
+      // Mirror backend LocalRecordViewSet: list includes rows where sk_user matches even if village
+      // is outside profile.micro_villages — do not hide those rows client-side.
+      if (String(row.sk_user_id) === String(user.id)) {
         return true;
       }
       if (villageScopes.size > 0) {
@@ -666,8 +862,13 @@ const LocalRecordsGrid = () => {
         ids.add(rowIdKey(approval.record_id));
       }
     });
+    rows.forEach((r) => {
+      if (r.metadata_approval_status === "PENDING") {
+        ids.add(rowIdKey(r.id));
+      }
+    });
     return ids;
-  }, [approvalRows]);
+  }, [approvalRows, rows]);
 
   const filteredRows = useMemo(
     () =>
@@ -759,7 +960,8 @@ const LocalRecordsGrid = () => {
     return Math.min(360, Math.ceil(textWidth + 18));
   };
 
-  /** Colgroup indexes where admin sees A/R (approval row PENDING + non-zero month value). */
+  const pendingActionMonthColumnIndexesRef = useRef<Set<number>>(new Set());
+  /** Colgroup indexes where admin sees A/R (approval PENDING + non-zero month value). */
   const pendingActionMonthColumnIndexes = useMemo(() => {
     if (!isAdmin) {
       return new Set<number>();
@@ -777,10 +979,11 @@ const LocalRecordsGrid = () => {
     });
     return set;
   }, [filteredRows, isAdmin, approvalByKey]);
+  pendingActionMonthColumnIndexesRef.current = pendingActionMonthColumnIndexes;
 
   useEffect(() => {
     setColumnWidths((prev) => {
-      if (appliedServerLayoutRef.current) {
+      if (appliedServerLayoutRef.current && !isAdmin) {
         return prev;
       }
       if (Object.keys(prev).length > 0) {
@@ -792,15 +995,16 @@ const LocalRecordsGrid = () => {
       LOCAL_HEADER_LABELS.forEach((label, index) => {
         next[index + 1] = estimateHeaderWidth(label);
       });
+      const narrowMonth = getUniformMonthColumnWidth();
       for (let index = LOCAL_MONTH_COLUMN_START_INDEX; index <= LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
         const monthLabel = MONTH_LABELS[index - LOCAL_MONTH_COLUMN_START_INDEX] || "";
         next[index] = pendingActionMonthColumnIndexes.has(index)
           ? estimateMonthColumnWithActionsWidth(monthLabel)
-          : estimateVerticalMonthHeaderWidth(monthLabel);
+          : narrowMonth;
       }
       return next;
     });
-  }, [pendingActionMonthColumnIndexes]);
+  }, [pendingActionMonthColumnIndexes, isAdmin]);
 
   useEffect(() => {
     setColumnWidths((prev) => {
@@ -812,15 +1016,26 @@ const LocalRecordsGrid = () => {
       }
       const next = { ...prev };
       let changed = false;
+      const narrowMonth = getUniformMonthColumnWidth();
       for (let index = LOCAL_MONTH_COLUMN_START_INDEX; index <= LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        const width = next[index] || 0;
+        const monthLabel = MONTH_LABELS[index - LOCAL_MONTH_COLUMN_START_INDEX] || "";
+        const isPending = pendingActionMonthColumnIndexes.has(index);
+        if (!isPending) {
+          if (touchedColumnIndexesRef.current.has(index)) {
+            continue;
+          }
+          if (width !== narrowMonth) {
+            next[index] = narrowMonth;
+            touchedColumnIndexesRef.current.delete(index);
+            changed = true;
+          }
+          continue;
+        }
         if (touchedColumnIndexesRef.current.has(index)) {
           continue;
         }
-        const width = next[index] || 0;
-        const monthLabel = MONTH_LABELS[index - LOCAL_MONTH_COLUMN_START_INDEX] || "";
-        const targetWidth = pendingActionMonthColumnIndexes.has(index)
-          ? estimateMonthColumnWithActionsWidth(monthLabel)
-          : estimateVerticalMonthHeaderWidth(monthLabel);
+        const targetWidth = estimateMonthColumnWithActionsWidth(monthLabel);
         if (targetWidth !== width) {
           next[index] = targetWidth;
           changed = true;
@@ -828,7 +1043,7 @@ const LocalRecordsGrid = () => {
       }
       return changed ? next : prev;
     });
-  }, [pendingActionMonthColumnIndexes]);
+  }, [pendingActionMonthColumnIndexes, isAdmin]);
 
   useEffect(() => {
     if (!user) return;
@@ -864,19 +1079,33 @@ const LocalRecordsGrid = () => {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isAdmin]);
 
   const handleSaveColumnLayoutForEveryone = async () => {
     try {
       setSavingLayout(true);
+      const narrowMonth = getUniformMonthColumnWidth();
+      const column_widths: Record<number, number> = { ...columnWidths };
+      for (let index = LOCAL_MONTH_COLUMN_START_INDEX; index <= LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        const w = columnWidths[index];
+        if (typeof w === "number" && Number.isFinite(w) && w >= 10) {
+          column_widths[index] = Math.round(w);
+        } else {
+          const monthLabel = MONTH_LABELS[index - LOCAL_MONTH_COLUMN_START_INDEX] || "";
+          column_widths[index] = pendingActionMonthColumnIndexes.has(index)
+            ? estimateMonthColumnWithActionsWidth(monthLabel)
+            : narrowMonth;
+        }
+      }
       await saveMalariaGridColumnLayout("local_records", {
-        column_widths: columnWidths,
+        column_widths,
         is_expanded_to_header_width: isExpandedToHeaderWidth,
       });
       appliedServerLayoutRef.current = true;
+      setColumnWidths(column_widths);
       toast({
         title: "Column layout saved",
-        description: "All users will see this table width on their next visit or refresh.",
+        description: "All users will see these column widths on their next visit or refresh, including Jan–Dec.",
       });
     } catch (error) {
       toast({
@@ -897,6 +1126,13 @@ const LocalRecordsGrid = () => {
       LOCAL_HEADER_LABELS.forEach((label, index) => {
         expandedWidths[index + 1] = estimateHeaderWidth(label);
       });
+      const narrowMonth = getUniformMonthColumnWidth();
+      for (let index = LOCAL_MONTH_COLUMN_START_INDEX; index <= LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        const monthLabel = MONTH_LABELS[index - LOCAL_MONTH_COLUMN_START_INDEX] || "";
+        expandedWidths[index] = pendingActionMonthColumnIndexes.has(index)
+          ? estimateMonthColumnWithActionsWidth(monthLabel)
+          : narrowMonth;
+      }
       setColumnWidths(expandedWidths);
       setIsExpandedToHeaderWidth(true);
       return;
@@ -931,6 +1167,9 @@ const LocalRecordsGrid = () => {
   const handleTextCellChange = (rowId: string | number, field: keyof LocalRecord, value: string) => {
     const id = rowIdKey(rowId);
     setRows((prev) => prev.map((r) => (rowIdKey(r.id) === id ? { ...r, [field]: value } : r)));
+    if (LOCAL_METADATA_DIRTY_FIELDS.has(field)) {
+      dirtyLocalMetadataRowIdsRef.current.add(id);
+    }
     setDirtyIds((prev) => {
       const next = new Set(prev);
       next.add(id);
@@ -1000,20 +1239,21 @@ const LocalRecordsGrid = () => {
 
   const addRow = () => {
     if (!user) return;
+    const geo = !isAdmin && isSkOrShw ? skGeoLock : emptySkGeographyLock();
     const newRow: LocalGridRow = {
       id: `new-${crypto.randomUUID()}`,
       village_id: "",
       sk_user_id: user.id,
-      district_id: "",
-      upazila_id: "",
-      union_id: "",
+      district_id: geo.district_id,
+      upazila_id: geo.upazila_id,
+      union_id: geo.union_id,
       reporting_year: year,
       sk_user_display_name: "",
       sk_user_designation: "",
       sk_user_ss_name: "",
-      district_name: "",
-      upazila_name: "",
-      union_name: "",
+      district_name: geo.district_name,
+      upazila_name: geo.upazila_name,
+      union_name: geo.union_name,
       village_name: "",
       village_name_bn: "",
       village_code: "",
@@ -1057,30 +1297,39 @@ const LocalRecordsGrid = () => {
     setSelectedWard("all");
     setSelectedVillage("all");
     setRecordView("all");
+    if (geo.union_name) {
+      void ensureVillagesForUnion(geo.union_name);
+    }
   };
 
-  const buildCreatePayload = (row: LocalGridRow, villageId: string): LocalRecordCreatePayload => ({
-    village: villageId,
-    reporting_year: row.reporting_year || year,
-    hh: row.hh || 0,
-    population: row.population || 0,
-    itn_2023: row.itn_2023 || 0,
-    itn_2024: row.itn_2024 || 0,
-    itn_2025: row.itn_2025 || 0,
-    itn_2026: row.itn_2026 || 0,
-    jan_cases: row.jan_cases || 0,
-    feb_cases: row.feb_cases || 0,
-    mar_cases: row.mar_cases || 0,
-    apr_cases: row.apr_cases || 0,
-    may_cases: row.may_cases || 0,
-    jun_cases: row.jun_cases || 0,
-    jul_cases: row.jul_cases || 0,
-    aug_cases: row.aug_cases || 0,
-    sep_cases: row.sep_cases || 0,
-    oct_cases: row.oct_cases || 0,
-    nov_cases: row.nov_cases || 0,
-    dec_cases: row.dec_cases || 0,
-  });
+  const buildCreatePayload = (row: LocalGridRow, villageId: string): LocalRecordCreatePayload => {
+    const base: LocalRecordCreatePayload = {
+      village: villageId,
+      reporting_year: row.reporting_year || year,
+      hh: row.hh || 0,
+      population: row.population || 0,
+      itn_2023: row.itn_2023 || 0,
+      itn_2024: row.itn_2024 || 0,
+      itn_2025: row.itn_2025 || 0,
+      itn_2026: row.itn_2026 || 0,
+      jan_cases: row.jan_cases || 0,
+      feb_cases: row.feb_cases || 0,
+      mar_cases: row.mar_cases || 0,
+      apr_cases: row.apr_cases || 0,
+      may_cases: row.may_cases || 0,
+      jun_cases: row.jun_cases || 0,
+      jul_cases: row.jul_cases || 0,
+      aug_cases: row.aug_cases || 0,
+      sep_cases: row.sep_cases || 0,
+      oct_cases: row.oct_cases || 0,
+      nov_cases: row.nov_cases || 0,
+      dec_cases: row.dec_cases || 0,
+    };
+    if (!isAdmin) {
+      base.metadata_submission = buildLocalMetadataSubmission(row);
+    }
+    return base;
+  };
 
   const resolveVillageIdForNewRow = async (row: LocalGridRow): Promise<string> => {
     const districtName = String(row.district_name || "").trim();
@@ -1099,6 +1348,72 @@ const LocalRecordsGrid = () => {
 
     const findByName = <T extends { id: number; name: string }>(items: T[], name: string) =>
       items.find((item) => item.name.trim().toLowerCase() === name.trim().toLowerCase());
+
+    if (!isAdmin) {
+      const district = findByName(masterData.districts, districtName);
+      if (!district) {
+        throw new LocalHierarchyNotFoundError(
+          `District "${districtName}" was not found in the system. Select an existing district or ask an admin to add the geography.`,
+        );
+      }
+      const districtId = district.id;
+      const upazila = masterData.upazilas.find(
+        (item) => item.district_id === districtId && item.name.trim().toLowerCase() === upazilaName.toLowerCase(),
+      );
+      if (!upazila) {
+        throw new LocalHierarchyNotFoundError(
+          `Upazila "${upazilaName}" was not found under that district. Select an existing upazila or ask an admin to add the geography.`,
+        );
+      }
+      const upazilaId = upazila.id;
+      const union = masterData.unions.find(
+        (item) => item.upazila_id === upazilaId && item.name.trim().toLowerCase() === unionName.toLowerCase(),
+      );
+      if (!union) {
+        throw new LocalHierarchyNotFoundError(
+          `Union "${unionName}" was not found under that upazila. Select an existing union or ask an admin to add the geography.`,
+        );
+      }
+      const unionId = union.id;
+      const existingVillage = masterData.villages.find(
+        (item) =>
+          item.union_id === unionId &&
+          item.name.trim().toLowerCase() === villageName.toLowerCase() &&
+          String(item.ward_no || "").trim() === wardNo,
+      );
+      if (existingVillage) {
+        return String(existingVillage.id);
+      }
+      const sanitized = villageName.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || "VLG";
+      const villageCode = `${sanitized.slice(0, 6)}${Date.now().toString().slice(-6)}`;
+      const createdVillage = await createVillage({
+        union: unionId,
+        name: villageName,
+        name_bn: row.village_name_bn || "",
+        village_code: villageCode,
+        latitude: row.village_latitude,
+        longitude: row.village_longitude,
+        ward_no: wardNo || null,
+        sk_shw_name: row.village_sk_shw_name || "",
+        ss_name: row.village_ss_name || "",
+        mmw_hp_chwc_name: row.village_mmw_hp_chwc_name || "",
+        distance_from_upazila_office_km: row.village_distance_from_upazila_office_km,
+        bordering_country_name: row.village_bordering_country_name || "",
+        other_activities: row.village_other_activities || "",
+      });
+      const newVid = Number(createdVillage.id);
+      const newRowVillage: MasterVillage = {
+        id: newVid,
+        name: villageName,
+        ward_no: wardNo || null,
+        union_id: unionId,
+      };
+      setMasterData((prev) => ({
+        ...prev,
+        villages: [...prev.villages.filter((v) => v.id !== newVid), newRowVillage],
+      }));
+      return String(createdVillage.id);
+    }
 
     let districtId = findByName(masterData.districts, districtName)?.id;
     if (!districtId) {
@@ -1149,6 +1464,17 @@ const LocalRecordsGrid = () => {
       bordering_country_name: row.village_bordering_country_name || "",
       other_activities: row.village_other_activities || "",
     });
+    const adminNewVid = Number(createdVillage.id);
+    const adminNewVillage: MasterVillage = {
+      id: adminNewVid,
+      name: villageName,
+      ward_no: wardNo || null,
+      union_id: unionId,
+    };
+    setMasterData((prev) => ({
+      ...prev,
+      villages: [...prev.villages.filter((v) => v.id !== adminNewVid), adminNewVillage],
+    }));
     return String(createdVillage.id);
   };
 
@@ -1161,6 +1487,9 @@ const LocalRecordsGrid = () => {
       const parsed = Number(normalized);
       if (Number.isNaN(parsed)) return;
       setRows((prev) => prev.map((r) => (rowIdKey(r.id) === id ? { ...r, [field]: parsed } : r)));
+    }
+    if (field === "village_distance_from_upazila_office_km") {
+      dirtyLocalMetadataRowIdsRef.current.add(id);
     }
     setDirtyIds((prev) => {
       const next = new Set(prev);
@@ -1192,7 +1521,18 @@ const LocalRecordsGrid = () => {
       for (const r of dirty) {
         if (r._isNew) {
           const villageId = await resolveVillageIdForNewRow(r);
-          await createLocalRecord(buildCreatePayload(r, villageId));
+          const created = await createLocalRecord(buildCreatePayload(r, villageId));
+          const draftKey = rowIdKey(r.id);
+          setRows((prev) => {
+            const idx = prev.findIndex((row) => rowIdKey(row.id) === draftKey);
+            const saved: LocalGridRow = { ...created };
+            if (idx < 0) {
+              return [saved, ...prev];
+            }
+            const next = [...prev];
+            next[idx] = saved;
+            return next;
+          });
           continue;
         }
         if (isAdmin) {
@@ -1200,7 +1540,10 @@ const LocalRecordsGrid = () => {
           await updateUpazila(r.upazila_id, { name: r.upazila_name });
           await updateUnion(r.union_id, { name: r.union_name });
         }
-        await updateLocalRecord(rowIdKey(r.id), buildUpdatePayload(r));
+        await updateLocalRecord(
+          rowIdKey(r.id),
+          buildUpdatePayload(r, !isAdmin && dirtyLocalMetadataRowIdsRef.current.has(rowIdKey(r.id))),
+        );
         if (isAdmin) {
           await updateVillage(r.village_id, buildVillageUpdatePayload(r));
         }
@@ -1210,19 +1553,76 @@ const LocalRecordsGrid = () => {
       setMasterData(refreshedMaster);
       await fetchData();
       setDirtyIds(new Set());
+      dirtyLocalMetadataRowIdsRef.current.clear();
       toast({ title: "Saved successfully" });
     } catch (error) {
       if (error instanceof LocalSaveValidationError) {
         setSaveErrorAlert({ variant: "location", missing: error.missing });
+      } else if (error instanceof LocalHierarchyNotFoundError) {
+        setSaveErrorAlert({
+          variant: "generic",
+          title: "Cannot save row",
+          message: error.message,
+        });
       } else {
         setSaveErrorAlert({
           variant: "generic",
-          title: "Save error",
+        title: "Save error",
           message: error instanceof Error ? error.message : "Failed to save records.",
-        });
+      });
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleApproveLocalMetadata = async (id: string | number) => {
+    const key = rowIdKey(id);
+    if (metadataActionBusyId !== null) return;
+    try {
+      setMetadataActionBusyId(key);
+      const updated = await approveLocalRecordMetadata(key);
+      setRows((prev) =>
+        prev.map((r) =>
+          rowIdKey(r.id) === key
+            ? ({ ...r, ...updated, ...(r._isNew ? { _isNew: true as const } : {}) } as LocalGridRow)
+            : r,
+        ),
+      );
+      toast({ title: "Metadata approved" });
+    } catch (error) {
+      toast({
+        title: "Approve failed",
+        description: error instanceof Error ? error.message : "Could not approve metadata.",
+        variant: "destructive",
+      });
+    } finally {
+      setMetadataActionBusyId(null);
+    }
+  };
+
+  const handleRejectLocalMetadata = async (id: string | number) => {
+    const key = rowIdKey(id);
+    if (metadataActionBusyId !== null) return;
+    try {
+      setMetadataActionBusyId(key);
+      const updated = await rejectLocalRecordMetadata(key);
+      setRows((prev) =>
+        prev.map((r) =>
+          rowIdKey(r.id) === key
+            ? ({ ...r, ...updated, ...(r._isNew ? { _isNew: true as const } : {}) } as LocalGridRow)
+            : r,
+        ),
+      );
+      toast({ title: "Metadata rejected" });
+    } catch (error) {
+      toast({
+        title: "Reject failed",
+        description: error instanceof Error ? error.message : "Could not reject metadata.",
+        variant: "destructive",
+      });
+    } finally {
+      setMetadataActionBusyId(null);
     }
   };
 
@@ -1281,7 +1681,6 @@ const LocalRecordsGrid = () => {
     return openMonthNumbers.has(monthIndex + 1);
   };
 
-  const isSkOrShw = role === "sk";
   const canEditOwnNewRow = (row: LocalGridRow) =>
     isSkOrShw && !!user && row._isNew && String(row.sk_user_id) === String(user.id);
 
@@ -1507,7 +1906,7 @@ const LocalRecordsGrid = () => {
             size="icon"
             onClick={() => void handleSaveColumnLayoutForEveryone()}
             disabled={savingLayout || loading}
-            title="Save current column widths for all users"
+            title="Publish column layout for everyone (SK and admins). Jan–Dec widths are normalized to standard month sizes; other columns use your current sizes."
             aria-label="Save column layout for all users"
           >
             {savingLayout ? <Loader2 className="h-4 w-4 animate-spin" /> : <Columns3 className="h-4 w-4" />}
@@ -1628,25 +2027,69 @@ const LocalRecordsGrid = () => {
             {filteredRows.length === 0 && !loading && (
               <tr>
                 <td colSpan={37} className="text-center py-8 text-muted-foreground">
-                  No records found for current filters
+                  {isAdmin && recordView === "pending"
+                    ? "No pending records for current filters (monthly submissions or metadata approval)."
+                    : "No records found for current filters"}
                 </td>
               </tr>
             )}
 
             {paginatedRows.map((row, index) => (
-              <tr key={row.id} className={row._isNew ? "bg-sky-50/70 hover:bg-sky-100/70" : "hover:bg-gray-50"}>
-                <td className="grid-td p-1 text-center">
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => requestDeleteRow(row.id)}
-                      className="text-destructive hover:text-destructive/80 p-0.5"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+              <tr
+                key={row.id}
+                className={localRecordRowMetaClasses(row)}
+                title={
+                  row.metadata_approval_status === "REJECTED"
+                    ? row.metadata_rejection_note || "Metadata rejected"
+                    : row.metadata_approval_status === "PENDING"
+                      ? "Metadata pending approval"
+                      : undefined
+                }
+              >
+                <td className={`grid-td p-1 text-center align-top min-w-[52px] ${localRecordMetaCellBg(row)}`}>
+                  <div className="flex flex-col items-center gap-0.5">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => requestDeleteRow(row.id)}
+                        className="text-destructive hover:text-destructive/80 p-0.5"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {isAdmin && row.metadata_approval_status === "PENDING" && !row._isNew && (
+                      <div className="flex gap-0.5">
+                        <button
+                          type="button"
+                          className="rounded border border-emerald-300 bg-emerald-50 p-0.5 hover:bg-emerald-100 disabled:opacity-50"
+                          title="Approve metadata"
+                          disabled={metadataActionBusyId !== null}
+                          onClick={() => void handleApproveLocalMetadata(row.id)}
+                        >
+                          {metadataActionBusyId === rowIdKey(row.id) ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-emerald-800" />
+                          ) : (
+                            <Check className="h-3 w-3 text-emerald-800" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-fuchsia-300 bg-fuchsia-50 p-0.5 hover:bg-fuchsia-100 disabled:opacity-50"
+                          title="Reject metadata"
+                          disabled={metadataActionBusyId !== null}
+                          onClick={() => void handleRejectLocalMetadata(row.id)}
+                        >
+                          {metadataActionBusyId === rowIdKey(row.id) ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-fuchsia-800" />
+                          ) : (
+                            <X className="h-3 w-3 text-fuchsia-800" />
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </td>
-                <td className={`grid-td sticky left-0 z-[5] font-medium ${row._isNew ? "bg-sky-50/70" : "bg-white"}`}>
+                <td className={`grid-td sticky left-0 z-[5] font-medium ${localRecordMetaCellBg(row)}`}>
                   {(page - 1) * pageSize + index + 1}
                 </td>
                 <td className="grid-td">Bangladesh</td>
@@ -1655,7 +2098,11 @@ const LocalRecordsGrid = () => {
                 </td>
                 <td className="grid-td p-0">
                   {row._isNew ? (
-                    otherModeByRow[rowIdKey(row.id)]?.district ? (
+                    skGeoLock.lockDistrict ? (
+                      <span className="block px-1 py-0.5 font-medium text-muted-foreground" title="Assigned area (not editable)">
+                        {row.district_name || "—"}
+                      </span>
+                    ) : otherModeByRow[rowIdKey(row.id)]?.district ? (
                       <input
                         className="grid-input"
                         placeholder="District"
@@ -1700,7 +2147,11 @@ const LocalRecordsGrid = () => {
                 </td>
                 <td className="grid-td p-0">
                   {row._isNew ? (
-                    otherModeByRow[rowIdKey(row.id)]?.upazila ? (
+                    skGeoLock.lockUpazila ? (
+                      <span className="block px-1 py-0.5 font-medium text-muted-foreground" title="Assigned area (not editable)">
+                        {row.upazila_name || "—"}
+                      </span>
+                    ) : otherModeByRow[rowIdKey(row.id)]?.upazila ? (
                       <input
                         className="grid-input"
                         placeholder="Upazila"
@@ -1744,7 +2195,11 @@ const LocalRecordsGrid = () => {
                 </td>
                 <td className="grid-td p-0">
                   {row._isNew ? (
-                    otherModeByRow[rowIdKey(row.id)]?.union ? (
+                    skGeoLock.lockUnion ? (
+                      <span className="block px-1 py-0.5 font-medium text-muted-foreground" title="Assigned area (not editable)">
+                        {row.union_name || "—"}
+                      </span>
+                    ) : otherModeByRow[rowIdKey(row.id)]?.union ? (
                       <input
                         className="grid-input"
                         placeholder="Union"
@@ -1888,7 +2343,7 @@ const LocalRecordsGrid = () => {
                     type="number"
                     min={0}
                     className="grid-input"
-                    value={row.population}
+                    value={row.population === 0 ? "" : row.population}
                     onChange={(e) => handleCellChange(row.id, "population", e.target.value)}
                     disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedNumber(row, "population")}
                   />
@@ -1933,8 +2388,8 @@ const LocalRecordsGrid = () => {
                     <td
                       key={col}
                       className={`grid-td p-0 border ${getMonthBg(status)} ${
-                        editable ? "" : "opacity-80"
-                      }`}
+                        isAdmin && isPendingCell ? "!overflow-visible whitespace-normal align-middle" : ""
+                      } ${editable ? "" : "opacity-80"}`}
                       title={
                         status === "APPROVED"
                           ? "Approved"
@@ -1945,22 +2400,20 @@ const LocalRecordsGrid = () => {
                           : "Not submitted"
                       }
                     >
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          min={0}
-                          className={`grid-input bg-transparent ${
-                            editable ? "" : "text-muted-foreground"
-                          }`}
-                          value={value === 0 ? "" : value}
-                          onChange={(e) => handleCellChange(row.id, col, e.target.value)}
-                          disabled={!editable}
-                        />
-                        {isAdmin && isPendingCell && (
-                          <div className="pr-1 flex items-center gap-0.5">
+                      {isAdmin && isPendingCell ? (
+                        <div className="flex min-w-0 items-center gap-0 px-0 py-0.5">
+                      <input
+                        type="number"
+                        min={0}
+                            className={`grid-input bg-transparent min-w-0 flex-1 !w-auto !overflow-visible !text-clip ${editable ? "" : "text-muted-foreground"}`}
+                            value={value === 0 ? "" : value}
+                        onChange={(e) => handleCellChange(row.id, col, e.target.value)}
+                        disabled={!editable}
+                      />
+                          <div className="flex shrink-0 items-center gap-0.5 pr-0.5">
                             <button
                               type="button"
-                              className="h-4 w-4 rounded text-[9px] leading-none bg-green-600 text-white"
+                              className="h-4 w-4 shrink-0 rounded text-[9px] leading-none bg-green-600 text-white"
                               title="Approve"
                               onClick={() => handleApprovalAction(row.id, monthNumber, "APPROVED")}
                             >
@@ -1968,15 +2421,26 @@ const LocalRecordsGrid = () => {
                             </button>
                             <button
                               type="button"
-                              className="h-4 w-4 rounded text-[9px] leading-none bg-fuchsia-600 text-white"
+                              className="h-4 w-4 shrink-0 rounded text-[9px] leading-none bg-fuchsia-600 text-white"
                               title="Reject"
                               onClick={() => handleApprovalAction(row.id, monthNumber, "REJECTED")}
                             >
                               R
                             </button>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="flex min-w-0 items-center">
+                          <input
+                            type="number"
+                            min={0}
+                            className={`grid-input bg-transparent ${editable ? "" : "text-muted-foreground"}`}
+                            value={value === 0 ? "" : value}
+                            onChange={(e) => handleCellChange(row.id, col, e.target.value)}
+                            disabled={!editable}
+                          />
+                        </div>
+                      )}
                     </td>
                   );
                 })}

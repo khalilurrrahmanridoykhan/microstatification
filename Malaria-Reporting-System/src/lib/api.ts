@@ -1,6 +1,23 @@
 export type AppRole = "admin" | "sk";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type MetadataApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type RecordType = "local" | "non_local";
+
+export interface LocalRecordMetadataSubmission {
+  village?: {
+    sk_shw_name?: string;
+    ss_name?: string;
+    mmw_hp_chwc_name?: string;
+    distance_from_upazila_office_km?: number | null;
+    bordering_country_name?: string;
+    other_activities?: string;
+  };
+  profile?: {
+    micro_sk_shw_name?: string;
+    micro_ss_name?: string;
+    micro_designation?: string;
+  };
+}
 
 export interface SessionUser {
   id: string;
@@ -78,6 +95,8 @@ export interface LocalRecord extends MonthlyValues {
   village_bordering_country_name: string;
   village_other_activities: string;
   ward_no: string | null;
+  metadata_approval_status?: MetadataApprovalStatus;
+  metadata_rejection_note?: string;
 }
 
 export interface NonLocalRecord extends MonthlyValues {
@@ -89,6 +108,25 @@ export interface NonLocalRecord extends MonthlyValues {
   upazila_or_township: string;
   union_name: string;
   village_name: string;
+  metadata_approval_status?: MetadataApprovalStatus;
+  metadata_rejection_note?: string;
+  division_name?: string;
+  name_of_sk_shw?: string;
+  designation?: string;
+  name_of_ss?: string;
+  village_name_bn?: string;
+  village_code?: string;
+  latitude?: string;
+  longitude?: string;
+  population_text?: string;
+  hh_text?: string;
+  itn_2026_text?: string;
+  itn_2025_text?: string;
+  itn_2024_text?: string;
+  mmw_hp_chwc_name?: string;
+  village_distance_km?: string;
+  border_country_name?: string;
+  other_activities?: string;
 }
 
 export interface ApprovalRow {
@@ -202,6 +240,7 @@ export interface LocalRecordUpdate extends MonthlyValues {
   itn_2025: number;
   itn_2026: number;
   sk_user_designation?: string;
+  metadata_submission?: LocalRecordMetadataSubmission;
 }
 
 export interface LocalRecordCreatePayload extends MonthlyValues {
@@ -214,6 +253,7 @@ export interface LocalRecordCreatePayload extends MonthlyValues {
   itn_2024: number;
   itn_2025: number;
   itn_2026: number;
+  metadata_submission?: LocalRecordMetadataSubmission;
 }
 
 export interface NonLocalRecordPayload extends MonthlyValues {
@@ -224,6 +264,8 @@ export interface NonLocalRecordPayload extends MonthlyValues {
   upazila_or_township: string;
   union_name: string;
   village_name: string;
+  metadata_submission?: Record<string, string>;
+  grid_metadata?: Record<string, string>;
 }
 
 export interface VillageUpdatePayload {
@@ -513,12 +555,30 @@ export function fetchLocalRecordsPage(params: {
   return requestCached<PaginatedResponse<LocalRecord>>(`/malaria/local-records/?${query.toString()}`);
 }
 
-export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promise<{ success: boolean }> {
+export function updateLocalRecord(id: string, payload: LocalRecordUpdate): Promise<LocalRecord> {
   clearGetRequestCache("/malaria/local-records/");
   clearGetRequestCache("/malaria/monthly-approvals/");
-  return request<{ success: boolean }>(`/malaria/local-records/${id}/`, {
+  return request<LocalRecord>(`/malaria/local-records/${id}/`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export function approveLocalRecordMetadata(id: string): Promise<LocalRecord> {
+  clearGetRequestCache("/malaria/local-records/");
+  clearGetRequestCache("/malaria/monthly-approvals/");
+  return request<LocalRecord>(`/malaria/local-records/${id}/approve_metadata/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function rejectLocalRecordMetadata(id: string, note?: string): Promise<LocalRecord> {
+  clearGetRequestCache("/malaria/local-records/");
+  clearGetRequestCache("/malaria/monthly-approvals/");
+  return request<LocalRecord>(`/malaria/local-records/${id}/reject_metadata/`, {
+    method: "POST",
+    body: JSON.stringify({ note: note || "" }),
   });
 }
 
@@ -660,11 +720,27 @@ export function createNonLocalRecord(payload: NonLocalRecordPayload): Promise<No
   });
 }
 
-export function updateNonLocalRecord(id: string, payload: NonLocalRecordPayload): Promise<{ success: boolean }> {
+export function updateNonLocalRecord(id: string, payload: NonLocalRecordPayload): Promise<NonLocalRecord> {
   clearGetRequestCache("/malaria/non-local-records/");
-  return request<{ success: boolean }>(`/malaria/non-local-records/${id}/`, {
+  return request<NonLocalRecord>(`/malaria/non-local-records/${id}/`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export function approveNonLocalRecordMetadata(id: string): Promise<NonLocalRecord> {
+  clearGetRequestCache("/malaria/non-local-records/");
+  return request<NonLocalRecord>(`/malaria/non-local-records/${id}/approve_metadata/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function rejectNonLocalRecordMetadata(id: string, note?: string): Promise<NonLocalRecord> {
+  clearGetRequestCache("/malaria/non-local-records/");
+  return request<NonLocalRecord>(`/malaria/non-local-records/${id}/reject_metadata/`, {
+    method: "POST",
+    body: JSON.stringify({ note: note || "" }),
   });
 }
 

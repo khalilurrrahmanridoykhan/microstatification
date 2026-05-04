@@ -3,11 +3,13 @@ import math
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
+from .metadata_approval import nonlocal_display_metadata
 from .models import (
     District,
     LocalRecord,
     MalariaGridColumnLayout,
     MalariaUserRole,
+    METADATA_APPROVAL_PENDING,
     MicrostatificationDataUpload,
     MonthAccessSetting,
     MonthlyApproval,
@@ -284,30 +286,86 @@ class LocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     raw_village_sk_shw_name = serializers.ReadOnlyField(source="village.sk_shw_name")
     village_ss_name = serializers.SerializerMethodField()
     raw_village_ss_name = serializers.ReadOnlyField(source="village.ss_name")
-    village_mmw_hp_chwc_name = serializers.ReadOnlyField(source="village.mmw_hp_chwc_name")
-    village_distance_from_upazila_office_km = serializers.ReadOnlyField(
-        source="village.distance_from_upazila_office_km"
-    )
-    village_bordering_country_name = serializers.ReadOnlyField(source="village.bordering_country_name")
-    village_other_activities = serializers.ReadOnlyField(source="village.other_activities")
+    village_mmw_hp_chwc_name = serializers.SerializerMethodField()
+    village_distance_from_upazila_office_km = serializers.SerializerMethodField()
+    village_bordering_country_name = serializers.SerializerMethodField()
+    village_other_activities = serializers.SerializerMethodField()
+    metadata_approval_status = serializers.CharField(read_only=True)
+    metadata_pending = serializers.JSONField(read_only=True)
+    metadata_rejection_note = serializers.CharField(read_only=True)
     village = serializers.PrimaryKeyRelatedField(queryset=Village.objects.all(), write_only=True, required=False)
     sk_user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True, required=False)
     villages = VillageNestedSerializer(source="village", read_only=True)
 
+    def _pending_profile(self, obj):
+        if getattr(obj, "metadata_approval_status", None) != METADATA_APPROVAL_PENDING:
+            return {}
+        return (obj.metadata_pending or {}).get("profile") or {}
+
+    def _pending_village(self, obj):
+        if getattr(obj, "metadata_approval_status", None) != METADATA_APPROVAL_PENDING:
+            return {}
+        return (obj.metadata_pending or {}).get("village") or {}
+
     def get_sk_user_display_name(self, obj):
+        pend = self._pending_profile(obj)
+        if "micro_sk_shw_name" in pend:
+            return _clean_assignment_text(pend.get("micro_sk_shw_name"))
         return get_cached_local_record_assigned_user_details(obj)["name"]
 
     def get_sk_user_designation(self, obj):
+        pend = self._pending_profile(obj)
+        if "micro_designation" in pend:
+            return _clean_assignment_text(pend.get("micro_designation"))
         return get_cached_local_record_assigned_user_details(obj)["designation"]
 
     def get_sk_user_ss_name(self, obj):
+        pend = self._pending_profile(obj)
+        if "micro_ss_name" in pend:
+            return _clean_assignment_text(pend.get("micro_ss_name"))
         return get_cached_local_record_assigned_user_details(obj)["ss_name"]
 
     def get_village_sk_shw_name(self, obj):
-        return self.get_sk_user_display_name(obj) or _clean_assignment_text(getattr(obj.village, "sk_shw_name", ""))
+        name = self.get_sk_user_display_name(obj)
+        if name:
+            return name
+        pv = self._pending_village(obj)
+        if "sk_shw_name" in pv:
+            return _clean_assignment_text(pv.get("sk_shw_name"))
+        return _clean_assignment_text(getattr(obj.village, "sk_shw_name", ""))
 
     def get_village_ss_name(self, obj):
-        return self.get_sk_user_ss_name(obj) or _clean_assignment_text(getattr(obj.village, "ss_name", ""))
+        ss = self.get_sk_user_ss_name(obj)
+        if ss:
+            return ss
+        pv = self._pending_village(obj)
+        if "ss_name" in pv:
+            return _clean_assignment_text(pv.get("ss_name"))
+        return _clean_assignment_text(getattr(obj.village, "ss_name", ""))
+
+    def get_village_mmw_hp_chwc_name(self, obj):
+        pv = self._pending_village(obj)
+        if "mmw_hp_chwc_name" in pv:
+            return pv.get("mmw_hp_chwc_name") or ""
+        return getattr(obj.village, "mmw_hp_chwc_name", "") or ""
+
+    def get_village_distance_from_upazila_office_km(self, obj):
+        pv = self._pending_village(obj)
+        if "distance_from_upazila_office_km" in pv:
+            return pv.get("distance_from_upazila_office_km")
+        return getattr(obj.village, "distance_from_upazila_office_km", None)
+
+    def get_village_bordering_country_name(self, obj):
+        pv = self._pending_village(obj)
+        if "bordering_country_name" in pv:
+            return pv.get("bordering_country_name") or ""
+        return getattr(obj.village, "bordering_country_name", "") or ""
+
+    def get_village_other_activities(self, obj):
+        pv = self._pending_village(obj)
+        if "other_activities" in pv:
+            return pv.get("other_activities") or ""
+        return getattr(obj.village, "other_activities", "") or ""
 
     class Meta:
         model = LocalRecord
@@ -340,6 +398,9 @@ class LocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
             "village_distance_from_upazila_office_km",
             "village_bordering_country_name",
             "village_other_activities",
+            "metadata_approval_status",
+            "metadata_pending",
+            "metadata_rejection_note",
             "reporting_year",
             "hh",
             "population",
@@ -359,6 +420,81 @@ class LocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
 class NonLocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
     sk_user_id = serializers.IntegerField(read_only=True)
     sk_user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True, required=False)
+    grid_metadata = serializers.JSONField(read_only=True)
+    metadata_approval_status = serializers.CharField(read_only=True)
+    metadata_pending = serializers.JSONField(read_only=True)
+    metadata_rejection_note = serializers.CharField(read_only=True)
+    division_name = serializers.SerializerMethodField()
+    name_of_sk_shw = serializers.SerializerMethodField()
+    designation = serializers.SerializerMethodField()
+    name_of_ss = serializers.SerializerMethodField()
+    village_name_bn = serializers.SerializerMethodField()
+    village_code = serializers.SerializerMethodField()
+    latitude = serializers.SerializerMethodField()
+    longitude = serializers.SerializerMethodField()
+    population_text = serializers.SerializerMethodField()
+    hh_text = serializers.SerializerMethodField()
+    itn_2026_text = serializers.SerializerMethodField()
+    itn_2025_text = serializers.SerializerMethodField()
+    itn_2024_text = serializers.SerializerMethodField()
+    mmw_hp_chwc_name = serializers.SerializerMethodField()
+    village_distance_km = serializers.SerializerMethodField()
+    border_country_name = serializers.SerializerMethodField()
+    other_activities = serializers.SerializerMethodField()
+
+    def _meta(self, obj):
+        return nonlocal_display_metadata(obj)
+
+    def get_division_name(self, obj):
+        return self._meta(obj).get("division_name") or ""
+
+    def get_name_of_sk_shw(self, obj):
+        return self._meta(obj).get("name_of_sk_shw") or ""
+
+    def get_designation(self, obj):
+        return self._meta(obj).get("designation") or ""
+
+    def get_name_of_ss(self, obj):
+        return self._meta(obj).get("name_of_ss") or ""
+
+    def get_village_name_bn(self, obj):
+        return self._meta(obj).get("village_name_bn") or ""
+
+    def get_village_code(self, obj):
+        return self._meta(obj).get("village_code") or ""
+
+    def get_latitude(self, obj):
+        return self._meta(obj).get("latitude") or ""
+
+    def get_longitude(self, obj):
+        return self._meta(obj).get("longitude") or ""
+
+    def get_population_text(self, obj):
+        return self._meta(obj).get("population_text") or ""
+
+    def get_hh_text(self, obj):
+        return self._meta(obj).get("hh_text") or ""
+
+    def get_itn_2026_text(self, obj):
+        return self._meta(obj).get("itn_2026_text") or ""
+
+    def get_itn_2025_text(self, obj):
+        return self._meta(obj).get("itn_2025_text") or ""
+
+    def get_itn_2024_text(self, obj):
+        return self._meta(obj).get("itn_2024_text") or ""
+
+    def get_mmw_hp_chwc_name(self, obj):
+        return self._meta(obj).get("mmw_hp_chwc_name") or ""
+
+    def get_village_distance_km(self, obj):
+        return self._meta(obj).get("village_distance_km") or ""
+
+    def get_border_country_name(self, obj):
+        return self._meta(obj).get("border_country_name") or ""
+
+    def get_other_activities(self, obj):
+        return self._meta(obj).get("other_activities") or ""
 
     class Meta:
         model = NonLocalRecord
@@ -372,6 +508,27 @@ class NonLocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer
             "union_name",
             "village_name",
             *MONTH_COLUMNS,
+            "grid_metadata",
+            "metadata_approval_status",
+            "metadata_pending",
+            "metadata_rejection_note",
+            "division_name",
+            "name_of_sk_shw",
+            "designation",
+            "name_of_ss",
+            "village_name_bn",
+            "village_code",
+            "latitude",
+            "longitude",
+            "population_text",
+            "hh_text",
+            "itn_2026_text",
+            "itn_2025_text",
+            "itn_2024_text",
+            "mmw_hp_chwc_name",
+            "village_distance_km",
+            "border_country_name",
+            "other_activities",
             "created_at",
             "updated_at",
             "sk_user",

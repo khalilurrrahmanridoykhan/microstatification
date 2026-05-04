@@ -104,6 +104,16 @@ class Village(TimestampedModel):
         return f"{self.name}{suffix}"
 
 
+METADATA_APPROVAL_PENDING = "PENDING"
+METADATA_APPROVAL_APPROVED = "APPROVED"
+METADATA_APPROVAL_REJECTED = "REJECTED"
+METADATA_APPROVAL_STATUS_CHOICES = (
+    (METADATA_APPROVAL_PENDING, "Pending"),
+    (METADATA_APPROVAL_APPROVED, "Approved"),
+    (METADATA_APPROVAL_REJECTED, "Rejected"),
+)
+
+
 class MonthlyCasesMixin(models.Model):
     jan_cases = models.PositiveIntegerField(default=0)
     feb_cases = models.PositiveIntegerField(default=0)
@@ -132,12 +142,31 @@ class LocalRecord(TimestampedModel, MonthlyCasesMixin):
     itn_2024 = models.PositiveIntegerField(default=0)
     itn_2025 = models.PositiveIntegerField(default=0)
     itn_2026 = models.PositiveIntegerField(default=0)
+    metadata_approval_status = models.CharField(
+        max_length=16,
+        choices=METADATA_APPROVAL_STATUS_CHOICES,
+        default=METADATA_APPROVAL_APPROVED,
+    )
+    metadata_pending = models.JSONField(null=True, blank=True)
+    metadata_reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="malaria_local_metadata_reviews",
+        null=True,
+        blank=True,
+    )
+    metadata_reviewed_at = models.DateTimeField(null=True, blank=True)
+    metadata_rejection_note = models.CharField(max_length=500, blank=True, default="")
 
     class Meta:
         ordering = ("-reporting_year", "village__name")
         indexes = [
             models.Index(fields=["reporting_year"], name="malaria_local_year_idx"),
             models.Index(fields=["sk_user", "reporting_year"], name="malaria_local_user_year_idx"),
+            models.Index(
+                fields=["metadata_approval_status", "reporting_year"],
+                name="mal_loc_meta_stat_yr_idx",
+            ),
         ]
         constraints = [
             models.UniqueConstraint(fields=("village", "reporting_year"), name="malaria_unique_local_record_per_village_year"),
@@ -155,12 +184,32 @@ class NonLocalRecord(TimestampedModel, MonthlyCasesMixin):
     upazila_or_township = models.CharField(max_length=255, blank=True, default="")
     union_name = models.CharField(max_length=255, blank=True, default="")
     village_name = models.CharField(max_length=255, blank=True, default="")
+    grid_metadata = models.JSONField(default=dict, blank=True)
+    metadata_approval_status = models.CharField(
+        max_length=16,
+        choices=METADATA_APPROVAL_STATUS_CHOICES,
+        default=METADATA_APPROVAL_APPROVED,
+    )
+    metadata_pending = models.JSONField(null=True, blank=True)
+    metadata_reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="malaria_nonlocal_metadata_reviews",
+        null=True,
+        blank=True,
+    )
+    metadata_reviewed_at = models.DateTimeField(null=True, blank=True)
+    metadata_rejection_note = models.CharField(max_length=500, blank=True, default="")
 
     class Meta:
         ordering = ("-reporting_year", "-updated_at")
         indexes = [
             models.Index(fields=["reporting_year"], name="malaria_nonlocal_year_idx"),
             models.Index(fields=["sk_user", "reporting_year"], name="malaria_nonlocal_user_year_idx"),
+            models.Index(
+                fields=["metadata_approval_status", "reporting_year"],
+                name="mal_nloc_meta_stat_yr_idx",
+            ),
         ]
 
     def __str__(self):

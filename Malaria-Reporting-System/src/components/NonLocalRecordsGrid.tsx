@@ -14,12 +14,25 @@ import {
   MONTH_LABELS,
   type MonthColumn,
   estimateMonthColumnWithActionsWidth,
-  estimateVerticalMonthHeaderWidth,
+  getUniformMonthColumnWidth,
   getDhakaMonth,
   getDhakaYear,
 } from "@/lib/monthUtils";
-import { Columns3, Loader2, Maximize2, Minimize2, Plus, Trash2, RefreshCw, Save } from "lucide-react";
 import {
+  Check,
+  Columns3,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Plus,
+  RefreshCw,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
+import * as XLSX from "xlsx";
+import {
+  approveNonLocalRecordMetadata,
   createNonLocalRecord,
   deleteNonLocalRecord,
   fetchMalariaMasterData,
@@ -28,6 +41,7 @@ import {
   fetchMalariaGridColumnLayout,
   fetchMonthAccessSettings,
   fetchNonLocalRecordsPage,
+  rejectNonLocalRecordMetadata,
   saveMalariaGridColumnLayout,
   upsertMonthlyApproval,
   updateNonLocalRecord,
@@ -39,6 +53,20 @@ import {
 
 interface NonLocalRow extends NonLocalRecord {
   _isNew?: boolean;
+}
+
+function nonLocalRowMetaClasses(row: NonLocalRow): string {
+  if (row._isNew) return "bg-sky-50/70 hover:bg-sky-100/70";
+  if (row.metadata_approval_status === "PENDING") return "bg-amber-50/85 hover:bg-amber-100/75";
+  if (row.metadata_approval_status === "REJECTED") return "bg-fuchsia-50/75 hover:bg-fuchsia-100/70";
+  return "hover:bg-gray-50";
+}
+
+function nonLocalMetaCellBg(row: NonLocalRow): string {
+  if (row._isNew) return "bg-sky-50/70";
+  if (row.metadata_approval_status === "PENDING") return "bg-amber-50/85";
+  if (row.metadata_approval_status === "REJECTED") return "bg-fuchsia-50/75";
+  return "bg-white";
 }
 
 type CellStatus = "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
@@ -108,6 +136,25 @@ const NON_LOCAL_LIST_FIELDS = [
   "union_name",
   "village_name",
   ...MONTH_COLUMNS,
+  "metadata_approval_status",
+  "metadata_rejection_note",
+  "division_name",
+  "name_of_sk_shw",
+  "designation",
+  "name_of_ss",
+  "village_name_bn",
+  "village_code",
+  "latitude",
+  "longitude",
+  "population_text",
+  "hh_text",
+  "itn_2026_text",
+  "itn_2025_text",
+  "itn_2024_text",
+  "mmw_hp_chwc_name",
+  "village_distance_km",
+  "border_country_name",
+  "other_activities",
 ];
 
 const NON_LOCAL_MONTH_COLUMN_START_INDEX = 21;
@@ -153,8 +200,30 @@ function isMonthField(field: NonLocalEditableField): field is MonthColumn {
   return MONTH_COLUMNS.includes(field as MonthColumn);
 }
 
-function buildPayload(row: NonLocalRow): NonLocalRecordPayload {
+function buildNonLocalMetadataFlat(row: NonLocalRow): Record<string, string> {
   return {
+    division_name: row.division_name || "",
+    name_of_sk_shw: row.name_of_sk_shw || "",
+    designation: row.designation || "",
+    name_of_ss: row.name_of_ss || "",
+    village_name_bn: row.village_name_bn || "",
+    village_code: row.village_code || "",
+    latitude: row.latitude || "",
+    longitude: row.longitude || "",
+    population_text: row.population_text || "",
+    hh_text: row.hh_text || "",
+    itn_2026_text: row.itn_2026_text || "",
+    itn_2025_text: row.itn_2025_text || "",
+    itn_2024_text: row.itn_2024_text || "",
+    mmw_hp_chwc_name: row.mmw_hp_chwc_name || "",
+    village_distance_km: row.village_distance_km || "",
+    border_country_name: row.border_country_name || "",
+    other_activities: row.other_activities || "",
+  };
+}
+
+function buildPayload(row: NonLocalRow, isAdminUser: boolean, includeNonAdminMetadataSubmission: boolean): NonLocalRecordPayload {
+  const base: NonLocalRecordPayload = {
     reporting_year: row.reporting_year,
     country: row.country.trim() || "Bangladesh",
     district_or_state: row.district_or_state,
@@ -174,6 +243,13 @@ function buildPayload(row: NonLocalRow): NonLocalRecordPayload {
     nov_cases: row.nov_cases,
     dec_cases: row.dec_cases,
   };
+  const flat = buildNonLocalMetadataFlat(row);
+  if (isAdminUser) {
+    base.grid_metadata = flat;
+  } else if (includeNonAdminMetadataSubmission) {
+    base.metadata_submission = flat;
+  }
+  return base;
 }
 
 const NonLocalRecordsGrid = () => {
@@ -190,6 +266,7 @@ const NonLocalRecordsGrid = () => {
   const [saving, setSaving] = useState(false);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
+  const dirtyNonLocalMetadataRowIdsRef = useRef<Set<string>>(new Set());
   const [openMonthNumbers, setOpenMonthNumbers] = useState<Set<number>>(new Set([currentMonth]));
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const [isExpandedToHeaderWidth, setIsExpandedToHeaderWidth] = useState(false);
@@ -198,6 +275,7 @@ const NonLocalRecordsGrid = () => {
   const [savingLayout, setSavingLayout] = useState(false);
   const [approvalRows, setApprovalRows] = useState<ApprovalRow[]>([]);
   const [recordView, setRecordView] = useState<"all" | "pending">("all");
+  const [metadataActionBusyId, setMetadataActionBusyId] = useState<string | null>(null);
   const [masterData, setMasterData] = useState<MalariaMasterData>({
     districts: [],
     upazilas: [],
@@ -256,8 +334,13 @@ const NonLocalRecordsGrid = () => {
         ids.add(approval.record_id);
       }
     });
+    rows.forEach((r) => {
+      if (r.metadata_approval_status === "PENDING") {
+        ids.add(r.id);
+      }
+    });
     return ids;
-  }, [approvalRows]);
+  }, [approvalRows, rows]);
 
   const displayedRows = useMemo(() => {
     if (!isAdmin || recordView === "all") return rows;
@@ -283,6 +366,50 @@ const NonLocalRecordsGrid = () => {
         description: error instanceof Error ? error.message : "Failed to update approval.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleApproveNonLocalMetadata = async (id: string) => {
+    if (metadataActionBusyId !== null) return;
+    try {
+      setMetadataActionBusyId(id);
+      const updated = await approveNonLocalRecordMetadata(id);
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === id ? ({ ...r, ...updated, ...(r._isNew ? { _isNew: true as const } : {}) } as NonLocalRow) : r,
+        ),
+      );
+      toast({ title: "Metadata approved" });
+    } catch (error) {
+      toast({
+        title: "Approve failed",
+        description: error instanceof Error ? error.message : "Could not approve metadata.",
+        variant: "destructive",
+      });
+    } finally {
+      setMetadataActionBusyId(null);
+    }
+  };
+
+  const handleRejectNonLocalMetadata = async (id: string) => {
+    if (metadataActionBusyId !== null) return;
+    try {
+      setMetadataActionBusyId(id);
+      const updated = await rejectNonLocalRecordMetadata(id);
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === id ? ({ ...r, ...updated, ...(r._isNew ? { _isNew: true as const } : {}) } as NonLocalRow) : r,
+        ),
+      );
+      toast({ title: "Metadata rejected" });
+    } catch (error) {
+      toast({
+        title: "Reject failed",
+        description: error instanceof Error ? error.message : "Could not reject metadata.",
+        variant: "destructive",
+      });
+    } finally {
+      setMetadataActionBusyId(null);
     }
   };
 
@@ -463,6 +590,7 @@ const NonLocalRecordsGrid = () => {
     return Math.min(320, Math.ceil(textWidth + 18));
   };
 
+  const pendingActionMonthColumnIndexesRef = useRef<Set<number>>(new Set());
   const pendingActionMonthColumnIndexes = useMemo(() => {
     if (!isAdmin) {
       return new Set<number>();
@@ -480,10 +608,11 @@ const NonLocalRecordsGrid = () => {
     });
     return set;
   }, [displayedRows, isAdmin, approvalByKey]);
+  pendingActionMonthColumnIndexesRef.current = pendingActionMonthColumnIndexes;
 
   useEffect(() => {
     setColumnWidths((prev) => {
-      if (appliedServerLayoutRef.current) {
+      if (appliedServerLayoutRef.current && !isAdmin) {
         return prev;
       }
       if (Object.keys(prev).length > 0) {
@@ -493,15 +622,16 @@ const NonLocalRecordsGrid = () => {
       NON_LOCAL_HEADER_LABELS.forEach((label, index) => {
         next[index] = estimateHeaderWidth(label);
       });
+      const narrowMonth = getUniformMonthColumnWidth();
       for (let index = NON_LOCAL_MONTH_COLUMN_START_INDEX; index <= NON_LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
         const monthLabel = MONTH_LABELS[index - NON_LOCAL_MONTH_COLUMN_START_INDEX] || "";
         next[index] = pendingActionMonthColumnIndexes.has(index)
           ? estimateMonthColumnWithActionsWidth(monthLabel)
-          : estimateVerticalMonthHeaderWidth(monthLabel);
+          : narrowMonth;
       }
       return next;
     });
-  }, [pendingActionMonthColumnIndexes]);
+  }, [pendingActionMonthColumnIndexes, isAdmin]);
 
   useEffect(() => {
     setColumnWidths((prev) => {
@@ -513,15 +643,26 @@ const NonLocalRecordsGrid = () => {
       }
       const next = { ...prev };
       let changed = false;
+      const narrowMonth = getUniformMonthColumnWidth();
       for (let index = NON_LOCAL_MONTH_COLUMN_START_INDEX; index <= NON_LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        const width = next[index] || 0;
+        const monthLabel = MONTH_LABELS[index - NON_LOCAL_MONTH_COLUMN_START_INDEX] || "";
+        const isPending = pendingActionMonthColumnIndexes.has(index);
+        if (!isPending) {
+          if (touchedColumnIndexesRef.current.has(index)) {
+            continue;
+          }
+          if (width !== narrowMonth) {
+            next[index] = narrowMonth;
+            touchedColumnIndexesRef.current.delete(index);
+            changed = true;
+          }
+          continue;
+        }
         if (touchedColumnIndexesRef.current.has(index)) {
           continue;
         }
-        const width = next[index] || 0;
-        const monthLabel = MONTH_LABELS[index - NON_LOCAL_MONTH_COLUMN_START_INDEX] || "";
-        const targetWidth = pendingActionMonthColumnIndexes.has(index)
-          ? estimateMonthColumnWithActionsWidth(monthLabel)
-          : estimateVerticalMonthHeaderWidth(monthLabel);
+        const targetWidth = estimateMonthColumnWithActionsWidth(monthLabel);
         if (targetWidth !== width) {
           next[index] = targetWidth;
           changed = true;
@@ -529,7 +670,7 @@ const NonLocalRecordsGrid = () => {
       }
       return changed ? next : prev;
     });
-  }, [pendingActionMonthColumnIndexes]);
+  }, [pendingActionMonthColumnIndexes, isAdmin]);
 
   useEffect(() => {
     if (!user) return;
@@ -565,19 +706,33 @@ const NonLocalRecordsGrid = () => {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isAdmin]);
 
   const handleSaveColumnLayoutForEveryone = async () => {
     try {
       setSavingLayout(true);
+      const narrowMonth = getUniformMonthColumnWidth();
+      const column_widths: Record<number, number> = { ...columnWidths };
+      for (let index = NON_LOCAL_MONTH_COLUMN_START_INDEX; index <= NON_LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        const w = columnWidths[index];
+        if (typeof w === "number" && Number.isFinite(w) && w >= 10) {
+          column_widths[index] = Math.round(w);
+        } else {
+          const monthLabel = MONTH_LABELS[index - NON_LOCAL_MONTH_COLUMN_START_INDEX] || "";
+          column_widths[index] = pendingActionMonthColumnIndexes.has(index)
+            ? estimateMonthColumnWithActionsWidth(monthLabel)
+            : narrowMonth;
+        }
+      }
       await saveMalariaGridColumnLayout("non_local_records", {
-        column_widths: columnWidths,
+        column_widths,
         is_expanded_to_header_width: isExpandedToHeaderWidth,
       });
       appliedServerLayoutRef.current = true;
+      setColumnWidths(column_widths);
       toast({
         title: "Column layout saved",
-        description: "All users will see this table width on their next visit or refresh.",
+        description: "All users will see these column widths on their next visit or refresh, including Jan–Dec.",
       });
     } catch (error) {
       toast({
@@ -597,6 +752,13 @@ const NonLocalRecordsGrid = () => {
       NON_LOCAL_HEADER_LABELS.forEach((label, index) => {
         expandedWidths[index] = estimateHeaderWidth(label);
       });
+      const narrowMonth = getUniformMonthColumnWidth();
+      for (let index = NON_LOCAL_MONTH_COLUMN_START_INDEX; index <= NON_LOCAL_MONTH_COLUMN_END_INDEX; index += 1) {
+        const monthLabel = MONTH_LABELS[index - NON_LOCAL_MONTH_COLUMN_START_INDEX] || "";
+        expandedWidths[index] = pendingActionMonthColumnIndexes.has(index)
+          ? estimateMonthColumnWithActionsWidth(monthLabel)
+          : narrowMonth;
+      }
       setColumnWidths(expandedWidths);
       setIsExpandedToHeaderWidth(true);
       return;
@@ -729,6 +891,7 @@ const NonLocalRecordsGrid = () => {
 
   const handleExtraFieldChange = (rowId: string, field: NonLocalExtraEditableField, value: string) => {
     setRows((prev) => prev.map((row) => (row.id === rowId ? ({ ...row, [field]: value } as NonLocalRow) : row)));
+    dirtyNonLocalMetadataRowIdsRef.current.add(rowId);
     setDirtyIds((prev) => new Set(prev).add(rowId));
   };
 
@@ -815,14 +978,17 @@ const NonLocalRecordsGrid = () => {
       const dirty = rows.filter((r) => dirtyIds.has(r.id));
 
       for (const r of dirty) {
+        const includeMeta =
+          !isAdmin && (r._isNew || dirtyNonLocalMetadataRowIdsRef.current.has(r.id));
         if (r._isNew) {
-          await createNonLocalRecord(buildPayload(r));
+          await createNonLocalRecord(buildPayload(r, isAdmin, includeMeta));
         } else {
-          await updateNonLocalRecord(r.id, buildPayload(r));
+          await updateNonLocalRecord(r.id, buildPayload(r, isAdmin, includeMeta));
         }
       }
 
       await fetchData();
+      dirtyNonLocalMetadataRowIdsRef.current.clear();
       toast({ title: "Saved successfully" });
     } catch (error) {
       toast({
@@ -843,9 +1009,61 @@ const NonLocalRecordsGrid = () => {
   const canEditOwnNewRow = (row: NonLocalRow) =>
     isSkOrShw && !!user && row._isNew && String(row.sk_user_id) === String(user.id);
   const canEditLocationField = (row: NonLocalRow) => isAdmin || canEditOwnNewRow(row);
+  const canEditNonLocalMetadata = (row: NonLocalRow) => {
+    if (isAdmin) return true;
+    if (!isSkOrShw || !user || String(row.sk_user_id) !== String(user.id)) return false;
+    if (row._isNew) return canEditOwnNewRow(row);
+    return true;
+  };
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
   const hasDirty = dirtyIds.size > 0 || deletedIds.length > 0;
+
+  const handleDownloadXlsx = () => {
+    const exportRows = displayedRows.map((row, index) => ({
+      SL: index + 1,
+      Country: row.country || "",
+      Division: row.division_name || "",
+      District: row.district_or_state || "",
+      Upazila: row.upazila_or_township || "",
+      Union: row.union_name || "",
+      "Ward No": wardByRow[row.id] || "",
+      "Name of SK/SHW": row.name_of_sk_shw || "",
+      "Desig.": row.designation || "",
+      "Name of SS": row.name_of_ss || "",
+      "Village Name (English)": row.village_name || "",
+      "Village Name (Bangla)": row.village_name_bn || "",
+      "Village Code": row.village_code || "",
+      Latitude: row.latitude ?? "",
+      Longitute: row.longitude ?? "",
+      Population: row.population_text ?? "",
+      "HH Number": row.hh_text ?? "",
+      "2026 (Active LLINs)": row.itn_2026_text ?? "",
+      "2025 (Active LLINs)": row.itn_2025_text ?? "",
+      "2024 (Active LLINs)": row.itn_2024_text ?? "",
+      January: row.jan_cases,
+      February: row.feb_cases,
+      March: row.mar_cases,
+      April: row.apr_cases,
+      May: row.may_cases,
+      June: row.jun_cases,
+      July: row.jul_cases,
+      August: row.aug_cases,
+      September: row.sep_cases,
+      October: row.oct_cases,
+      November: row.nov_cases,
+      December: row.dec_cases,
+      "Name of MMW, Health post & CHW(C)": row.mmw_hp_chwc_name || "",
+      "Village Distance from upazila office (KM)": row.village_distance_km ?? "",
+      "Name of Border with others country": row.border_country_name || "",
+      "Others  Activities (TDA/Dev care)": row.other_activities || "",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Imported Records");
+    XLSX.writeFile(workbook, `malaria_imported_filtered_${year}.xlsx`);
+  };
 
   return (
     <div className="space-y-3">
@@ -874,6 +1092,16 @@ const NonLocalRecordsGrid = () => {
         <Button variant="outline" size="sm" onClick={addRow}>
           <Plus className="h-4 w-4 mr-1" /> Add Row
         </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadXlsx}
+          disabled={loading || displayedRows.length === 0}
+        >
+          Download Data
+        </Button>
+
         <Button variant="outline" size="icon" onClick={toggleExpandToHeaderWidth} title="Toggle full-width columns">
           {isExpandedToHeaderWidth ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
@@ -883,7 +1111,7 @@ const NonLocalRecordsGrid = () => {
             size="icon"
             onClick={() => void handleSaveColumnLayoutForEveryone()}
             disabled={savingLayout || loading}
-            title="Save current column widths for all users"
+            title="Publish column layout for everyone (SK and admins). Jan–Dec widths are normalized to standard month sizes; other columns use your current sizes."
             aria-label="Save column layout for all users"
           >
             {savingLayout ? <Loader2 className="h-4 w-4 animate-spin" /> : <Columns3 className="h-4 w-4" />}
@@ -978,24 +1206,69 @@ const NonLocalRecordsGrid = () => {
             {displayedRows.length === 0 && !loading && (
               <tr>
                 <td colSpan={37} className="text-center py-8 text-muted-foreground">
-                  {isAdmin && recordView === "pending" ? "No pending records for current filters" : `No records for ${year}`}
+                  {isAdmin && recordView === "pending"
+                    ? "No pending records for current filters (monthly submissions or metadata approval)."
+                    : `No records for ${year}`}
                 </td>
               </tr>
             )}
 
             {displayedRows.map((row, index) => (
-              <tr key={row.id} className={row._isNew ? "bg-sky-50/70 hover:bg-sky-100/70" : "hover:bg-gray-50"}>
-                <td className="grid-td p-1 text-center">
-                  {isAdmin && (
-                    <button
-                      onClick={() => deleteRow(row.id)}
-                      className="text-destructive hover:text-destructive/80 p-0.5"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+              <tr
+                key={row.id}
+                className={nonLocalRowMetaClasses(row)}
+                title={
+                  row.metadata_approval_status === "REJECTED"
+                    ? row.metadata_rejection_note || "Metadata rejected"
+                    : row.metadata_approval_status === "PENDING"
+                      ? "Metadata pending approval"
+                      : undefined
+                }
+              >
+                <td className={`grid-td p-1 text-center align-top min-w-[52px] ${nonLocalMetaCellBg(row)}`}>
+                  <div className="flex flex-col items-center gap-0.5">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => deleteRow(row.id)}
+                        className="text-destructive hover:text-destructive/80 p-0.5"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {isAdmin && row.metadata_approval_status === "PENDING" && !row._isNew && (
+                      <div className="flex gap-0.5">
+                        <button
+                          type="button"
+                          className="rounded border border-emerald-300 bg-emerald-50 p-0.5 hover:bg-emerald-100 disabled:opacity-50"
+                          title="Approve metadata"
+                          disabled={metadataActionBusyId !== null}
+                          onClick={() => void handleApproveNonLocalMetadata(row.id)}
+                        >
+                          {metadataActionBusyId === row.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-emerald-800" />
+                          ) : (
+                            <Check className="h-3 w-3 text-emerald-800" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-fuchsia-300 bg-fuchsia-50 p-0.5 hover:bg-fuchsia-100 disabled:opacity-50"
+                          title="Reject metadata"
+                          disabled={metadataActionBusyId !== null}
+                          onClick={() => void handleRejectNonLocalMetadata(row.id)}
+                        >
+                          {metadataActionBusyId === row.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-fuchsia-800" />
+                          ) : (
+                            <X className="h-3 w-3 text-fuchsia-800" />
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </td>
-                <td className={`grid-td sticky left-0 z-[5] font-medium ${row._isNew ? "bg-sky-50/70" : "bg-white"}`}>
+                <td className={`grid-td sticky left-0 z-[5] font-medium ${nonLocalMetaCellBg(row)}`}>
                   {index + 1}
                 </td>
 
@@ -1034,14 +1307,14 @@ const NonLocalRecordsGrid = () => {
                 </td>
 
                 <td className="grid-td p-0">
-                  {isAdmin ? (
+                  {canEditNonLocalMetadata(row) ? (
                     <input
                       className="grid-input"
-                      value={(row as unknown as Record<string, string>).division_name || (row.country === "Bangladesh" ? "Chattogram" : "")}
+                      value={row.division_name || (row.country === "Bangladesh" ? "Chattogram" : "")}
                       onChange={(e) => handleExtraFieldChange(row.id, "division_name", e.target.value)}
                     />
                   ) : (
-                    <span>{"Bangladesh" === row.country ? "Chattogram" : "-"}</span>
+                    <span>{row.division_name || ("Bangladesh" === row.country ? "Chattogram" : "-")}</span>
                   )}
                 </td>
 
@@ -1122,9 +1395,9 @@ const NonLocalRecordsGrid = () => {
                   )}
                 </td>
 
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).name_of_sk_shw || ""} onChange={(e) => handleExtraFieldChange(row.id, "name_of_sk_shw", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).designation || ""} onChange={(e) => handleExtraFieldChange(row.id, "designation", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).name_of_ss || ""} onChange={(e) => handleExtraFieldChange(row.id, "name_of_ss", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.name_of_sk_shw || ""} onChange={(e) => handleExtraFieldChange(row.id, "name_of_sk_shw", e.target.value)} /> : <span className="text-muted-foreground">{row.name_of_sk_shw || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.designation || ""} onChange={(e) => handleExtraFieldChange(row.id, "designation", e.target.value)} /> : <span className="text-muted-foreground">{row.designation || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.name_of_ss || ""} onChange={(e) => handleExtraFieldChange(row.id, "name_of_ss", e.target.value)} /> : <span className="text-muted-foreground">{row.name_of_ss || "-"}</span>}</td>
 
                 <td className="grid-td p-0">
                   {row.country === "Bangladesh" && !otherModeByRow[row.id]?.union ? (
@@ -1236,15 +1509,15 @@ const NonLocalRecordsGrid = () => {
                   )}
                 </td>
 
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).village_name_bn || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_name_bn", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).village_code || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_code", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).latitude || ""} onChange={(e) => handleExtraFieldChange(row.id, "latitude", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).longitude || ""} onChange={(e) => handleExtraFieldChange(row.id, "longitude", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).population_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "population_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).hh_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "hh_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).itn_2026_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2026_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).itn_2025_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2025_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).itn_2024_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2024_text", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.village_name_bn || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_name_bn", e.target.value)} /> : <span className="text-muted-foreground">{row.village_name_bn || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.village_code || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_code", e.target.value)} /> : <span className="text-muted-foreground">{row.village_code || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.latitude || ""} onChange={(e) => handleExtraFieldChange(row.id, "latitude", e.target.value)} /> : <span className="text-muted-foreground">{row.latitude || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.longitude || ""} onChange={(e) => handleExtraFieldChange(row.id, "longitude", e.target.value)} /> : <span className="text-muted-foreground">{row.longitude || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.population_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "population_text", e.target.value)} /> : <span className="text-muted-foreground">{row.population_text || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.hh_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "hh_text", e.target.value)} /> : <span className="text-muted-foreground">{row.hh_text || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.itn_2026_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2026_text", e.target.value)} /> : <span className="text-muted-foreground">{row.itn_2026_text || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.itn_2025_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2025_text", e.target.value)} /> : <span className="text-muted-foreground">{row.itn_2025_text || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.itn_2024_text || ""} onChange={(e) => handleExtraFieldChange(row.id, "itn_2024_text", e.target.value)} /> : <span className="text-muted-foreground">{row.itn_2024_text || "-"}</span>}</td>
 
                 {MONTH_COLUMNS.map((col, idx) => {
                   const value = row[col as MonthColumn];
@@ -1257,8 +1530,8 @@ const NonLocalRecordsGrid = () => {
                     <td
                       key={col}
                       className={`grid-td p-0 border ${getMonthBg(status)} ${
-                        editable ? "" : "opacity-80"
-                      }`}
+                        isAdmin && isPendingCell ? "!overflow-visible whitespace-normal align-middle" : ""
+                      } ${editable ? "" : "opacity-80"}`}
                       title={
                         status === "APPROVED"
                           ? "Approved"
@@ -1269,22 +1542,20 @@ const NonLocalRecordsGrid = () => {
                           : "Not submitted"
                       }
                     >
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          min={0}
-                          className={`grid-input bg-transparent ${
-                            editable ? "" : "text-muted-foreground"
-                          }`}
-                          value={value === 0 ? "" : value}
-                          onChange={(e) => handleCellChange(row.id, col, e.target.value)}
-                          disabled={!editable}
-                        />
-                        {isAdmin && isPendingCell && (
-                          <div className="pr-1 flex items-center gap-0.5">
+                      {isAdmin && isPendingCell ? (
+                        <div className="flex min-w-0 items-center gap-0 px-0 py-0.5">
+                          <input
+                            type="number"
+                            min={0}
+                            className={`grid-input bg-transparent min-w-0 flex-1 !w-auto !overflow-visible !text-clip ${editable ? "" : "text-muted-foreground"}`}
+                            value={value === 0 ? "" : value}
+                            onChange={(e) => handleCellChange(row.id, col, e.target.value)}
+                            disabled={!editable}
+                          />
+                          <div className="flex shrink-0 items-center gap-0.5 pr-0.5">
                             <button
                               type="button"
-                              className="h-4 w-4 rounded text-[9px] leading-none bg-green-600 text-white"
+                              className="h-4 w-4 shrink-0 rounded text-[9px] leading-none bg-green-600 text-white"
                               title="Approve"
                               onClick={() => handleApprovalAction(row.id, monthNumber, "APPROVED")}
                             >
@@ -1292,23 +1563,34 @@ const NonLocalRecordsGrid = () => {
                             </button>
                             <button
                               type="button"
-                              className="h-4 w-4 rounded text-[9px] leading-none bg-fuchsia-600 text-white"
+                              className="h-4 w-4 shrink-0 rounded text-[9px] leading-none bg-fuchsia-600 text-white"
                               title="Reject"
                               onClick={() => handleApprovalAction(row.id, monthNumber, "REJECTED")}
                             >
                               R
                             </button>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="flex min-w-0 items-center">
+                          <input
+                            type="number"
+                            min={0}
+                            className={`grid-input bg-transparent ${editable ? "" : "text-muted-foreground"}`}
+                            value={value === 0 ? "" : value}
+                            onChange={(e) => handleCellChange(row.id, col, e.target.value)}
+                            disabled={!editable}
+                          />
+                        </div>
+                      )}
                     </td>
                   );
                 })}
 
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).mmw_hp_chwc_name || ""} onChange={(e) => handleExtraFieldChange(row.id, "mmw_hp_chwc_name", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).village_distance_km || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_distance_km", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).border_country_name || ""} onChange={(e) => handleExtraFieldChange(row.id, "border_country_name", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
-                <td className="grid-td p-0">{isAdmin ? <input className="grid-input" value={(row as unknown as Record<string, string>).other_activities || ""} onChange={(e) => handleExtraFieldChange(row.id, "other_activities", e.target.value)} /> : <span className="text-muted-foreground">-</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.mmw_hp_chwc_name || ""} onChange={(e) => handleExtraFieldChange(row.id, "mmw_hp_chwc_name", e.target.value)} /> : <span className="text-muted-foreground">{row.mmw_hp_chwc_name || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.village_distance_km || ""} onChange={(e) => handleExtraFieldChange(row.id, "village_distance_km", e.target.value)} /> : <span className="text-muted-foreground">{row.village_distance_km || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.border_country_name || ""} onChange={(e) => handleExtraFieldChange(row.id, "border_country_name", e.target.value)} /> : <span className="text-muted-foreground">{row.border_country_name || "-"}</span>}</td>
+                <td className="grid-td p-0">{canEditNonLocalMetadata(row) ? <input className="grid-input" value={row.other_activities || ""} onChange={(e) => handleExtraFieldChange(row.id, "other_activities", e.target.value)} /> : <span className="text-muted-foreground">{row.other_activities || "-"}</span>}</td>
               </tr>
             ))}
           </tbody>
