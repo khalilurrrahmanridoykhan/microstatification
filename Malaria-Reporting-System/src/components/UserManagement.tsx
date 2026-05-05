@@ -11,13 +11,13 @@ import {
 } from "@/lib/api";
 
 const UserManagement = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, role: authRole } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("123456");
-  const [role, setRole] = useState<AppRole>("sk");
+  const [role, setRole] = useState<AppRole>("spo");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -44,7 +44,7 @@ const UserManagement = () => {
     setName("");
     setEmail("");
     setPassword("123456");
-    setRole("sk");
+    setRole("spo");
     setEditingUserId(null);
   };
 
@@ -174,8 +174,15 @@ const UserManagement = () => {
               onChange={(event) => setRole(event.target.value as AppRole)}
               className="mt-2 w-full rounded-lg border px-3 py-2 text-sm"
             >
-              <option value="sk">SK</option>
-              <option value="admin">Admin</option>
+              {authRole === "admin" ? (
+                <>
+                  <option value="spo">SPO</option>
+                  <option value="dm">District Manager</option>
+                  <option value="admin">Admin</option>
+                </>
+              ) : (
+                <option value="spo">SPO</option>
+              )}
             </select>
           </div>
         </div>

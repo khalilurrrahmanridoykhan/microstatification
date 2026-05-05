@@ -15,11 +15,15 @@ const RequiredMark = () => (
 function CreateUsers() {
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
   const isMicroAdminUser = Number(userInfo?.role) === 7;
-  const roleOptions = isMicroAdminUser
+  const microRole = String(userInfo?.profile?.micro_role || "").toLowerCase();
+  const isDistrictManager = Number(userInfo?.role) === 10 || microRole === "dm" || microRole === "district_manager";
+  const roleOptions = isDistrictManager
+    ? [{ label: "SPO", value: "11" }]
+    : isMicroAdminUser
     ? [
         { label: "User", value: "4" },
-        { label: "SK", value: "8" },
-        { label: "SHW", value: "9" },
+        { label: "SPO", value: "11" },
+        { label: "District Manager", value: "10" },
       ]
     : [{ label: "User", value: "4" }];
   const allowedRoleValues = roleOptions.map((item) => item.value);
@@ -31,7 +35,7 @@ function CreateUsers() {
     first_name: "",
     last_name: "",
     email: "",
-    role: "4",
+    role: isDistrictManager ? "11" : "4",
     is_staff: false,
   });
   const [message, setMessage] = useState("");
@@ -51,8 +55,17 @@ function CreateUsers() {
 
     const lowered = normalized.toLowerCase();
     if (lowered === "user") return "4";
-    if (lowered === "sk" && allowedRoleSet.has("8")) return "8";
-    if (lowered === "shw" && allowedRoleSet.has("9")) return "9";
+    if (lowered === "sk" || lowered === "shw" || lowered === "spo") {
+      if (allowedRoleSet.has("11")) return "11";
+    }
+    if (lowered === "dm" || lowered === "district_manager") {
+      if (allowedRoleSet.has("10")) return "10";
+    }
+    if (normalized === "8" || normalized === "9") {
+      if (allowedRoleSet.has("11")) return "11";
+    }
+    if (normalized === "10" && allowedRoleSet.has("10")) return "10";
+    if (normalized === "11" && allowedRoleSet.has("11")) return "11";
     return allowedRoleValues[0] || "4";
   };
 
@@ -143,7 +156,7 @@ function CreateUsers() {
         last_name: form.last_name.trim(),
         email: form.email.trim(),
         role: Number(form.role) || 4,
-        is_staff: isMicroAdminUser ? false : form.is_staff,
+        is_staff: isMicroAdminUser || isDistrictManager ? false : form.is_staff,
       };
 
       await axios.post(`${BACKEND_URL}/api/users/`, payload, {
@@ -156,7 +169,7 @@ function CreateUsers() {
         first_name: "",
         last_name: "",
         email: "",
-        role: "4",
+        role: isDistrictManager ? "11" : "4",
         is_staff: false,
       });
       setMessage("");
@@ -551,7 +564,7 @@ function CreateUsers() {
             )}
           </button>
         </div>
-        {isMicroAdminUser && (
+        {(isMicroAdminUser || isDistrictManager) && (
           <div className="form-group">
             <label htmlFor="role">
               Role
@@ -565,17 +578,20 @@ function CreateUsers() {
               className="w-full px-3 py-2 border rounded"
               required
             >
-              <option value="4">User</option>
-              <option value="8">SK</option>
-              <option value="9">SHW</option>
+              {roleOptions.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
             </select>
           </div>
         )}
         <div className="col-span-2">
-          {isMicroAdminUser ? (
+          {isMicroAdminUser || isDistrictManager ? (
             <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-              Microstatification admins can create only `User`, `SK`, and `SHW`
-              accounts here. Location assignment can be completed from `Assign User`.
+              {isDistrictManager
+                ? "District managers can create only SPO accounts in their assigned district."
+                : "Microstatification admins can create only `User`, `SPO`, and `District Manager` accounts here. Location assignment can be completed from `Assign User`."}
             </div>
           ) : (
             <>

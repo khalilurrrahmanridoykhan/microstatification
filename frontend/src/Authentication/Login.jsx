@@ -16,7 +16,13 @@ const getMicroRole = (user) =>
 const isMalariaFieldUser = (user) => {
   const role = Number(user?.role || 0);
   const microRole = getMicroRole(user);
-  return role === 8 || role === 9 || microRole === "sk" || microRole === "shw";
+  return role === 8 || role === 9 || role === 11 || microRole === "sk" || microRole === "shw" || microRole === "spo";
+};
+
+const isMalariaDistrictManager = (user) => {
+  const role = Number(user?.role || 0);
+  const microRole = getMicroRole(user);
+  return role === 10 || microRole === "dm" || microRole === "district_manager";
 };
 
 const isMalariaAdminUser = (user) => {
@@ -33,9 +39,14 @@ const hasMalariaWorkspaceAccess = (user) => {
     role === 7 ||
     role === 8 ||
     role === 9 ||
+    role === 10 ||
+    role === 11 ||
     microRole === "micro_admin" ||
+    microRole === "dm" ||
+    microRole === "district_manager" ||
     microRole === "sk" ||
-    microRole === "shw"
+    microRole === "shw" ||
+    microRole === "spo"
   );
 };
 
@@ -97,7 +108,9 @@ const Login = ({ setAuthToken }) => {
         const nextPath =
           isMalariaAdminUser(user)
             ? "/dashboard"
-            : isMalariaFieldUser(user)
+            : isMalariaDistrictManager(user)
+              ? "/dashboard"
+              : isMalariaFieldUser(user)
               ? "/malaria/"
               : user?.username === BRAC_DOWNLOAD_USERNAME
                 ? "/projects/55/all-rows"

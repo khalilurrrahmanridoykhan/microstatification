@@ -61,7 +61,7 @@ def _clean_assignment_text(value):
 
 def _get_assigned_micro_role(user, profile):
     micro_role = _clean_assignment_text(getattr(profile, "micro_role", "")).lower()
-    if micro_role in {"sk", "shw"}:
+    if micro_role in {"sk", "shw", "spo"}:
         return micro_role
 
     user_role = getattr(user, "role", None)
@@ -69,6 +69,8 @@ def _get_assigned_micro_role(user, profile):
         return "sk"
     if user_role == 9:
         return "shw"
+    if user_role == 11:
+        return "spo"
     return ""
 
 
@@ -84,7 +86,7 @@ def get_local_record_assigned_user_details(record):
     assigned_ss_name = _clean_assignment_text(getattr(profile, "micro_ss_name", ""))
 
     has_assignment = bool(
-        micro_role in {"sk", "shw"}
+        micro_role in {"sk", "shw", "spo"}
         or assigned_name
         or assigned_designation
         or assigned_ss_name
@@ -536,10 +538,19 @@ class NonLocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer
 
 
 class MonthAccessSettingSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
+    district_id = serializers.IntegerField(read_only=True)
+    district = serializers.PrimaryKeyRelatedField(
+        queryset=District.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
     class Meta:
         model = MonthAccessSetting
         fields = (
             "id",
+            "district",
+            "district_id",
             "reporting_year",
             "month",
             "is_open",
@@ -589,7 +600,7 @@ class MalariaUserCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=6)
     full_name = serializers.CharField()
-    role = serializers.ChoiceField(choices=MalariaUserRole.ROLE_CHOICES, default=MalariaUserRole.ROLE_SK)
+    role = serializers.ChoiceField(choices=MalariaUserRole.ROLE_CHOICES, default=MalariaUserRole.ROLE_SPO)
 
 
 class MicrostatificationDataUploadSerializer(serializers.ModelSerializer):

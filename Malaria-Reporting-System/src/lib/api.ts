@@ -1,4 +1,4 @@
-export type AppRole = "admin" | "sk";
+export type AppRole = "admin" | "dm" | "spo";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type MetadataApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type RecordType = "local" | "non_local";
@@ -354,7 +354,10 @@ function parseLegacyRole(value: unknown, microRole: unknown): AppRole {
   if (numericRole === 1 || numericRole === 7 || normalizedMicroRole === "micro_admin") {
     return "admin";
   }
-  return "sk";
+  if (numericRole === 10 || normalizedMicroRole === "dm" || normalizedMicroRole === "district_manager") {
+    return "dm";
+  }
+  return "spo";
 }
 
 function getLegacySessionFromMainApp(): SessionData | null {
@@ -508,11 +511,26 @@ async function requestCached<T>(path: string, ttlMs: number = getRequestCacheTtl
   return data;
 }
 
-export function login(email: string, password: string): Promise<LoginResponse> {
-  return request<LoginResponse>("/auth/login", {
+export async function login(email: string, password: string): Promise<LoginResponse> {
+  const data = (await request<unknown>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
-  });
+  })) as Record<string, unknown>;
+
+  const token = data.token;
+  const isDjangoStyle =
+    typeof token === "string" &&
+    data.user !== null &&
+    typeof data.user === "object" &&
+    data.role === undefined;
+
+  if (isDjangoStyle) {
+    setAuthToken(token);
+    const session = await getSession();
+    return { token, ...session };
+  }
+
+  return data as unknown as LoginResponse;
 }
 
 export function logout(): Promise<void> {

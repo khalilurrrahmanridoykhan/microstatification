@@ -299,7 +299,7 @@ class UserSerializer(serializers.ModelSerializer):
             'role', 'is_staff', 'profile', 'date_joined'  # Add date_joined here
         ]
 
-    PROFILE_M2M_FIELDS = ['organizations', 'projects', 'forms', 'templates']
+    PROFILE_M2M_FIELDS = ['organizations', 'projects', 'forms', 'templates', 'micro_villages']
     PROFILE_SCALAR_FIELDS = [
         'data_collection_type',
         'micro_role',

@@ -165,7 +165,14 @@ const App = () => {
     userDetails?.username === BRAC_DOWNLOAD_USERNAME;
   const microRole = String(userDetails?.profile?.micro_role || "").toLowerCase();
   const isMalariaFieldUser =
-    userRole === 8 || userRole === 9 || microRole === "sk" || microRole === "shw";
+    userRole === 8 ||
+    userRole === 9 ||
+    userRole === 11 ||
+    microRole === "sk" ||
+    microRole === "shw" ||
+    microRole === "spo";
+  const isMalariaDistrictManager =
+    userRole === 10 || microRole === "dm" || microRole === "district_manager";
   const defaultAuthenticatedPath = isBracDownloadUser
     ? "/projects/55/all-rows"
     : isMalariaFieldUser
@@ -257,8 +264,8 @@ const App = () => {
             </>
           )}
 
-          {/* Microstatification Admin (role 7) */}
-          {!isBracDownloadUser && userRole === 7 && (
+          {/* Microstatification Admin (role 7) + District Manager (role 10) */}
+          {!isBracDownloadUser && (userRole === 7 || isMalariaDistrictManager) && (
             <Route
               path="/"
               element={
@@ -288,10 +295,12 @@ const App = () => {
                 path="microstatification/download"
                 element={<MicrostatificationDownload />}
               />
-              <Route
-                path="malaria/upload-microstatification"
-                element={<MicrostatificationUpload />}
-              />
+              {userRole === 7 && (
+                <Route
+                  path="malaria/upload-microstatification"
+                  element={<MicrostatificationUpload />}
+                />
+              )}
               <Route path="profile" element={<UserProfile />} />
               <Route path="mobile-app" element={<MobileAppDownload />} />
             </Route>

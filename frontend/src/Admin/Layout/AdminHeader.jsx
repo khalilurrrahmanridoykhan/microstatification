@@ -9,6 +9,9 @@ import '../../AdminPanel.css';
 function Header({ setAuthToken, user, isOpen, setIsOpen }) {
     const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
     const isMicroAdminUser = Number(userInfo?.role) === 7;
+    const microRole = String(userInfo?.profile?.micro_role || "").toLowerCase();
+    const isDistrictManager = Number(userInfo?.role) === 10 || microRole === "dm" || microRole === "district_manager";
+    const isMicroDashboardUser = isMicroAdminUser || isDistrictManager;
 
 
     const navigate = useNavigate();
@@ -71,7 +74,7 @@ function Header({ setAuthToken, user, isOpen, setIsOpen }) {
                 </div>
 
                 {/* SEARCH BAR */}
-                {!isMicroAdminUser && (
+                {!isMicroDashboardUser && (
                     <div className="hidden md:flex items-center justify-center w-full">
                         <SearchBar />
                     </div>
@@ -105,7 +108,7 @@ function Header({ setAuthToken, user, isOpen, setIsOpen }) {
                                 <button className="dropdown-item" onClick={handleViewProfile}>
                                     View Profile
                                 </button>
-                                {!isMicroAdminUser && (
+                                {!isMicroDashboardUser && (
                                     <>
                                         <div className="dropdown-divider"></div>
                                         <button className="dropdown-item"

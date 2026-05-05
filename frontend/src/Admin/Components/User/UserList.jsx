@@ -12,6 +12,9 @@ const PAGE_SIZE = 10;
 function UserList() {
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
   const isMicroAdminUser = Number(userInfo?.role) === 7;
+  const microRole = String(userInfo?.profile?.micro_role || "").toLowerCase();
+  const isDistrictManager = Number(userInfo?.role) === 10 || microRole === "dm" || microRole === "district_manager";
+  const isMicroDashboardUser = isMicroAdminUser || isDistrictManager;
   const [users, setUsers] = useState([]);
   const [organizations, setOrganizations] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -32,7 +35,7 @@ function UserList() {
 
   useEffect(() => {
     const loadOptions = async () => {
-      if (isMicroAdminUser) {
+      if (isMicroDashboardUser) {
         setOrganizations([]);
         setProjects([]);
         setForms([]);
@@ -95,7 +98,7 @@ function UserList() {
     };
 
     loadOptions();
-  }, [isMicroAdminUser]);
+  }, [isMicroDashboardUser]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -345,7 +348,7 @@ function UserList() {
   const showingTo = totalCount
     ? Math.min((safePage - 1) * PAGE_SIZE + users.length, totalCount)
     : 0;
-  const canRemoveRoleAccess = (role) => role === 8 || role === 9;
+  const canRemoveRoleAccess = (role) => role === 8 || role === 9 || role === 11;
 
   return (
     <div>
@@ -354,7 +357,7 @@ function UserList() {
           <h2 className="inline-block mb-4 text-black text-[22px] border-b-2 border-blue-400 border-solid">
             All Users
           </h2>
-          {isMicroAdminUser && (
+          {isMicroDashboardUser && (
             <div className="flex items-center gap-3">
               <button className="bg-[var(--primary2)] px-5 py-2 rounded-lg cursor-pointer text-base transition-all duration-300 ease-in-out outline-none hover:text-white hover:shadow-[0_4px_12px_rgba(53,153,219,0.3)] mt-btn">
                 <Link
@@ -366,7 +369,7 @@ function UserList() {
               </button>
             </div>
           )}
-          {!isMicroAdminUser && (
+          {!isMicroDashboardUser && (
             <button
               className={` bg-[var(--primary2)]  px-5 py-2 rounded-lg cursor-pointer text-base transition-all duration-300 ease-in-out outline-none  hover:text-white hover:shadow-[0_4px_12px_rgba(53,153,219,0.3)] mt-btn`}
             >
@@ -392,7 +395,7 @@ function UserList() {
               Reset Filters
             </button>
           </div>
-          <div className={`grid gap-3 ${isMicroAdminUser ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+          <div className={`grid gap-3 ${isMicroDashboardUser ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Created From
@@ -415,7 +418,7 @@ function UserList() {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-            {!isMicroAdminUser && (
+            {!isMicroDashboardUser && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Created By
@@ -432,7 +435,7 @@ function UserList() {
               </div>
             )}
           </div>
-          {!isMicroAdminUser && (
+          {!isMicroDashboardUser && (
             <div className="grid gap-3 md:grid-cols-3 mt-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -554,7 +557,7 @@ function UserList() {
                           >
                             <FaKey />
                           </button>
-                          {canRemoveRoleAccess(user.role) && (
+                          {canRemoveRoleAccess(user.role) && isMicroAdminUser && (
                             <button
                               onClick={() => handleRemoveAccess(user)}
                               title={`Remove ${getRoleName(user.role)} access`}
@@ -562,7 +565,7 @@ function UserList() {
                               <FaUserSlash />
                             </button>
                           )}
-                          {!isMicroAdminUser && (
+                          {!isMicroDashboardUser && (
                             <button
                               onClick={async () => {
                                 const result = await Swal.fire({
@@ -671,9 +674,13 @@ function getRoleName(role) {
     case 7:
       return "Microstatification Admin";
     case 8:
-      return "SK";
+      return "SPO (legacy SK)";
     case 9:
-      return "SHW";
+      return "SPO (legacy SHW)";
+    case 10:
+      return "District Manager";
+    case 11:
+      return "SPO";
     default:
       return "Unknown Role";
   }

@@ -8,6 +8,8 @@ function DashboardSidebar({ setAuthToken, location }) {
   const [currentOpenMenu, setCurrentOpenMenu] = useState(null);
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
   const isMicroAdminUser = Number(userInfo?.role) === 7;
+  const microRole = String(userInfo?.profile?.micro_role || "").toLowerCase();
+  const isDistrictManager = Number(userInfo?.role) === 10 || microRole === "dm" || microRole === "district_manager";
 
   const toggleMenu = (menuId) => {
     setCurrentOpenMenu((prev) => (prev === menuId ? null : menuId));
@@ -28,7 +30,7 @@ function DashboardSidebar({ setAuthToken, location }) {
     navigate("/login");
   };
 
-  if (isMicroAdminUser) {
+  if (isMicroAdminUser || isDistrictManager) {
     return (
       <div className="menu">
         <div className="menu-content">
@@ -79,6 +81,14 @@ function DashboardSidebar({ setAuthToken, location }) {
               }`}
           >
             <i className="fas fa-calendar-alt" /> <span>Monthly Access</span>
+          </Link>
+
+          <Link
+            to="/profile"
+            className={`menu-item border-b ${isActive("/profile") ? "active" : "text-black"
+              }`}
+          >
+            <i className="fas fa-user-circle" /> <span>Profile</span>
           </Link>
 
           <button className="w-full menu-item logout" onClick={handleLogout}>

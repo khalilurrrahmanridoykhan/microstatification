@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { BACKEND_URL } from "../../../config";
@@ -120,9 +120,14 @@ async function resolveRequestErrorMessage(error) {
 }
 
 function MicrostatificationDownload() {
+  const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
+  const microRole = String(userInfo?.profile?.micro_role || "").toLowerCase();
+  const isDistrictManager =
+    Number(userInfo?.role) === 10 || microRole === "dm" || microRole === "district_manager";
   const [downloadDistrict, setDownloadDistrict] = useState("");
   const [downloadFormat, setDownloadFormat] = useState("xlsx");
   const [downloading, setDownloading] = useState(false);
+  const [dmDistrictName, setDmDistrictName] = useState("");
 
   const districts = [
     "Bandarban",
@@ -131,14 +136,39 @@ function MicrostatificationDownload() {
     "Rangamati",
     "Chattogram",
   ];
-  const districtOptions = [
-    { value: "all", label: "All Districts (ZIP)" },
-    ...districts.map((district) => ({ value: district, label: district })),
-  ];
+  const districtOptions = useMemo(() => {
+    if (isDistrictManager) {
+      return dmDistrictName ? [{ value: dmDistrictName, label: dmDistrictName }] : [];
+    }
+    return [
+      { value: "all", label: "All Districts (ZIP)" },
+      ...districts.map((district) => ({ value: district, label: district })),
+    ];
+  }, [dmDistrictName, isDistrictManager]);
+
+  useEffect(() => {
+    if (!isDistrictManager) return;
+    const token = sessionStorage.getItem("authToken");
+    axios
+      .get(`${BACKEND_URL}/api/malaria/districts/`, {
+        headers: { Authorization: `Token ${token}` },
+      })
+      .then((response) => {
+        const firstDistrict = Array.isArray(response.data) ? response.data[0] : null;
+        if (firstDistrict?.name) {
+          setDmDistrictName(firstDistrict.name);
+          setDownloadDistrict(firstDistrict.name);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load district", error);
+        toast.error("Failed to load your district");
+      });
+  }, [isDistrictManager]);
 
   const handleDownload = async () => {
     if (!downloadDistrict) {
-      toast.error("Please select a district or All Districts");
+      toast.error(isDistrictManager ? "Your account has no assigned district" : "Please select a district or All Districts");
       return;
     }
 
@@ -216,7 +246,7 @@ function MicrostatificationDownload() {
               value={downloadDistrict}
               onChange={(e) => setDownloadDistrict(e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={downloading}
+              disabled={downloading || isDistrictManager}
             >
               <option value="">-- Select an Option --</option>
               {districtOptions.map((option) => (

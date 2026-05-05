@@ -213,7 +213,7 @@ const AdminRecordReview = () => {
         <table className="w-full text-xs border-collapse">
           <thead className="bg-muted sticky top-0">
             <tr>
-              <th className="p-2 text-left">SK</th>
+              <th className="p-2 text-left">SPO</th>
               <th className="p-2 text-left">Location</th>
               {MONTH_LABELS.map((m) => (
                 <th key={m} className="p-2 text-center">

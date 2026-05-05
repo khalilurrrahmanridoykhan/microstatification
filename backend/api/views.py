@@ -257,8 +257,8 @@ def get_ordered_field_list(all_fields):
 logger = logging.getLogger(__name__)
 
 MICROSTATIFICATION_ADMIN_ROLE = 7
-MICROSTATIFICATION_MANAGED_ROLES = {4, 8, 9}
-MICROSTATIFICATION_GLOBAL_VISIBLE_ROLES = {8, 9}
+MICROSTATIFICATION_MANAGED_ROLES = {4, 8, 9, 10, 11}
+MICROSTATIFICATION_GLOBAL_VISIBLE_ROLES = {8, 9, 10, 11}
 MICROSTATIFICATION_CREATOR_SCOPED_ROLE = 4
 MICROSTATIFICATION_ALLOWED_USER_UPDATE_FIELDS = {
     'email',
@@ -6159,6 +6159,36 @@ def _get_assigned_project_ids(user):
 def _is_microstatification_admin(user):
     return getattr(user, 'role', 4) == MICROSTATIFICATION_ADMIN_ROLE
 
+def _get_microstatification_dm_district_id(user):
+    profile = getattr(user, 'profile', None)
+    if not profile:
+        return None
+    return getattr(profile, 'micro_district_id', None) or None
+
+def _is_microstatification_district_manager(user):
+    profile = getattr(user, 'profile', None)
+    micro_role = (getattr(profile, 'micro_role', '') or '').strip().lower() if profile else ''
+    return getattr(user, 'role', 4) == 10 or micro_role in {'dm', 'district_manager'}
+
+def _get_microstatification_dm_user_filter(user):
+    did = _get_microstatification_dm_district_id(user)
+    if not did:
+        return Q(pk__in=[])
+    district_scope = (
+        Q(profile__micro_district_id=did)
+        | Q(profile__micro_upazila__district_id=did)
+        | Q(profile__micro_union__upazila__district_id=did)
+        | Q(profile__micro_village__union__upazila__district_id=did)
+        | Q(profile__micro_villages__union__upazila__district_id=did)
+        | Q(created_by=user)
+    )
+    return Q(role__in={8, 9, 11}) & district_scope
+
+def _is_microstatification_spo_user(user):
+    profile = getattr(user, 'profile', None)
+    micro_role = (getattr(profile, 'micro_role', '') or '').strip().lower() if profile else ''
+    return getattr(user, 'role', None) in {8, 9, 11} or micro_role in {'sk', 'shw', 'spo'}
+
 def _get_microstatification_managed_users_filter(user):
     return (
         Q(role__in=MICROSTATIFICATION_GLOBAL_VISIBLE_ROLES)
@@ -6208,6 +6238,10 @@ class UserViewSet(viewsets.ModelViewSet):
             queryset = base_queryset.filter(
                 _get_microstatification_user_filter(user)
             ).distinct()
+        elif _is_microstatification_district_manager(user):
+            queryset = base_queryset.filter(
+                _get_microstatification_dm_user_filter(user)
+            ).distinct()
         else:
             queryset = base_queryset.filter(_get_user_access_filter_for_user(user)).distinct()
 
@@ -6216,6 +6250,10 @@ class UserViewSet(viewsets.ModelViewSet):
             if _is_microstatification_admin(user):
                 return queryset.filter(
                     _get_microstatification_managed_users_filter(user)
+                ).distinct()
+            if _is_microstatification_district_manager(user):
+                return queryset.filter(
+                    _get_microstatification_dm_user_filter(user)
                 ).distinct()
             return queryset.exclude(role=1).distinct()
 
@@ -6244,6 +6282,10 @@ class UserViewSet(viewsets.ModelViewSet):
             if _is_microstatification_admin(user):
                 queryset = queryset.filter(
                     _get_microstatification_managed_users_filter(user)
+                )
+            elif _is_microstatification_district_manager(user):
+                queryset = queryset.filter(
+                    _get_microstatification_dm_user_filter(user)
                 )
             else:
                 queryset = queryset.filter(
@@ -6311,6 +6353,9 @@ class UserViewSet(viewsets.ModelViewSet):
                 "micro admin": 7,
                 "sk": 8,
                 "shw": 9,
+                "dm": 10,
+                "district manager": 10,
+                "spo": 11,
             }
             normalized = search.lower()
             role_matches = []
@@ -6381,6 +6426,13 @@ class UserViewSet(viewsets.ModelViewSet):
                 .only('id', 'username', 'email')
                 .order_by('username')
             )
+        elif _is_microstatification_district_manager(user):
+            users = (
+                User.objects.filter(_get_microstatification_dm_user_filter(user))
+                .distinct()
+                .only('id', 'username', 'email')
+                .order_by('username')
+            )
         else:
             queryset = _get_user_access_filter_for_user(user)
             users = (
@@ -6424,6 +6476,13 @@ class UserViewSet(viewsets.ModelViewSet):
                 .only('id', 'username', 'email', 'role')
                 .order_by('username')
             )
+        elif _is_microstatification_district_manager(user):
+            users = (
+                User.objects.filter(_get_microstatification_dm_user_filter(user))
+                .distinct()
+                .only('id', 'username', 'email', 'role')
+                .order_by('username')
+            )
         else:
             queryset = _get_user_access_filter_for_user(user)
             users = (
@@ -6447,7 +6506,9 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def _sanitize_microstatification_admin_update(self, request, instance):
         if getattr(instance, 'role', None) not in MICROSTATIFICATION_MANAGED_ROLES:
-            raise PermissionDenied('Microstatification admins can update only User, SK, and SHW users.')
+            raise PermissionDenied(
+                'Microstatification admins can update only User, SPO, and District Manager users.'
+            )
 
         raw_profile = request.data.get('profile', {})
         if raw_profile in (None, ''):
@@ -6471,7 +6532,10 @@ class UserViewSet(viewsets.ModelViewSet):
                 raise ValidationError({'role': 'Role must be a valid number.'})
 
             if requested_role not in MICROSTATIFICATION_MANAGED_ROLES:
-                raise PermissionDenied('Microstatification admins can assign only User, SK, or SHW roles.')
+                raise PermissionDenied(
+                    'Microstatification admins can assign only User, SPO, District Manager, '
+                    'or legacy SK/SHW roles.'
+                )
 
             sanitized_data['role'] = requested_role
 
@@ -6492,6 +6556,16 @@ class UserViewSet(viewsets.ModelViewSet):
                 sanitized_profile.setdefault('data_collection_type', 'microstatification')
                 sanitized_profile.setdefault('micro_role', 'shw')
                 sanitized_profile.setdefault('micro_designation', 'SHW')
+                sanitized_profile.setdefault('micro_sk_shw_name', username)
+            elif requested_role == 10:
+                sanitized_profile.setdefault('data_collection_type', 'microstatification')
+                sanitized_profile.setdefault('micro_role', 'dm')
+                sanitized_profile.setdefault('micro_designation', 'DM')
+                sanitized_profile.setdefault('micro_sk_shw_name', username)
+            elif requested_role == 11:
+                sanitized_profile.setdefault('data_collection_type', 'microstatification')
+                sanitized_profile.setdefault('micro_role', 'spo')
+                sanitized_profile.setdefault('micro_designation', 'SPO')
                 sanitized_profile.setdefault('micro_sk_shw_name', username)
             elif requested_role == 4:
                 sanitized_profile.update({
@@ -6528,7 +6602,10 @@ class UserViewSet(viewsets.ModelViewSet):
             raise ValidationError({'role': 'Role must be a valid number.'})
 
         if requested_role not in MICROSTATIFICATION_MANAGED_ROLES:
-            raise PermissionDenied('Microstatification admins can create only User, SK, or SHW users.')
+            raise PermissionDenied(
+                'Microstatification admins can create only User, SPO, District Manager, '
+                'or legacy SK/SHW users.'
+            )
 
         sanitized_data = {
             'username': request.data.get('username'),
@@ -6557,6 +6634,16 @@ class UserViewSet(viewsets.ModelViewSet):
             sanitized_profile.setdefault('micro_role', 'shw')
             sanitized_profile.setdefault('micro_designation', 'SHW')
             sanitized_profile.setdefault('micro_sk_shw_name', username)
+        elif requested_role == 10:
+            sanitized_profile.setdefault('data_collection_type', 'microstatification')
+            sanitized_profile.setdefault('micro_role', 'dm')
+            sanitized_profile.setdefault('micro_designation', 'DM')
+            sanitized_profile.setdefault('micro_sk_shw_name', username)
+        elif requested_role == 11:
+            sanitized_profile.setdefault('data_collection_type', 'microstatification')
+            sanitized_profile.setdefault('micro_role', 'spo')
+            sanitized_profile.setdefault('micro_designation', 'SPO')
+            sanitized_profile.setdefault('micro_sk_shw_name', username)
         else:
             sanitized_profile.setdefault('data_collection_type', 'normal')
 
@@ -6565,11 +6652,102 @@ class UserViewSet(viewsets.ModelViewSet):
 
         return sanitized_data
 
+    def _sanitize_microstatification_dm_create(self, request):
+        did = _get_microstatification_dm_district_id(request.user)
+        if not did:
+            raise PermissionDenied('District managers must have an assigned district to create users.')
+
+        raw_role = request.data.get('role', 11)
+        try:
+            requested_role = int(raw_role)
+        except (TypeError, ValueError):
+            raise ValidationError({'role': 'Role must be a valid number.'})
+        if requested_role != 11:
+            raise PermissionDenied('District managers can create only SPO users.')
+
+        raw_profile = request.data.get('profile', {})
+        if raw_profile in (None, ''):
+            raw_profile = {}
+        if not isinstance(raw_profile, dict):
+            raise ValidationError({'profile': 'Invalid profile payload.'})
+
+        username = (request.data.get('username') or '').strip()
+        sanitized_profile = {
+            key: value
+            for key, value in raw_profile.items()
+            if key in MICROSTATIFICATION_ALLOWED_PROFILE_FIELDS
+        }
+        sanitized_profile.update({
+            'data_collection_type': 'microstatification',
+            'micro_role': 'spo',
+            'micro_district': did,
+            'micro_designation': 'SPO',
+        })
+        sanitized_profile.setdefault('micro_sk_shw_name', username)
+
+        return {
+            'username': request.data.get('username'),
+            'email': (request.data.get('email') or '').strip(),
+            'password': request.data.get('password'),
+            'first_name': request.data.get('first_name', ''),
+            'last_name': request.data.get('last_name', ''),
+            'role': 11,
+            'is_staff': False,
+            'profile': sanitized_profile,
+        }
+
+    def _sanitize_microstatification_dm_update(self, request, instance):
+        did = _get_microstatification_dm_district_id(request.user)
+        if not did:
+            raise PermissionDenied('District managers must have an assigned district to update users.')
+
+        if not _is_microstatification_spo_user(instance):
+            raise PermissionDenied('District managers can update only SPO users.')
+        profile = getattr(instance, 'profile', None)
+        if not profile or getattr(profile, 'micro_district_id', None) != did:
+            raise PermissionDenied('District managers can update only users in their district.')
+
+        if 'role' in request.data:
+            try:
+                requested_role = int(request.data.get('role'))
+            except (TypeError, ValueError):
+                raise ValidationError({'role': 'Role must be a valid number.'})
+            if requested_role != 11:
+                raise PermissionDenied('District managers can assign only the SPO role.')
+
+        raw_profile = request.data.get('profile', {})
+        if raw_profile in (None, ''):
+            raw_profile = {}
+        if not isinstance(raw_profile, dict):
+            raise ValidationError({'profile': 'Invalid profile payload.'})
+
+        sanitized_data = {}
+        for field in MICROSTATIFICATION_ALLOWED_USER_UPDATE_FIELDS:
+            if field in request.data:
+                sanitized_data[field] = request.data.get(field)
+        sanitized_data['role'] = 11
+
+        sanitized_profile = {
+            key: value
+            for key, value in raw_profile.items()
+            if key in MICROSTATIFICATION_ALLOWED_PROFILE_FIELDS
+        }
+        sanitized_profile.update({
+            'data_collection_type': 'microstatification',
+            'micro_role': 'spo',
+            'micro_district': did,
+            'micro_designation': 'SPO',
+        })
+        sanitized_data['profile'] = sanitized_profile
+        return sanitized_data
+
     def create(self, request, *args, **kwargs):
         """Override create to set created_by field"""
         serializer_data = request.data
         if _is_microstatification_admin(request.user):
             serializer_data = self._sanitize_microstatification_admin_create(request)
+        elif _is_microstatification_district_manager(request.user):
+            serializer_data = self._sanitize_microstatification_dm_create(request)
 
         serializer = self.get_serializer(data=serializer_data, context={'created_by': request.user})
         serializer.is_valid(raise_exception=True)
@@ -6585,6 +6763,12 @@ class UserViewSet(viewsets.ModelViewSet):
 
         if _is_microstatification_admin(request.user):
             serializer_data = self._sanitize_microstatification_admin_update(
+                request,
+                instance,
+            )
+            serializer_partial = True
+        elif _is_microstatification_district_manager(request.user):
+            serializer_data = self._sanitize_microstatification_dm_update(
                 request,
                 instance,
             )
@@ -6614,6 +6798,8 @@ class UserViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         if _is_microstatification_admin(request.user):
             raise PermissionDenied('Microstatification admins cannot delete users.')
+        if _is_microstatification_district_manager(request.user):
+            raise PermissionDenied('District managers cannot delete users.')
 
         return super().destroy(request, *args, **kwargs)
 
@@ -6623,21 +6809,23 @@ class UserViewSet(viewsets.ModelViewSet):
         Downgrade SK/SHW users to plain User and clear malaria-specific access.
         """
         acting_user = request.user
+        if _is_microstatification_district_manager(acting_user):
+            raise PermissionDenied('District managers cannot remove user access.')
         if not (
             acting_user.is_superuser
             or getattr(acting_user, 'role', 4) == 1
             or _is_microstatification_admin(acting_user)
         ):
-            raise PermissionDenied('Only admins can remove SK/SHW access.')
+            raise PermissionDenied('Only admins can remove SPO / field worker access.')
 
         instance = self.get_object()
         profile = getattr(instance, 'profile', None)
         current_micro_role = (getattr(profile, 'micro_role', '') or '').strip().lower()
         current_role = getattr(instance, 'role', None)
 
-        if current_role not in {8, 9} and current_micro_role not in {'sk', 'shw'}:
+        if current_role not in {8, 9, 11} and current_micro_role not in {'sk', 'shw', 'spo'}:
             raise ValidationError(
-                {'detail': 'Remove access is available only for SK or SHW users.'}
+                {'detail': 'Remove access is available only for SPO (SK/SHW) users.'}
             )
 
         from malaria.models import MalariaUserRole

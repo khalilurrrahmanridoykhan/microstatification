@@ -59,7 +59,18 @@ from .models import (
     Village,
 )
 from .microstatification_sync import sync_microstatification_workbook
-from .permissions import HasMalariaAccess, IsMalariaAdmin, get_malaria_role, has_malaria_access, is_malaria_admin
+from .permissions import (
+    HasMalariaAccess,
+    IsMalariaAdmin,
+    IsMalariaGlobalAdmin,
+    IsMalariaPrivileged,
+    get_dm_district_id,
+    get_malaria_role,
+    has_malaria_access,
+    has_malaria_privileged_access,
+    is_malaria_dm,
+    is_malaria_global_admin,
+)
 from .serializers import (
     DistrictSerializer,
     LocalRecordSerializer,
@@ -182,8 +193,10 @@ MICROSTATIFICATION_CSV_HEADERS = [
 ]
 MICRO_DASHBOARD_ROLE_LABELS = {
     4: "User",
-    8: "SK",
-    9: "SHW",
+    8: "SPO",
+    9: "SPO",
+    10: "DM",
+    11: "SPO",
 }
 MICRO_DASHBOARD_SCOPE_LABELS = (
     ("district", "District"),
@@ -274,6 +287,21 @@ def _serialize_user_from_row(row, role):
         "profile": profile_data,
         "role": role,
     }
+
+
+def _dm_spo_user_scope_q(user):
+    did = get_dm_district_id(user)
+    if not did:
+        return Q(pk__in=[])
+    district_scope = (
+        Q(profile__micro_district_id=did)
+        | Q(profile__micro_upazila__district_id=did)
+        | Q(profile__micro_union__upazila__district_id=did)
+        | Q(profile__micro_village__union__upazila__district_id=did)
+        | Q(profile__micro_villages__union__upazila__district_id=did)
+        | Q(created_by=user)
+    )
+    return Q(role__in={8, 9, 11}) & district_scope
 
 
 def _apply_filters(queryset, request, exact_fields, in_fields=None):
@@ -504,20 +532,59 @@ def _get_rejected_month_fields(record_type, instance):
     }
 
 
-def _get_month_access_lookup(reporting_year):
+def _resolve_month_access_district_id(district_id=None, district_name=None):
+    if district_id not in (None, ""):
+        try:
+            return int(district_id)
+        except (TypeError, ValueError):
+            return None
+    district_name = (district_name or "").strip()
+    if not district_name:
+        return None
+    return District.objects.filter(name__iexact=district_name).values_list("id", flat=True).first()
+
+
+def _local_record_district_id(instance):
+    try:
+        return instance.village.union.upazila.district_id
+    except AttributeError:
+        return (
+            Village.objects.filter(pk=getattr(instance, "village_id", None))
+            .values_list("union__upazila__district_id", flat=True)
+            .first()
+        )
+
+
+def _non_local_record_district_id(instance):
+    return _resolve_month_access_district_id(district_name=getattr(instance, "district_or_state", ""))
+
+
+def _get_month_access_lookup(reporting_year, district_id=None, district_name=None):
     today = _current_dhaka_date()
+    resolved_district_id = _resolve_month_access_district_id(district_id=district_id, district_name=district_name)
+    setting_filter = Q(district__isnull=True)
+    if resolved_district_id:
+        setting_filter |= Q(district_id=resolved_district_id)
     settings_by_month = {
-        setting.month: setting
-        for setting in MonthAccessSetting.objects.filter(reporting_year=reporting_year).only(
+        (setting.month, setting.district_id): setting
+        for setting in MonthAccessSetting.objects.filter(
+            setting_filter,
+            reporting_year=reporting_year,
+        ).only(
             "month",
             "close_date",
+            "district_id",
         )
     }
     lookup = {}
 
     for month_number in range(1, len(MONTH_COLUMNS) + 1):
         month_start = _month_start_date(reporting_year, month_number)
-        setting = settings_by_month.get(month_number)
+        setting = (
+            settings_by_month.get((month_number, resolved_district_id))
+            if resolved_district_id
+            else None
+        ) or settings_by_month.get((month_number, None))
         close_date = setting.close_date if setting and setting.close_date else _default_month_close_date(
             reporting_year,
             month_number,
@@ -527,8 +594,12 @@ def _get_month_access_lookup(reporting_year):
     return lookup
 
 
-def _get_open_month_fields(reporting_year):
-    access_lookup = _get_month_access_lookup(reporting_year)
+def _get_open_month_fields(reporting_year, district_id=None, district_name=None):
+    access_lookup = _get_month_access_lookup(
+        reporting_year,
+        district_id=district_id,
+        district_name=district_name,
+    )
     return {
         MONTH_COLUMNS[month_number - 1]
         for month_number, is_open in access_lookup.items()
@@ -566,7 +637,7 @@ def _sync_monthly_approvals_for_user_submission(record_type, instance, changed_m
 
 
 def _build_dashboard_payload():
-    role_rows = MalariaUserRole.objects.filter(role=MalariaUserRole.ROLE_SK).count()
+    role_rows = MalariaUserRole.objects.filter(role=MalariaUserRole.ROLE_SPO).count()
     village_count = Village.objects.count()
     assignment_count = LocalRecord.objects.count()
     approvals = MonthlyApproval.objects.filter(status=MonthlyApproval.STATUS_APPROVED)
@@ -694,7 +765,7 @@ def _resolve_micro_template_path(district_name):
 
 def _build_micro_designation_lookup():
     designation_lookup = {}
-    role_label_map = {8: "SK(H)", 9: "SHW(H)"}
+    role_label_map = {8: "SPO", 9: "SPO", 11: "SPO"}
     users = (
         User.objects.filter(role__in=role_label_map.keys())
         .select_related("profile")
@@ -1350,11 +1421,19 @@ def _copy_micro_template_sheet_to_workbook(source_ws, target_workbook):
     return target_ws
 
 
-def _build_microstatification_dashboard_payload(request_user):
+def _build_microstatification_dashboard_payload(request_user, district_id=None):
+    district_name = None
+    if district_id:
+        district_name = District.objects.filter(pk=district_id).values_list("name", flat=True).first()
+
     managed_user_filter = (
-        Q(role__in={8, 9})
+        Q(role__in={8, 9, 10, 11})
         | Q(role=4, created_by=request_user)
     )
+    if is_malaria_dm(request_user):
+        managed_user_filter = _dm_spo_user_scope_q(request_user)
+    elif district_id:
+        managed_user_filter &= Q(profile__micro_district_id=district_id)
     managed_users = list(
         User.objects.filter(managed_user_filter)
         .select_related(
@@ -1393,8 +1472,11 @@ def _build_microstatification_dashboard_payload(request_user):
             district_user_counts[district_name] += 1
 
     district_stats = []
+    village_queryset = Village.objects
+    if district_id:
+        village_queryset = village_queryset.filter(union__upazila__district_id=district_id)
     village_rows = (
-        Village.objects.values(
+        village_queryset.values(
             "union__upazila__district_id",
             "union__upazila__district__name",
         )
@@ -1406,9 +1488,12 @@ def _build_microstatification_dashboard_payload(request_user):
         .order_by("-villages", "union__upazila__district__name")
     )
 
+    upload_queryset = MicrostatificationDataUpload.objects
+    if district_name:
+        upload_queryset = upload_queryset.filter(district__iexact=district_name)
     upload_rows = {
         row["district"]: row
-        for row in MicrostatificationDataUpload.objects.values("district")
+        for row in upload_queryset.values("district")
         .annotate(
             uploads=Count("id"),
             villages_created=Coalesce(Sum("villages_created"), 0),
@@ -1448,9 +1533,10 @@ def _build_microstatification_dashboard_payload(request_user):
             }
         )
 
-    recent_upload_qs = list(
-        MicrostatificationDataUpload.objects.select_related("uploaded_by").order_by("-created_at")[:6]
-    )
+    recent_upload_query = MicrostatificationDataUpload.objects.select_related("uploaded_by")
+    if district_name:
+        recent_upload_query = recent_upload_query.filter(district__iexact=district_name)
+    recent_upload_qs = list(recent_upload_query.order_by("-created_at")[:6])
     recent_uploads = MicrostatificationDataUploadSerializer(recent_upload_qs, many=True).data
     upload_trend = [
         {
@@ -1469,7 +1555,7 @@ def _build_microstatification_dashboard_payload(request_user):
             "label": label,
             "count": role_counts[label],
         }
-        for _, label in MICRO_DASHBOARD_ROLE_LABELS.items()
+        for label in dict.fromkeys(MICRO_DASHBOARD_ROLE_LABELS.values())
     ]
     scope_breakdown = [
         {
@@ -1485,17 +1571,25 @@ def _build_microstatification_dashboard_payload(request_user):
     last_upload_at = recent_upload_qs[0].created_at if recent_upload_qs else None
     assignment_coverage = round((assigned_users / len(managed_users)) * 100, 1) if managed_users else 0
     reporting_year = _current_dhaka_year()
-    local_case_totals = LocalRecord.objects.filter(reporting_year=reporting_year).aggregate(
+    local_record_queryset = LocalRecord.objects.filter(reporting_year=reporting_year)
+    non_local_record_queryset = NonLocalRecord.objects.filter(reporting_year=reporting_year)
+    if district_id:
+        local_record_queryset = local_record_queryset.filter(village__union__upazila__district_id=district_id)
+        if district_name:
+            non_local_record_queryset = non_local_record_queryset.filter(district_or_state__iexact=district_name)
+        else:
+            non_local_record_queryset = non_local_record_queryset.none()
+    local_case_totals = local_record_queryset.aggregate(
         **{field: Coalesce(Sum(field), 0) for field in MONTH_COLUMNS}
     )
-    non_local_case_totals = NonLocalRecord.objects.filter(reporting_year=reporting_year).aggregate(
+    non_local_case_totals = non_local_record_queryset.aggregate(
         **{field: Coalesce(Sum(field), 0) for field in MONTH_COLUMNS}
     )
     case_presence_q = Q()
     for field in MONTH_COLUMNS:
         case_presence_q |= Q(**{f"{field}__gt": 0})
     reported_case_rows = (
-        LocalRecord.objects.filter(reporting_year=reporting_year)
+        local_record_queryset
         .filter(case_presence_q)
         .count()
     )
@@ -1664,9 +1758,134 @@ def _village_allowed_for_profile(profile, village):
     return _village_within_profile_scope(profile, village)
 
 
-def _ensure_local_record_editable(user, instance, validated_data):
-    if is_malaria_admin(user):
+def _local_record_in_dm_district(user, instance):
+    did = get_dm_district_id(user)
+    if not did or not instance:
+        return False
+    village = getattr(instance, "village", None)
+    if not village:
+        return False
+    union = getattr(village, "union", None)
+    upazila = getattr(union, "upazila", None) if union else None
+    district_id = getattr(upazila, "district_id", None) if upazila else None
+    return district_id == did
+
+
+def _non_local_in_dm_district(user, instance):
+    did = get_dm_district_id(user)
+    if not did or not instance:
+        return False
+    try:
+        dname = District.objects.only("name").get(pk=did).name
+    except District.DoesNotExist:
+        return False
+    country = (getattr(instance, "country", "") or "").strip().lower()
+    dist = (getattr(instance, "district_or_state", "") or "").strip().lower()
+    return country == "bangladesh" and dist == (dname or "").strip().lower()
+
+
+def _village_in_dm_district(user, village):
+    did = get_dm_district_id(user)
+    if not did or not village:
+        return False
+    union = getattr(village, "union", None)
+    upazila = getattr(union, "upazila", None) if union else None
+    district_id = getattr(upazila, "district_id", None) if upazila else None
+    return district_id == did
+
+
+def _user_managed_in_dm_district(actor, target_user):
+    """True if target SPO is assigned inside the DM district or was created by the DM."""
+    if not is_malaria_dm(actor) or not target_user:
+        return True
+    did = get_dm_district_id(actor)
+    if not did:
+        return False
+    if get_malaria_role(target_user) != "spo":
+        return False
+    if getattr(target_user, "created_by_id", None) == getattr(actor, "id", None):
+        return True
+    profile = getattr(target_user, "profile", None)
+    if not profile:
+        return False
+    if getattr(profile, "micro_district_id", None) == did:
+        return True
+    if getattr(profile, "micro_upazila_id", None):
+        return Upazila.objects.filter(pk=profile.micro_upazila_id, district_id=did).exists()
+    if getattr(profile, "micro_union_id", None):
+        return Union.objects.filter(pk=profile.micro_union_id, upazila__district_id=did).exists()
+    if getattr(profile, "micro_village_id", None):
+        return Village.objects.filter(pk=profile.micro_village_id, union__upazila__district_id=did).exists()
+    if hasattr(profile, "micro_villages") and profile.micro_villages.filter(union__upazila__district_id=did).exists():
+        return True
+    return False
+
+
+def _assert_dm_nonlocal_sk_user(actor, sk_user):
+    """
+    District managers may only bind non-local rows to SPO users in their district.
+    """
+    if not is_malaria_dm(actor):
         return
+    if not sk_user:
+        raise PermissionError(
+            "Specify sk_user: an SPO in your district must own this non-local record."
+        )
+    if not _user_managed_in_dm_district(actor, sk_user):
+        raise PermissionError(
+            "You can only assign non-local records to users in your district."
+        )
+    if get_malaria_role(sk_user) != "spo":
+        raise PermissionError(
+            "You can only assign non-local records to SPO users in your district."
+        )
+
+
+def _apply_privileged_new_user_profile(actor, user, malaria_role):
+    """When a DM creates a malaria user, pin them to the DM's district for SPO."""
+    if not is_malaria_dm(actor) or malaria_role != MalariaUserRole.ROLE_SPO:
+        return
+    did = get_dm_district_id(actor)
+    if not did:
+        return
+    profile = getattr(user, "profile", None)
+    if not profile:
+        return
+    profile.micro_district_id = did
+    profile.micro_role = "spo"
+    profile.save(update_fields=["micro_district", "micro_role"])
+
+
+def _assert_privileged_role_assignment(actor, target_user, new_role):
+    """Raise PermissionError if DM tries to assign outside allowed roles or users."""
+    if is_malaria_global_admin(actor):
+        return
+    if not is_malaria_dm(actor):
+        raise PermissionError("Admin access required.")
+    if new_role not in {MalariaUserRole.ROLE_SPO}:
+        raise PermissionError("District managers may only assign the SPO role.")
+    if not _user_managed_in_dm_district(actor, target_user):
+        raise PermissionError("You can only manage users in your district.")
+
+
+def _assert_privileged_user_create(actor, malaria_role):
+    if is_malaria_global_admin(actor):
+        return
+    if not is_malaria_dm(actor):
+        raise PermissionError("Admin access required.")
+    if malaria_role != MalariaUserRole.ROLE_SPO:
+        raise PermissionError("District managers may only create SPO users.")
+    if not get_dm_district_id(actor):
+        raise PermissionError("Your account must have an assigned district to create users.")
+
+
+def _ensure_local_record_editable(user, instance, validated_data):
+    if is_malaria_global_admin(user):
+        return
+    if is_malaria_dm(user):
+        if _local_record_in_dm_district(user, instance):
+            return
+        raise PermissionError("You can only edit local records in your district.")
 
     profile = getattr(user, "profile", None)
     can_access = instance.sk_user_id == user.id or _record_within_profile_scope(profile, instance)
@@ -1679,14 +1898,27 @@ def _ensure_local_record_editable(user, instance, validated_data):
         for field in MONTH_COLUMNS
         if field in validated_data and validated_data[field] != getattr(instance, field)
     ]
-    allowed_month_fields = _get_open_month_fields(instance.reporting_year) | rejected_month_fields
+    allowed_month_fields = (
+        _get_open_month_fields(
+            instance.reporting_year,
+            district_id=_local_record_district_id(instance),
+        )
+        | rejected_month_fields
+    )
     disallowed = [field for field in changed_month_fields if field not in allowed_month_fields]
     if disallowed:
         raise ValueError("You can only edit months that are still open or months returned as not approved.")
 
 
 def _ensure_non_local_record_editable(user, instance, validated_data):
-    if is_malaria_admin(user):
+    if is_malaria_global_admin(user):
+        return
+    if is_malaria_dm(user):
+        if not _non_local_in_dm_district(user, instance):
+            raise PermissionError("You can only edit non-local records in your district.")
+        new_sk = validated_data.get("sk_user")
+        if new_sk is not None and new_sk.pk != instance.sk_user_id:
+            _assert_dm_nonlocal_sk_user(user, new_sk)
         return
 
     if instance.sk_user_id != user.id:
@@ -1701,7 +1933,13 @@ def _ensure_non_local_record_editable(user, instance, validated_data):
     disallowed = [
         field
         for field in changed_month_fields
-        if field not in (_get_open_month_fields(instance.reporting_year) | rejected_month_fields)
+        if field not in (
+            _get_open_month_fields(
+                instance.reporting_year,
+                district_id=_non_local_record_district_id(instance),
+            )
+            | rejected_month_fields
+        )
     ]
     if disallowed:
         raise ValueError("You can only edit months that are still open or months returned as not approved.")
@@ -1799,8 +2037,13 @@ class ProfilesView(APIView):
     permission_classes = [IsAuthenticated, HasMalariaAccess]
 
     def get(self, request):
-        users = User.objects.filter(malaria_role__isnull=False).values("id", "first_name", "last_name", "email", "username").order_by(
-            "username"
+        users = User.objects.filter(Q(malaria_role__isnull=False) | Q(role__in=(8, 9, 10, 11)))
+        if is_malaria_dm(request.user):
+            users = users.filter(_dm_spo_user_scope_q(request.user))
+        users = (
+            users.distinct()
+            .values("id", "first_name", "last_name", "email", "username")
+            .order_by("username")
         )
         users = _apply_filters(users, request, exact_fields=["id"], in_fields=["id"])
 
@@ -1856,12 +2099,18 @@ class UserRolesView(APIView):
             allowed_ids = {item.strip() for item in user_ids.split(",") if item.strip()}
             payload = [row for row in payload if str(row["user_id"]) in allowed_ids]
 
+        if is_malaria_dm(request.user):
+            allowed_ids = set(
+                User.objects.filter(_dm_spo_user_scope_q(request.user)).values_list("id", flat=True)
+            )
+            payload = [row for row in payload if row["user_id"] in allowed_ids]
+
         if _count_requested(request):
             return Response({"data": payload, "count": len(payload)})
         return Response(payload)
 
     def post(self, request):
-        if not is_malaria_admin(request.user):
+        if not has_malaria_privileged_access(request.user):
             return Response({"detail": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
 
         user_id = request.data.get("user_id")
@@ -1874,17 +2123,27 @@ class UserRolesView(APIView):
         except User.DoesNotExist:
             return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        try:
+            _assert_privileged_role_assignment(request.user, user, role)
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
         role_obj, _ = MalariaUserRole.objects.update_or_create(user=user, defaults={"role": role})
         return Response(MalariaUserRoleSerializer(role_obj).data, status=status.HTTP_201_CREATED)
 
 
 class MalariaUserCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsMalariaAdmin]
+    permission_classes = [IsAuthenticated, IsMalariaPrivileged]
 
     def post(self, request):
         serializer = MalariaUserCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
+
+        try:
+            _assert_privileged_user_create(request.user, validated["role"])
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
         email = validated["email"].strip().lower()
         username = email
@@ -1901,29 +2160,33 @@ class MalariaUserCreateView(APIView):
             email=email,
             first_name=first_name,
             last_name=last_name,
-            role=4,
+            role=11 if validated["role"] == MalariaUserRole.ROLE_SPO else 4,
             is_staff=False,
             created_by=request.user,
         )
         user.set_password(validated["password"])
         user.save()
         MalariaUserRole.objects.update_or_create(user=user, defaults={"role": validated["role"]})
+        _apply_privileged_new_user_profile(request.user, user, validated["role"])
 
         return Response({"user": _serialize_user(user)}, status=status.HTTP_201_CREATED)
 
 
 class MalariaUsersView(APIView):
-    permission_classes = [IsAuthenticated, IsMalariaAdmin]
+    permission_classes = [IsAuthenticated, IsMalariaPrivileged]
 
     def get(self, request):
         roles = MalariaUserRole.objects.select_related("user").order_by("user__username")
         role_filter = request.query_params.get("role")
-        if role_filter in {"admin", "sk"}:
+        if role_filter in {"admin", "dm", "spo"}:
             roles = roles.filter(role=role_filter)
 
         user_id = request.query_params.get("user_id")
         if user_id not in (None, ""):
             roles = roles.filter(user_id=user_id)
+
+        if is_malaria_dm(request.user):
+            roles = roles.filter(user_id__in=User.objects.filter(_dm_spo_user_scope_q(request.user)).values("id"))
 
         payload = []
         for role_obj in roles:
@@ -1949,6 +2212,11 @@ class MalariaUsersView(APIView):
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
 
+        try:
+            _assert_privileged_user_create(request.user, validated["role"])
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
         email = validated["email"].strip().lower()
         username = email
         if User.objects.filter(username=username).exists():
@@ -1964,13 +2232,14 @@ class MalariaUsersView(APIView):
             email=email,
             first_name=first_name,
             last_name=last_name,
-            role=4,
+            role=11 if validated["role"] == MalariaUserRole.ROLE_SPO else 4,
             is_staff=False,
             created_by=request.user,
         )
         user.set_password(validated["password"])
         user.save()
         role_obj, _ = MalariaUserRole.objects.update_or_create(user=user, defaults={"role": validated["role"]})
+        _apply_privileged_new_user_profile(request.user, user, validated["role"])
         return Response(
             {
                 "id": user.id,
@@ -1990,13 +2259,23 @@ class MalariaMasterDataView(APIView):
 
     def get(self, request):
         include_villages = str(request.query_params.get("include_villages", "1")).strip().lower() not in {"0", "false", "no"}
+        did = get_dm_district_id(request.user) if is_malaria_dm(request.user) else None
+        districts_qs = District.objects.all()
+        upazilas_qs = Upazila.objects.select_related("district").all()
+        unions_qs = Union.objects.select_related("upazila", "upazila__district").all()
+        villages_qs = Village.objects.select_related("union", "union__upazila", "union__upazila__district").all()
+        if did:
+            districts_qs = districts_qs.filter(pk=did)
+            upazilas_qs = upazilas_qs.filter(district_id=did)
+            unions_qs = unions_qs.filter(upazila__district_id=did)
+            villages_qs = villages_qs.filter(union__upazila__district_id=did)
         payload = {
-            "districts": DistrictSerializer(District.objects.all(), many=True).data,
-            "upazilas": UpazilaSerializer(Upazila.objects.select_related("district").all(), many=True).data,
-            "unions": UnionSerializer(Union.objects.select_related("upazila", "upazila__district").all(), many=True).data,
+            "districts": DistrictSerializer(districts_qs, many=True).data,
+            "upazilas": UpazilaSerializer(upazilas_qs, many=True).data,
+            "unions": UnionSerializer(unions_qs, many=True).data,
             "villages": (
                 VillageSerializer(
-                    Village.objects.select_related("union", "union__upazila", "union__upazila__district").all(),
+                    villages_qs,
                     many=True,
                 ).data
                 if include_villages
@@ -2009,7 +2288,7 @@ class MalariaMasterDataView(APIView):
 class MalariaAdminWriteMixin:
     def get_permissions(self):
         if self.action in {"update", "partial_update", "destroy"}:
-            return [IsAuthenticated(), IsMalariaAdmin()]
+            return [IsAuthenticated(), IsMalariaPrivileged()]
         if self.action == "create":
             return [IsAuthenticated(), HasMalariaAccess()]
         return [IsAuthenticated(), HasMalariaAccess()]
@@ -2028,8 +2307,19 @@ class DistrictViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets
     serializer_class = DistrictSerializer
     pagination_class = None
 
+    def get_permissions(self):
+        if self.action == "destroy":
+            return [IsAuthenticated(), IsMalariaGlobalAdmin()]
+        return super().get_permissions()
+
     def get_queryset(self):
         queryset = super().get_queryset()
+        if is_malaria_dm(self.request.user):
+            did = get_dm_district_id(self.request.user)
+            if did:
+                queryset = queryset.filter(pk=did)
+            else:
+                queryset = queryset.none()
         return _apply_filters(queryset, self.request, exact_fields=["id", "name"], in_fields=["id"])
 
 
@@ -2038,8 +2328,19 @@ class UpazilaViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
     serializer_class = UpazilaSerializer
     pagination_class = None
 
+    def get_permissions(self):
+        if self.action == "destroy":
+            return [IsAuthenticated(), IsMalariaGlobalAdmin()]
+        return super().get_permissions()
+
     def get_queryset(self):
         queryset = super().get_queryset()
+        if is_malaria_dm(self.request.user):
+            did = get_dm_district_id(self.request.user)
+            if did:
+                queryset = queryset.filter(district_id=did)
+            else:
+                queryset = queryset.none()
         return _apply_filters(queryset, self.request, exact_fields=["id", "district_id"], in_fields=["id"])
 
 
@@ -2048,8 +2349,19 @@ class UnionViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.Mo
     serializer_class = UnionSerializer
     pagination_class = None
 
+    def get_permissions(self):
+        if self.action == "destroy":
+            return [IsAuthenticated(), IsMalariaGlobalAdmin()]
+        return super().get_permissions()
+
     def get_queryset(self):
         queryset = super().get_queryset()
+        if is_malaria_dm(self.request.user):
+            did = get_dm_district_id(self.request.user)
+            if did:
+                queryset = queryset.filter(upazila__district_id=did)
+            else:
+                queryset = queryset.none()
         return _apply_filters(queryset, self.request, exact_fields=["id", "upazila_id"], in_fields=["id"])
 
 
@@ -2060,13 +2372,13 @@ class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
 
     def get_permissions(self):
         if self.action == "destroy":
-            return [IsAuthenticated(), IsMalariaAdmin()]
+            return [IsAuthenticated(), IsMalariaPrivileged()]
         return [IsAuthenticated(), HasMalariaAccess()]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if not is_malaria_admin(request.user):
+        if not has_malaria_privileged_access(request.user):
             profile = getattr(request.user, "profile", None)
             union = serializer.validated_data.get("union")
             if union is None:
@@ -2087,6 +2399,14 @@ class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
                         {"detail": "You can only create villages within your assigned ward."},
                         status=status.HTTP_403_FORBIDDEN,
                     )
+        elif is_malaria_dm(request.user):
+            profile = getattr(request.user, "profile", None)
+            union = serializer.validated_data.get("union")
+            if union is None or not _union_within_profile_scope(profile, union):
+                return Response(
+                    {"detail": "You can only create villages within your assigned district."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -2128,6 +2448,13 @@ class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
             size = max(1, min(int(limit), 200))
             queryset = queryset[:size]
 
+        if is_malaria_dm(self.request.user):
+            did = get_dm_district_id(self.request.user)
+            if did:
+                queryset = queryset.filter(union__upazila__district_id=did)
+            else:
+                queryset = queryset.none()
+
         return queryset
 
     def update(self, request, *args, **kwargs):
@@ -2136,7 +2463,13 @@ class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
 
-        if not is_malaria_admin(request.user):
+        if is_malaria_dm(request.user) and not _village_in_dm_district(request.user, instance):
+            return Response(
+                {"detail": "You can only edit villages in your district."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not has_malaria_privileged_access(request.user):
             profile = getattr(request.user, "profile", None)
             can_access = instance.local_records.filter(sk_user=request.user).exists() or _village_within_profile_scope(profile, instance)
             if not can_access:
@@ -2163,6 +2496,15 @@ class VillageViewSet(RequestedFieldsViewMixin, MalariaAdminWriteMixin, viewsets.
         self.perform_update(serializer)
         return Response(serializer.data)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if is_malaria_dm(request.user) and not _village_in_dm_district(request.user, instance):
+            return Response(
+                {"detail": "You can only delete villages in your district."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().destroy(request, *args, **kwargs)
+
 
 class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
     serializer_class = LocalRecordSerializer
@@ -2179,7 +2521,14 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             "village__union__upazila__district",
         ).all()
 
-        if not is_malaria_admin(self.request.user):
+        if has_malaria_privileged_access(self.request.user):
+            if is_malaria_dm(self.request.user):
+                did = get_dm_district_id(self.request.user)
+                if did:
+                    queryset = queryset.filter(village__union__upazila__district_id=did)
+                else:
+                    queryset = queryset.none()
+        else:
             profile = getattr(self.request.user, "profile", None)
             scope_q = _profile_local_scope_q(profile)
             if scope_q is not None:
@@ -2249,7 +2598,7 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         payload = request.data.copy()
-        if not is_malaria_admin(request.user):
+        if not has_malaria_privileged_access(request.user):
             payload["sk_user"] = request.user.id
 
         serializer = self.get_serializer(data=payload)
@@ -2257,7 +2606,7 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         validated = serializer.validated_data
         reporting_year = validated.get("reporting_year", timezone.now().year)
 
-        if not is_malaria_admin(request.user):
+        if not has_malaria_privileged_access(request.user):
             profile = getattr(request.user, "profile", None)
             village_obj = validated.get("village")
             if village_obj is not None and _profile_local_scope_q(profile) is not None:
@@ -2282,7 +2631,7 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             reporting_year=reporting_year,
             defaults=defaults,
         )
-        if not is_malaria_admin(request.user):
+        if not has_malaria_privileged_access(request.user):
             submitted_month_fields = [
                 field
                 for field in MONTH_COLUMNS
@@ -2291,7 +2640,12 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             month_fields_for_approval = (
                 submitted_month_fields
                 if submitted_month_fields
-                else sorted(_get_open_month_fields(reporting_year))
+                else sorted(
+                    _get_open_month_fields(
+                        reporting_year,
+                        district_id=_local_record_district_id(record),
+                    )
+                )
             )
             _sync_monthly_approvals_for_user_submission(
                 MonthlyApproval.RECORD_TYPE_LOCAL,
@@ -2338,7 +2692,7 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
 
         self.perform_update(serializer)
         instance = serializer.instance
-        if is_malaria_admin(request.user):
+        if has_malaria_privileged_access(request.user):
             if "sk_user_designation" in request.data:
                 designation = str(request.data.get("sk_user_designation") or "").strip()
                 profile = getattr(instance.sk_user, "profile", None)
@@ -2359,11 +2713,16 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                         "updated_at",
                     ]
                 )
-        if not is_malaria_admin(request.user) and (changed_month_fields or non_month_changes):
+        if not has_malaria_privileged_access(request.user) and (changed_month_fields or non_month_changes):
             month_fields_for_approval = (
                 changed_month_fields
                 if changed_month_fields
-                else sorted(_get_open_month_fields(serializer.instance.reporting_year))
+                else sorted(
+                    _get_open_month_fields(
+                        serializer.instance.reporting_year,
+                        district_id=_local_record_district_id(serializer.instance),
+                    )
+                )
             )
             _sync_monthly_approvals_for_user_submission(
                 MonthlyApproval.RECORD_TYPE_LOCAL,
@@ -2373,7 +2732,25 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         instance.refresh_from_db()
         return Response(self.get_serializer(instance).data)
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaAdmin])
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if is_malaria_global_admin(request.user):
+            return super().destroy(request, *args, **kwargs)
+        if is_malaria_dm(request.user):
+            if _local_record_in_dm_district(request.user, instance):
+                return super().destroy(request, *args, **kwargs)
+            return Response(
+                {"detail": "You can only delete local records in your district."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if instance.sk_user_id == request.user.id:
+            return super().destroy(request, *args, **kwargs)
+        return Response(
+            {"detail": "You can only delete your own local records."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaPrivileged])
     def approve_metadata(self, request, pk=None):
         instance = self.get_object()
         pending = instance.metadata_pending if isinstance(instance.metadata_pending, dict) else {}
@@ -2387,7 +2764,7 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             return Response(
                 {
                     "detail": (
-                        "Metadata was rejected. The SK/SHW must save again to submit a new version before you can approve."
+                        "Metadata was rejected. The SPO must save again to submit a new version before you can approve."
                     ),
                     "metadata_approval_status": instance.metadata_approval_status,
                 },
@@ -2403,7 +2780,7 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         return Response(
             {
                 "detail": (
-                    "No pending metadata to approve. Save metadata changes as SK/SHW first, "
+                    "No pending metadata to approve. Save metadata changes as SPO first, "
                     "or refresh the table."
                 ),
                 "metadata_approval_status": instance.metadata_approval_status,
@@ -2411,7 +2788,7 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaAdmin])
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaPrivileged])
     def reject_metadata(self, request, pk=None):
         instance = self.get_object()
         if instance.metadata_approval_status != METADATA_APPROVAL_PENDING:
@@ -2432,7 +2809,24 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = NonLocalRecord.objects.select_related("sk_user").all()
-        if not is_malaria_admin(self.request.user):
+        if has_malaria_privileged_access(self.request.user):
+            if is_malaria_dm(self.request.user):
+                did = get_dm_district_id(self.request.user)
+                if did:
+                    try:
+                        dname = District.objects.only("name").get(pk=did).name
+                    except District.DoesNotExist:
+                        dname = None
+                    if dname:
+                        queryset = queryset.filter(
+                            country__iexact="Bangladesh",
+                            district_or_state__iexact=dname,
+                        )
+                    else:
+                        queryset = queryset.none()
+                else:
+                    queryset = queryset.none()
+        else:
             queryset = queryset.filter(sk_user=self.request.user)
         reporting_year_value = (self.request.query_params.get("reporting_year") or "").strip().lower()
         exact_fields = [
@@ -2488,15 +2882,33 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         # Ensure sk_user is always set to avoid DB NOT NULL failures.
         # Non-admin users are always bound to themselves.
         if not payload.get("sk_user"):
+            if has_malaria_privileged_access(request.user) and is_malaria_dm(request.user):
+                return Response(
+                    {
+                        "detail": (
+                            "Specify sk_user: an SPO in your district must own this non-local record."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             payload["sk_user"] = request.user.id
-        if not is_malaria_admin(request.user):
+        if not has_malaria_privileged_access(request.user):
             payload["sk_user"] = request.user.id
         serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
 
+        if is_malaria_dm(request.user):
+            try:
+                _assert_dm_nonlocal_sk_user(
+                    request.user,
+                    serializer.validated_data.get("sk_user"),
+                )
+            except PermissionError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
         self.perform_create(serializer)
         instance = serializer.instance
-        if is_malaria_admin(request.user):
+        if has_malaria_privileged_access(request.user):
             gm = payload.get("grid_metadata")
             if isinstance(gm, dict):
                 instance.grid_metadata = {**(instance.grid_metadata or {}), **gm}
@@ -2510,7 +2922,12 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             month_fields_for_approval = (
                 submitted_month_fields
                 if submitted_month_fields
-                else sorted(_get_open_month_fields(instance.reporting_year))
+                else sorted(
+                    _get_open_month_fields(
+                        instance.reporting_year,
+                        district_id=_non_local_record_district_id(instance),
+                    )
+                )
             )
             _sync_monthly_approvals_for_user_submission(
                 MonthlyApproval.RECORD_TYPE_NON_LOCAL,
@@ -2557,7 +2974,7 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
 
         self.perform_update(serializer)
         instance = serializer.instance
-        if is_malaria_admin(request.user):
+        if has_malaria_privileged_access(request.user):
             gm = request.data.get("grid_metadata")
             if isinstance(gm, dict):
                 instance.grid_metadata = {**(instance.grid_metadata or {}), **gm}
@@ -2576,11 +2993,16 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                         "updated_at",
                     ]
                 )
-        if not is_malaria_admin(request.user) and (changed_month_fields or non_month_changes):
+        if not has_malaria_privileged_access(request.user) and (changed_month_fields or non_month_changes):
             month_fields_for_approval = (
                 changed_month_fields
                 if changed_month_fields
-                else sorted(_get_open_month_fields(serializer.instance.reporting_year))
+                else sorted(
+                    _get_open_month_fields(
+                        serializer.instance.reporting_year,
+                        district_id=_non_local_record_district_id(serializer.instance),
+                    )
+                )
             )
             _sync_monthly_approvals_for_user_submission(
                 MonthlyApproval.RECORD_TYPE_NON_LOCAL,
@@ -2590,7 +3012,25 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         instance.refresh_from_db()
         return Response(self.get_serializer(instance).data)
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaAdmin])
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if is_malaria_global_admin(request.user):
+            return super().destroy(request, *args, **kwargs)
+        if is_malaria_dm(request.user):
+            if _non_local_in_dm_district(request.user, instance):
+                return super().destroy(request, *args, **kwargs)
+            return Response(
+                {"detail": "You can only delete non-local records in your district."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if instance.sk_user_id == request.user.id:
+            return super().destroy(request, *args, **kwargs)
+        return Response(
+            {"detail": "You can only delete your own non-local records."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaPrivileged])
     def approve_metadata(self, request, pk=None):
         instance = self.get_object()
         pending = instance.metadata_pending if isinstance(instance.metadata_pending, dict) else {}
@@ -2603,7 +3043,7 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             return Response(
                 {
                     "detail": (
-                        "Metadata was rejected. Wait for the SK/SHW to save again before approving."
+                        "Metadata was rejected. Wait for the SPO to save again before approving."
                     ),
                     "metadata_approval_status": instance.metadata_approval_status,
                 },
@@ -2623,7 +3063,7 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaAdmin])
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsMalariaPrivileged])
     def reject_metadata(self, request, pk=None):
         instance = self.get_object()
         if instance.metadata_approval_status != METADATA_APPROVAL_PENDING:
@@ -2644,19 +3084,38 @@ class MonthAccessSettingViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet)
     def get_permissions(self):
         if self.action in {"list", "retrieve"}:
             return [IsAuthenticated(), HasMalariaAccess()]
-        return [IsAuthenticated(), IsMalariaAdmin()]
+        return [IsAuthenticated(), IsMalariaPrivileged()]
 
     def get_queryset(self):
         queryset = MonthAccessSetting.objects.all()
+        if is_malaria_dm(self.request.user):
+            did = get_dm_district_id(self.request.user)
+            queryset = queryset.filter(district_id=did) if did else queryset.none()
+        elif self.request.query_params.get("district_id") in (None, ""):
+            queryset = queryset.filter(district__isnull=True)
         return _apply_filters(
             queryset,
             self.request,
-            exact_fields=["id", "reporting_year", "month"],
+            exact_fields=["id", "reporting_year", "month", "district_id"],
             in_fields=["id", "month"],
         )
 
     def create(self, request, *args, **kwargs):
         payload = request.data.copy()
+        district_id = payload.get("district") or payload.get("district_id")
+
+        if is_malaria_dm(request.user):
+            district_id = get_dm_district_id(request.user)
+            if not district_id:
+                return Response(
+                    {"detail": "Your account must have an assigned district to change month access."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            payload["district"] = district_id
+        elif district_id not in (None, ""):
+            payload["district"] = district_id
+        else:
+            payload["district"] = None
 
         try:
             reporting_year = int(payload.get("reporting_year"))
@@ -2675,6 +3134,7 @@ class MonthAccessSettingViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet)
             existing_instance = MonthAccessSetting.objects.filter(
                 reporting_year=payload.get("reporting_year"),
                 month=payload.get("month"),
+                district_id=payload.get("district"),
             ).first()
 
         serializer = self.get_serializer(existing_instance, data=payload)
@@ -2694,11 +3154,32 @@ class MonthlyApprovalViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in {"list", "retrieve"}:
             return [IsAuthenticated(), HasMalariaAccess()]
-        return [IsAuthenticated(), IsMalariaAdmin()]
+        return [IsAuthenticated(), IsMalariaPrivileged()]
 
     def get_queryset(self):
         queryset = MonthlyApproval.objects.all()
-        if not is_malaria_admin(self.request.user):
+        if is_malaria_global_admin(self.request.user):
+            pass
+        elif is_malaria_dm(self.request.user):
+            did = get_dm_district_id(self.request.user)
+            if did:
+                try:
+                    dname = District.objects.only("name").get(pk=did).name
+                except District.DoesNotExist:
+                    dname = None
+                if dname:
+                    queryset = queryset.filter(
+                        Q(local_record__village__union__upazila__district_id=did)
+                        | Q(
+                            non_local_record__country__iexact="Bangladesh",
+                            non_local_record__district_or_state__iexact=dname,
+                        )
+                    )
+                else:
+                    queryset = queryset.none()
+            else:
+                queryset = queryset.none()
+        else:
             profile = getattr(self.request.user, "profile", None)
             local_scope_q = _profile_local_approval_scope_q(profile)
             visible_local_q = Q(local_record__sk_user=self.request.user)
@@ -2778,10 +3259,18 @@ class MalariaDashboardView(APIView):
 
 
 class MicrostatificationDashboardSummaryView(APIView):
-    permission_classes = [IsAuthenticated, IsMalariaAdmin]
+    permission_classes = [IsAuthenticated, IsMalariaPrivileged]
 
     def get(self, request):
-        return Response(_build_microstatification_dashboard_payload(request.user))
+        district_id = None
+        if is_malaria_dm(request.user):
+            district_id = get_dm_district_id(request.user)
+            if not district_id:
+                return Response(
+                    {"detail": "Your account must have an assigned district to view this dashboard."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        return Response(_build_microstatification_dashboard_payload(request.user, district_id=district_id))
 
 
 class MicrostatificationDataUploadView(APIView):
@@ -3332,7 +3821,7 @@ class MicrostatificationDataDownloadView(APIView):
 
 
 class MicrostatificationDataDownloadLinkView(APIView):
-    permission_classes = [IsAuthenticated, IsMalariaAdmin]
+    permission_classes = [IsAuthenticated, IsMalariaPrivileged]
     renderer_classes = [
         renderers.JSONRenderer,
         JSONFormatXLSXRenderer,
@@ -3346,6 +3835,25 @@ class MicrostatificationDataDownloadLinkView(APIView):
                 {"detail": "Please select a district or choose All Districts."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if is_malaria_dm(request.user):
+            if district_name == MICROSTATIFICATION_ALL_DISTRICTS_TOKEN:
+                return Response(
+                    {"detail": "District managers cannot download all-district exports."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            did = get_dm_district_id(request.user)
+            if not did:
+                return Response(
+                    {"detail": "Your account must have an assigned district to download exports."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            allowed_name = District.objects.filter(pk=did).values_list("name", flat=True).first()
+            if not allowed_name or district_name.strip().lower() != allowed_name.strip().lower():
+                return Response(
+                    {"detail": "You are not allowed to download this district."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         if (
             district_name != MICROSTATIFICATION_ALL_DISTRICTS_TOKEN
@@ -3409,10 +3917,32 @@ class MicrostatificationDataDirectDownloadView(MicrostatificationDataDownloadVie
             )
 
         user = User.objects.filter(id=user_id, is_active=True).first()
-        if user is None or not is_malaria_admin(user):
+        if user is None or not has_malaria_privileged_access(user):
             return _micro_download_error_response(
                 "You are not allowed to download this file.",
                 status.HTTP_403_FORBIDDEN,
             )
+
+        if is_malaria_dm(user):
+            if district_name == MICROSTATIFICATION_ALL_DISTRICTS_TOKEN:
+                return _micro_download_error_response(
+                    "District managers cannot download all-district exports.",
+                    status.HTTP_403_FORBIDDEN,
+                )
+            did = get_dm_district_id(user)
+            if not did:
+                return _micro_download_error_response(
+                    "You are not allowed to download this file.",
+                    status.HTTP_403_FORBIDDEN,
+                )
+            try:
+                d_allowed = (District.objects.only("name").get(pk=did).name or "").strip().lower()
+            except District.DoesNotExist:
+                d_allowed = ""
+            if not d_allowed or district_name.strip().lower() != d_allowed:
+                return _micro_download_error_response(
+                    "You are not allowed to download this file.",
+                    status.HTTP_403_FORBIDDEN,
+                )
 
         return self._build_download_response(district_name, export_format)

@@ -10,10 +10,10 @@ interface RecordListRow {
 
 const fetchRecords = async () => {
   return [
-    { id: 1, skName: "SK Rahim Uddin", submissionDate: "2026-02-24", status: "Completed", village: "Village 1" },
-    { id: 2, skName: "SK Hasan Ali", submissionDate: "2026-02-23", status: "Pending", village: "Village 2" },
-    { id: 3, skName: "SK Mizanur Rahman", submissionDate: "2026-02-22", status: "Completed", village: "Village 3" },
-    { id: 4, skName: "SK Rani Begum", submissionDate: "2026-02-21", status: "In Progress", village: "Village 4" },
+    { id: 1, skName: "Rahim Uddin", submissionDate: "2026-02-24", status: "Completed", village: "Village 1" },
+    { id: 2, skName: "Hasan Ali", submissionDate: "2026-02-23", status: "Pending", village: "Village 2" },
+    { id: 3, skName: "Mizanur Rahman", submissionDate: "2026-02-22", status: "Completed", village: "Village 3" },
+    { id: 4, skName: "Rani Begum", submissionDate: "2026-02-21", status: "In Progress", village: "Village 4" },
   ] satisfies RecordListRow[];
 };
 
@@ -58,7 +58,7 @@ const RecordList = () => {
       <table className="min-w-full text-sm">
         <thead className="bg-gray-50 border-b">
           <tr>
-            <th className="px-6 py-3 text-left font-medium text-gray-500">SK Name</th>
+            <th className="px-6 py-3 text-left font-medium text-gray-500">SPO name</th>
             <th className="px-6 py-3 text-left font-medium text-gray-500">Submission Date</th>
             <th className="px-6 py-3 text-left font-medium text-gray-500">Village</th>
             <th className="px-6 py-3 text-left font-medium text-gray-500">Status</th>

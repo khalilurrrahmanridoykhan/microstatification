@@ -83,7 +83,7 @@ type LocalGridRow = LocalRecord & { _isNew?: boolean };
 
 const itnColumns = ["itn_2026", "itn_2025", "itn_2024"] as const;
 
-/** Server snapshot for SK “edit only when initially empty” columns (compare baseline, not live value). */
+/** Server snapshot for SPO “edit only when initially empty” columns (compare baseline, not live value). */
 type SkRestrictedBaseline = {
   village_sk_shw_name: string;
   sk_user_designation: string;
@@ -145,7 +145,7 @@ const LOCAL_HEADER_LABELS = [
   "Upazila",
   "Union",
   "Ward No",
-  "Name of SK/SHW",
+  "Name of SPO",
   "Desig.",
   "Name of SS",
   "Village Name (English)",
@@ -240,7 +240,7 @@ function profileScopeId(value: string | number | null | undefined): number | nul
   return Number.isFinite(n) ? n : null;
 }
 
-/** District name to pre-select in the local grid filter for SK/SHW from session geography. */
+/** District name to pre-select in the local grid filter for SPO/DM from session geography. */
 function resolveProfileDistrictFilterName(
   profile: AuthProfile | null | undefined,
   masterData: MalariaMasterData,
@@ -393,7 +393,7 @@ class LocalSaveValidationError extends Error {
   }
 }
 
-/** SK/SHW cannot auto-create district/upazila/union; hierarchy must already exist in master data. */
+/** SPO cannot auto-create district/upazila/union; hierarchy must already exist in master data. */
 class LocalHierarchyNotFoundError extends Error {
   constructor(message: string) {
     super(message);
@@ -434,7 +434,7 @@ function toProfileGeoId(value: string | number | null | undefined): number | nul
   return Number.isFinite(n) ? n : null;
 }
 
-/** Prefill + lock levels for SK/SHW new rows from session profile + master data. */
+/** Prefill + lock levels for SPO new rows from session profile + master data. */
 function resolveSkGeographyLockAndPrefill(
   profile: AuthProfile | null | undefined,
   masterData: MalariaMasterData,
@@ -529,8 +529,10 @@ function buildVillageUpdatePayload(row: LocalRecord): VillageUpdatePayload {
 const LocalRecordsGrid = () => {
   const { user, role, profile } = useAuth();
   const { toast } = useToast();
-  const isAdmin = role === "admin";
-  const isSkOrShw = role === "sk";
+  const isGlobalAdmin = role === "admin";
+  const isPrivileged = role === "admin" || role === "dm";
+  const isSpo = role === "spo";
+  const isAdmin = isPrivileged;
   const currentMonth = getDhakaMonth(); // 1..12
   const currentYear = getDhakaYear();
 
@@ -595,7 +597,7 @@ const LocalRecordsGrid = () => {
     if (approvalStatus === "APPROVED") return "APPROVED";
     if (approvalStatus === "REJECTED") return "REJECTED";
 
-    if (!isAdmin && year === currentYear && monthNumber === currentMonth) {
+    if (!isPrivileged && year === currentYear && monthNumber === currentMonth) {
       return "PENDING";
     }
     return "APPROVED";
@@ -773,13 +775,14 @@ const LocalRecordsGrid = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (isAdmin || !isSkOrShw || !profile) return;
+    if (isGlobalAdmin || !profile) return;
+    if (!isSpo && role !== "dm") return;
     if (!masterData.districts.length) return;
     if (profileDistrictFilterAppliedRef.current) return;
     profileDistrictFilterAppliedRef.current = true;
     const assignedDistrict = resolveProfileDistrictFilterName(profile, masterData);
     if (assignedDistrict) setSelectedDistrict(assignedDistrict);
-  }, [isAdmin, isSkOrShw, profile, masterData]);
+  }, [isGlobalAdmin, isSpo, role, profile, masterData]);
 
   useEffect(() => {
     if (isAdmin) return;
@@ -804,9 +807,9 @@ const LocalRecordsGrid = () => {
   }, [year, isAdmin, currentMonth]);
 
   const skGeoLock = useMemo(() => {
-    if (isAdmin || !isSkOrShw) return emptySkGeographyLock();
+    if (!isSpo) return emptySkGeographyLock();
     return resolveSkGeographyLockAndPrefill(profile, masterData);
-  }, [isAdmin, isSkOrShw, profile, masterData]);
+  }, [isSpo, profile, masterData]);
 
   const scopeFilteredRows = useMemo(() => {
     if (isAdmin || !user) return rows;
@@ -829,7 +832,7 @@ const LocalRecordsGrid = () => {
     }
 
     return rows.filter((row) => {
-      // Keep newly added drafts visible for the current SK/SHW so they can fill hierarchy fields.
+      // Keep newly added drafts visible for the current SPO so they can fill hierarchy fields.
       if (row._isNew && String(row.sk_user_id) === String(user.id)) {
         return true;
       }
@@ -1157,6 +1160,7 @@ const LocalRecordsGrid = () => {
   }, [user, isAdmin]);
 
   const handleSaveColumnLayoutForEveryone = async () => {
+    if (!isGlobalAdmin) return;
     try {
       setSavingLayout(true);
       const narrowMonth = getUniformMonthColumnWidth();
@@ -1314,7 +1318,7 @@ const LocalRecordsGrid = () => {
 
   const addRow = () => {
     if (!user) return;
-    const geo = !isAdmin && isSkOrShw ? skGeoLock : emptySkGeographyLock();
+    const geo = isSpo ? skGeoLock : emptySkGeographyLock();
     const newRow: LocalGridRow = {
       id: `new-${crypto.randomUUID()}`,
       village_id: "",
@@ -1757,10 +1761,10 @@ const LocalRecordsGrid = () => {
   };
 
   const canEditOwnNewRow = (row: LocalGridRow) =>
-    isSkOrShw && !!user && row._isNew && String(row.sk_user_id) === String(user.id);
+    isSpo && !!user && row._isNew && String(row.sk_user_id) === String(user.id);
 
   const canSkEditRestrictedText = (row: LocalGridRow, key: SkRestrictedTextKey) => {
-    if (isAdmin || !isSkOrShw) return true;
+    if (isAdmin || !isSpo) return true;
     if (canEditOwnNewRow(row)) return true;
     const baseline = skRestrictedBaselineRef.current.get(String(row.id));
     if (!baseline) return String(row[key] ?? "").trim() === "";
@@ -1768,7 +1772,7 @@ const LocalRecordsGrid = () => {
   };
 
   const canSkEditRestrictedNumber = (row: LocalGridRow, key: SkRestrictedNumberKey) => {
-    if (isAdmin || !isSkOrShw) return true;
+    if (isAdmin || !isSpo) return true;
     if (canEditOwnNewRow(row)) return true;
     const baseline = skRestrictedBaselineRef.current.get(String(row.id));
     if (!baseline) return skBaselineNumberIsEmpty(row[key]);
@@ -1787,7 +1791,7 @@ const LocalRecordsGrid = () => {
       Upazila: row.upazila_name,
       Union: row.union_name,
       "Ward No": row.ward_no || "",
-      "Name of SK/SHW": row.village_sk_shw_name || row.sk_user_display_name || "",
+      "Name of SPO": row.village_sk_shw_name || row.sk_user_display_name || "",
       "Desig.": row.sk_user_designation || "",
       "Name of SS": row.village_ss_name || row.sk_user_ss_name || "",
       "Village Name (English)": row.village_name,
@@ -1975,13 +1979,13 @@ const LocalRecordsGrid = () => {
           {isExpandedToHeaderWidth ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
 
-        {isAdmin && (
+        {isGlobalAdmin && (
           <Button
             variant="outline"
             size="icon"
             onClick={() => void handleSaveColumnLayoutForEveryone()}
             disabled={savingLayout || loading}
-            title="Publish column layout for everyone (SK and admins). Jan–Dec widths are normalized to standard month sizes; other columns use your current sizes."
+            title="Publish column layout for everyone (SPO and admins). Jan–Dec widths are normalized to standard month sizes; other columns use your current sizes."
             aria-label="Save column layout for all users"
           >
             {savingLayout ? <Loader2 className="h-4 w-4 animate-spin" /> : <Columns3 className="h-4 w-4" />}
@@ -2069,7 +2073,7 @@ const LocalRecordsGrid = () => {
               {renderHeaderCell("Upazila", 5, "grid-th min-w-[10px]")}
               {renderHeaderCell("Union", 6, "grid-th min-w-[10px]")}
               {renderHeaderCell("Ward No", 7, "grid-th min-w-[10px]")}
-              {renderHeaderCell("Name of SK/SHW", 8, "grid-th min-w-[10px]")}
+              {renderHeaderCell("Name of SPO", 8, "grid-th min-w-[10px]")}
               {renderHeaderCell("Desig.", 9, "grid-th min-w-[10px]")}
               {renderHeaderCell("Name of SS", 10, "grid-th min-w-[10px]")}
               {renderHeaderCell("Village Name (English)", 11, "grid-th min-w-[10px]")}

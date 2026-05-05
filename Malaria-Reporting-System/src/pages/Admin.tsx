@@ -38,7 +38,7 @@ const Admin = () => {
     () => ({
       records: {
         title: "Submitted Records",
-        subtitle: "Review SK submissions and approve monthly reporting.",
+        subtitle: "Review SPO submissions and approve monthly reporting.",
       },
       assignments: {
         title: "Assign New Village",
@@ -100,7 +100,7 @@ const Admin = () => {
     </section>
   );
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "dm") {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-destructive text-lg">Access Denied</p>

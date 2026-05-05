@@ -23,6 +23,8 @@ User.add_to_class('role', models.IntegerField(
         (7, 'micro_admin'),
         (8, 'sk'),
         (9, 'shw'),
+        (10, 'dm'),
+        (11, 'spo'),
     ],
     default=4  # Add this line
 ))

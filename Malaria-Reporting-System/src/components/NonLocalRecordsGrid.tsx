@@ -230,8 +230,10 @@ function buildPayload(row: NonLocalRow, isAdminUser: boolean, includeNonAdminMet
 const NonLocalRecordsGrid = () => {
   const { user, role } = useAuth();
   const { toast } = useToast();
-  const isAdmin = role === "admin";
-  const isSkOrShw = role === "sk";
+  const isGlobalAdmin = role === "admin";
+  const isPrivileged = role === "admin" || role === "dm";
+  const isSpo = role === "spo";
+  const isAdmin = isPrivileged;
   const currentMonth = getDhakaMonth();
   const currentYear = getDhakaYear();
 
@@ -282,7 +284,7 @@ const NonLocalRecordsGrid = () => {
     if (approvalStatus === "APPROVED") return "APPROVED";
     if (approvalStatus === "REJECTED") return "REJECTED";
 
-    if (!isAdmin && year === currentYear && monthNumber === currentMonth) {
+    if (!isPrivileged && year === currentYear && monthNumber === currentMonth) {
       return "PENDING";
     }
     return "APPROVED";
@@ -317,9 +319,9 @@ const NonLocalRecordsGrid = () => {
   }, [approvalRows, rows]);
 
   const displayedRows = useMemo(() => {
-    if (!isAdmin || recordView === "all") return rows;
+    if (!isPrivileged || recordView === "all") return rows;
     return rows.filter((row) => pendingRecordIds.has(row.id));
-  }, [rows, isAdmin, recordView, pendingRecordIds]);
+  }, [rows, isPrivileged, recordView, pendingRecordIds]);
 
   const handleApprovalAction = async (recordId: string, month: number, status: "APPROVED" | "REJECTED") => {
     try {
@@ -392,7 +394,7 @@ const NonLocalRecordsGrid = () => {
     setLoading(true);
     try {
       const requestPageSize = 100;
-      const skUserId = isAdmin ? undefined : user.id;
+      const skUserId = isPrivileged ? undefined : user.id;
       let firstPage = await fetchNonLocalRecordsPage({
         year,
         page: 1,
@@ -683,6 +685,7 @@ const NonLocalRecordsGrid = () => {
   }, [user, isAdmin]);
 
   const handleSaveColumnLayoutForEveryone = async () => {
+    if (!isGlobalAdmin) return;
     try {
       setSavingLayout(true);
       const narrowMonth = getUniformMonthColumnWidth();
@@ -938,11 +941,11 @@ const NonLocalRecordsGrid = () => {
     return openMonthNumbers.has(monthIndex + 1);
   };
   const canEditOwnNewRow = (row: NonLocalRow) =>
-    isSkOrShw && !!user && row._isNew && String(row.sk_user_id) === String(user.id);
+    isSpo && !!user && row._isNew && String(row.sk_user_id) === String(user.id);
   const canEditLocationField = (row: NonLocalRow) => isAdmin || canEditOwnNewRow(row);
   const canEditNonLocalMetadata = (row: NonLocalRow) => {
     if (isAdmin) return true;
-    if (!isSkOrShw || !user || String(row.sk_user_id) !== String(user.id)) return false;
+    if (!isSpo || !user || String(row.sk_user_id) !== String(user.id)) return false;
     if (row._isNew) return canEditOwnNewRow(row);
     return true;
   };
@@ -1018,13 +1021,13 @@ const NonLocalRecordsGrid = () => {
         <Button variant="outline" size="icon" onClick={toggleExpandToHeaderWidth} title="Toggle full-width columns">
           {isExpandedToHeaderWidth ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
-        {isAdmin && (
+        {isGlobalAdmin && (
           <Button
             variant="outline"
             size="icon"
             onClick={() => void handleSaveColumnLayoutForEveryone()}
             disabled={savingLayout || loading}
-            title="Publish column layout for everyone (SK and admins). Jan–Dec widths are normalized to standard month sizes; other columns use your current sizes."
+            title="Publish column layout for everyone (SPO and admins). Jan–Dec widths are normalized to standard month sizes; other columns use your current sizes."
             aria-label="Save column layout for all users"
           >
             {savingLayout ? <Loader2 className="h-4 w-4 animate-spin" /> : <Columns3 className="h-4 w-4" />}

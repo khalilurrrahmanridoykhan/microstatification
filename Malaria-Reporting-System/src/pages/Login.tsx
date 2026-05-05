@@ -84,7 +84,7 @@ const Login = () => {
                 admin@test.com / 123456
               </p>
               <p>
-                <span className="font-semibold text-foreground">SK:</span>{" "}
+                <span className="font-semibold text-foreground">SPO:</span>{" "}
                 sk1@test.com / 123456
               </p>
             </div>

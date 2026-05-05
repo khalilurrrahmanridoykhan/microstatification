@@ -48,7 +48,7 @@ const VillageAssignment = () => {
   }, [loadData]);
 
   const skUsers = useMemo(
-    () => users.filter((user) => user.role === "sk"),
+    () => users.filter((user) => user.role === "spo"),
     [users],
   );
 
@@ -83,7 +83,7 @@ const VillageAssignment = () => {
     if (!skId || !villageId) {
       toast({
         title: "Validation error",
-        description: "Select an SK and a village first.",
+        description: "Select an SPO and a village first.",
         variant: "destructive",
       });
       return;
@@ -109,7 +109,7 @@ const VillageAssignment = () => {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label htmlFor="skId" className="block text-xs font-medium text-gray-700">
-              Select SK
+              Select SPO
             </label>
             <select
               id="skId"
@@ -117,7 +117,7 @@ const VillageAssignment = () => {
               onChange={(event) => setSkId(event.target.value)}
               className="mt-2 w-full rounded-lg border px-3 py-2 text-sm"
             >
-              <option value="">Select SK</option>
+              <option value="">Select SPO</option>
               {skUsers.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.full_name}
@@ -239,7 +239,7 @@ const VillageAssignment = () => {
         <table className="min-w-full table-auto text-sm">
           <thead className="border-b bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-3 text-left">SK</th>
+                <th className="px-4 py-3 text-left">SPO</th>
               <th className="px-4 py-3 text-left">District</th>
               <th className="px-4 py-3 text-left">Upazila</th>
               <th className="px-4 py-3 text-left">Union</th>

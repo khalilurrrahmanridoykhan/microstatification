@@ -137,7 +137,10 @@ function AssignUserCard() {
   const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
   const isAdminUser = Number(userInfo?.role) === 1;
   const isMicroAdminUser = Number(userInfo?.role) === 7;
-  const defaultDataCollectionType = isMicroAdminUser
+  const currentMicroRole = String(userInfo?.profile?.micro_role || "").toLowerCase();
+  const isDistrictManager = Number(userInfo?.role) === 10 || currentMicroRole === "dm" || currentMicroRole === "district_manager";
+  const isMicroDashboardUser = isMicroAdminUser || isDistrictManager;
+  const defaultDataCollectionType = isMicroDashboardUser
     ? "microstatification"
     : "normal";
   const [users, setUsers] = useState([]);
@@ -150,7 +153,7 @@ function AssignUserCard() {
   const [dataCollectionType, setDataCollectionType] = useState(
     defaultDataCollectionType
   );
-  const [microRole, setMicroRole] = useState("");
+  const [microRole, setMicroRole] = useState(isDistrictManager ? "spo" : "");
   const [microDivision, setMicroDivision] = useState("");
   const [microDistrict, setMicroDistrict] = useState("");
   const [microUpazila, setMicroUpazila] = useState("");
@@ -199,8 +202,8 @@ function AssignUserCard() {
       const token = sessionStorage.getItem("authToken");
       try {
         setLoadingUsers(true);
-        setLoadingOrgs(!isMicroAdminUser);
-        setLoadingProjects(!isMicroAdminUser);
+        setLoadingOrgs(!isMicroDashboardUser);
+        setLoadingProjects(!isMicroDashboardUser);
 
         const userRes = await axios.get(`${BACKEND_URL}/api/users/user-list/`, {
           headers: { Authorization: `Token ${token}` },
@@ -209,7 +212,7 @@ function AssignUserCard() {
         setUsers(Array.isArray(userRes.data) ? userRes.data : []);
         setLoadingUsers(false);
 
-        if (isMicroAdminUser) {
+        if (isMicroDashboardUser) {
           setOrgs([]);
           setProjects([]);
           setAllowedOrgIds([]);
@@ -276,7 +279,7 @@ function AssignUserCard() {
       }
     };
     fetchData();
-  }, [isAdminUser, isMicroAdminUser, userInfo?.username]);
+  }, [isAdminUser, isMicroDashboardUser, userInfo?.username]);
 
   useEffect(() => {
     const fetchDistricts = async () => {
@@ -291,7 +294,11 @@ function AssignUserCard() {
           },
           params: { _t: Date.now() } // Cache-busting timestamp
         });
-        setDistricts(Array.isArray(res.data) ? res.data : []);
+        const nextDistricts = Array.isArray(res.data) ? res.data : [];
+        setDistricts(nextDistricts);
+        if (isDistrictManager && nextDistricts.length) {
+          setMicroDistrict(String(nextDistricts[0].id));
+        }
       } catch (error) {
         console.error("Failed to load districts", error);
         setDistricts([]);
@@ -301,7 +308,7 @@ function AssignUserCard() {
     };
 
     fetchDistricts();
-  }, [dataCollectionType]);
+  }, [dataCollectionType, isDistrictManager]);
 
   useEffect(() => {
     const fetchUpazilas = async () => {
@@ -497,6 +504,15 @@ function AssignUserCard() {
       setMicroSsName("");
       setVillageSearch("");
       setCustomSsNameMode(false);
+    } else if (microRole === "dm") {
+      setMicroUpazila("");
+      setMicroUnionIds([]);
+      setSelectedVillageIds([]);
+      setMicroWardNos([]);
+      setUnionVillages([]);
+      setMicroSsName("");
+      setVillageSearch("");
+      setCustomSsNameMode(false);
     }
   }, [microRole]);
   // console.log(users, orgs, projects);
@@ -545,9 +561,16 @@ function AssignUserCard() {
           return toast.error("Please select a Microstatification role.");
         }
 
-        const needsMicroDetails = microRole === "sk" || microRole === "shw";
-        if (needsMicroDetails && (!microDistrict || !microUpazila)) {
-          return toast.error("For SK/SHW role, please select at least district and upazila.");
+        const needsFieldWorkerScope =
+          microRole === "sk" || microRole === "shw" || microRole === "spo";
+        const needsDmDistrict = microRole === "dm";
+        if (needsFieldWorkerScope && (!microDistrict || !microUpazila)) {
+          return toast.error(
+            "For SPO (field) role, please select at least district and upazila."
+          );
+        }
+        if (needsDmDistrict && !microDistrict) {
+          return toast.error("For District Manager role, please select a district.");
         }
 
         const normalizedUnionIds = microUnionIds
@@ -575,32 +598,44 @@ function AssignUserCard() {
           : "";
 
         if (
-          needsMicroDetails
+          needsFieldWorkerScope
           && shouldFallbackToVillageScope
           && effectiveVillageIds.length === 0
         ) {
           return toast.error("No villages matched the selected Union/Ward filters.");
         }
 
+        const hasGeoForMicro = needsFieldWorkerScope || needsDmDistrict;
+        const microDesignationByRole = {
+          sk: "SK",
+          shw: "SHW",
+          spo: "SPO",
+          dm: "DM",
+        };
+
         updatedProfile.data_collection_type = "microstatification";
         updatedProfile.micro_role = microRole;
-        updatedProfile.micro_division = needsMicroDetails ? microDivision : "";
-        updatedProfile.micro_district = needsMicroDetails ? (microDistrict || null) : null;
-        updatedProfile.micro_upazila = needsMicroDetails ? (microUpazila || null) : null;
-        updatedProfile.micro_union = needsMicroDetails ? legacyUnionId : null;
-        updatedProfile.micro_village = needsMicroDetails
+        updatedProfile.micro_division = hasGeoForMicro ? microDivision : "";
+        updatedProfile.micro_district = hasGeoForMicro ? (microDistrict || null) : null;
+        updatedProfile.micro_upazila = needsFieldWorkerScope ? (microUpazila || null) : null;
+        updatedProfile.micro_union = needsFieldWorkerScope ? legacyUnionId : null;
+        updatedProfile.micro_village = needsFieldWorkerScope
           ? (effectiveVillageIds.length === 1 ? effectiveVillageIds[0] : null)
           : null;
-        updatedProfile.micro_villages = needsMicroDetails ? effectiveVillageIds : [];
-        updatedProfile.micro_ward_no = needsMicroDetails ? legacyWardNo : "";
-        updatedProfile.micro_sk_shw_name = needsMicroDetails ? selectedUser : "";
-        updatedProfile.micro_designation = needsMicroDetails ? microRole.toUpperCase() : "";
+        updatedProfile.micro_villages = needsFieldWorkerScope ? effectiveVillageIds : [];
+        updatedProfile.micro_ward_no = needsFieldWorkerScope ? legacyWardNo : "";
+        updatedProfile.micro_sk_shw_name = hasGeoForMicro ? selectedUser : "";
+        updatedProfile.micro_designation = hasGeoForMicro
+          ? microDesignationByRole[microRole] || ""
+          : "";
         updatedProfile.micro_ss_name = "";
 
         const microRoleMap = {
           micro_admin: 7,
           sk: 8,
           shw: 9,
+          spo: 11,
+          dm: 10,
         };
         newRole = microRoleMap[microRole] || currentRole;
       } else {
@@ -766,8 +801,10 @@ function AssignUserCard() {
     5: "Data Collector",
     6: "Officer",
     7: "Microstatification Admin",
-    8: "SK",
-    9: "SHW",
+    8: "SPO (legacy SK)",
+    9: "SPO (legacy SHW)",
+    10: "District Manager",
+    11: "SPO",
   };
 
   const divisionOptions = [
@@ -802,9 +839,11 @@ function AssignUserCard() {
     .map((id) => villageLookup.get(String(id)))
     .filter(Boolean);
 
-  const visibleUsers = isMicroAdminUser
-    ? users.filter(
-      (user) => user.role === 4 || user.role === 8 || user.role === 9
+  const visibleUsers = isDistrictManager
+    ? users.filter((user) => [8, 9, 11].includes(Number(user.role)))
+    : isMicroAdminUser
+    ? users.filter((user) =>
+      [4, 8, 9, 10, 11].includes(Number(user.role))
     )
     : users;
 
@@ -910,7 +949,7 @@ function AssignUserCard() {
         </div>
         {selectedUser && (
           <>
-            {isMicroAdminUser ? (
+            {isMicroDashboardUser ? (
               <div className="col-span-1 form-group">
                 <label htmlFor="dataCollectionType">Data Collection Type</label>
                 <input
@@ -935,7 +974,7 @@ function AssignUserCard() {
               </div>
             )}
 
-            {!isMicroAdminUser && dataCollectionType === "normal" && (
+            {!isMicroDashboardUser && dataCollectionType === "normal" && (
               <>
                 <div className="col-span-1 form-group">
                   <label htmlFor="orgList">Organization</label>
@@ -1012,17 +1051,27 @@ function AssignUserCard() {
                     className="w-full px-3 py-2 border rounded"
                     value={microRole}
                     onChange={(e) => setMicroRole(e.target.value)}
+                    disabled={isDistrictManager}
                   >
                     <option value="">Select role</option>
-                    {!isMicroAdminUser && (
+                    {!isMicroAdminUser && !isDistrictManager && (
                       <option value="micro_admin">Microstatification Admin</option>
                     )}
-                    <option value="sk">SK</option>
-                    <option value="shw">SHW</option>
+                    <option value="spo">SPO</option>
+                    {!isDistrictManager && <option value="dm">District Manager</option>}
+                    {isMicroAdminUser && (
+                      <>
+                        <option value="sk">SK (legacy)</option>
+                        <option value="shw">SHW (legacy)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
-                {(microRole === "sk" || microRole === "shw") && (
+                {(microRole === "sk" ||
+                  microRole === "shw" ||
+                  microRole === "spo" ||
+                  microRole === "dm") && (
                   <>
 
                     <div className="col-span-1 form-group">
@@ -1049,7 +1098,7 @@ function AssignUserCard() {
                         className="w-full px-3 py-2 border rounded"
                         value={microDistrict}
                         onChange={(e) => setMicroDistrict(e.target.value)}
-                        disabled={loadingGeo}
+                        disabled={loadingGeo || isDistrictManager}
                       >
                         <option value="">{loadingGeo ? "Loading districts..." : "Select district"}</option>
                         {districts.map((district) => (
@@ -1059,6 +1108,11 @@ function AssignUserCard() {
                         ))}
                       </select>
                     </div>
+
+                    {(microRole === "sk" ||
+                      microRole === "shw" ||
+                      microRole === "spo") && (
+                    <>
 
                     <div className="col-span-1 form-group">
                       <label htmlFor="microUpazila">Upazila</label>
@@ -1112,7 +1166,7 @@ function AssignUserCard() {
                             id="villageSearch"
                             type="text"
                             className="w-full px-3 py-2 pr-24 border rounded"
-                            placeholder="Search village by name, code, ward, SK/SHW, SS"
+                            placeholder="Search village by name, code, ward, SPO, SS"
                             value={villageSearch}
                             onFocus={() => setShowVillageResults(true)}
                             onChange={(e) => {
@@ -1221,6 +1275,8 @@ function AssignUserCard() {
                         </div>
                       )}
                     </div>
+                    </>
+                    )}
                   </>
                 )}
               </>
@@ -1252,8 +1308,11 @@ function AssignUserCard() {
               (dataCollectionType === "normal" && !selectedOrg) ||
               (dataCollectionType === "microstatification" &&
                 (!microRole ||
-                  ((microRole === "sk" || microRole === "shw") &&
-                    (!microDistrict || !microUpazila))))
+                  ((microRole === "sk" ||
+                    microRole === "shw" ||
+                    microRole === "spo") &&
+                    (!microDistrict || !microUpazila)) ||
+                  (microRole === "dm" && !microDistrict)))
             }
           >
             Save

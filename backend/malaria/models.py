@@ -20,10 +20,14 @@ class TimestampedModel(models.Model):
 
 class MalariaUserRole(TimestampedModel):
     ROLE_ADMIN = "admin"
-    ROLE_SK = "sk"
+    ROLE_DM = "dm"
+    ROLE_SPO = "spo"
+    # Legacy DB value (migrations rewrite rows to ROLE_SPO).
+    ROLE_SK_LEGACY = "sk"
     ROLE_CHOICES = (
         (ROLE_ADMIN, "Admin"),
-        (ROLE_SK, "SK"),
+        (ROLE_DM, "District Manager"),
+        (ROLE_SPO, "SPO"),
     )
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="malaria_role")
@@ -217,22 +221,24 @@ class NonLocalRecord(TimestampedModel, MonthlyCasesMixin):
 
 
 class MonthAccessSetting(TimestampedModel):
+    district = models.ForeignKey(District, null=True, blank=True, on_delete=models.CASCADE, related_name="month_access_settings")
     reporting_year = models.PositiveIntegerField(default=current_year)
     month = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(12)])
     is_open = models.BooleanField(default=False)
     close_date = models.DateField(null=True, blank=True)
 
     class Meta:
-        ordering = ("reporting_year", "month")
+        ordering = ("reporting_year", "district__name", "month")
         constraints = [
             models.UniqueConstraint(
-                fields=("reporting_year", "month"),
-                name="malaria_unique_month_access_per_year_month",
+                fields=("reporting_year", "month", "district"),
+                name="malaria_unique_month_access_per_year_month_district",
             ),
         ]
 
     def __str__(self):
-        return f"{self.reporting_year} month={self.month} close={self.close_date or 'default'}"
+        scope = self.district.name if self.district_id else "global"
+        return f"{self.reporting_year} {scope} month={self.month} close={self.close_date or 'default'}"
 
 
 class MonthlyApproval(TimestampedModel):

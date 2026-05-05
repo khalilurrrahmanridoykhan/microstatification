@@ -1,0 +1,48 @@
+{
+  "district": {
+    "id": 30,
+    "name": "xxxx",
+    "created_at": "2026-04-28 08:47:35.526050+00:00",
+    "updated_at": "2026-04-28 08:47:35.526071+00:00"
+  },
+  "upazilas": [
+    {
+      "id": 116,
+      "created_at": "2026-04-28 08:47:35.695560+00:00",
+      "updated_at": "2026-04-28 08:47:35.695576+00:00",
+      "district_id": 30,
+      "name": "ss"
+    }
+  ],
+  "unions": [
+    {
+      "id": 853,
+      "created_at": "2026-04-28 08:47:35.763777+00:00",
+      "updated_at": "2026-04-28 08:47:35.763795+00:00",
+      "upazila_id": 116,
+      "name": "xx"
+    }
+  ],
+  "villages": [
+    {
+      "id": 30159,
+      "created_at": "2026-04-28 08:47:35.834942+00:00",
+      "updated_at": "2026-04-28 08:47:35.834957+00:00",
+      "union_id": 853,
+      "name": "xx",
+      "name_bn": "xx",
+      "village_code": "XX055769",
+      "latitude": null,
+      "longitude": null,
+      "population": null,
+      "ward_no": "xx",
+      "sk_shw_name": "xx",
+      "ss_name": "xx",
+      "mmw_hp_chwc_name": "",
+      "distance_from_upazila_office_km": null,
+      "bordering_country_name": "",
+      "other_activities": ""
+    }
+  ],
+  "local_record_ids": []
+}

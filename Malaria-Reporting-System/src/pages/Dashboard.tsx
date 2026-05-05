@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 const Dashboard = () => {
   const { profile, role, signOut } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = role === "admin";
+  const isPrivileged = role === "admin" || role === "dm";
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -21,7 +21,7 @@ const Dashboard = () => {
           </h1>
 
           <div className="flex items-center gap-2 md:gap-3">
-            {isAdmin && (
+            {isPrivileged && (
               <Button
                 variant="outline"
                 size="sm"

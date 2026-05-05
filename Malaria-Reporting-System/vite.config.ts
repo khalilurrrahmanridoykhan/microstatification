@@ -5,13 +5,17 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
+// Proxy all `/api` traffic to the mock server (default) or Django, e.g.:
+//   MALARIA_API_PROXY=http://127.0.0.1:8888 npm run dev:web
+const malariaApiProxy = process.env.MALARIA_API_PROXY || "http://127.0.0.1:3000";
+
 export default defineConfig(({ mode }) => ({
   base: "/malaria/",
   server: {
     host: "::",
     port: 8080,
     proxy: {
-      "/api": "http://127.0.0.1:3000",
+      "/api": malariaApiProxy,
     },
     hmr: {
       overlay: false,

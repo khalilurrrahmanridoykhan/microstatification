@@ -79,6 +79,6 @@ class MonthlyApprovalAdmin(admin.ModelAdmin):
 
 @admin.register(MonthAccessSetting)
 class MonthAccessSettingAdmin(admin.ModelAdmin):
-    list_display = ("reporting_year", "month", "close_date", "is_open", "updated_at")
-    list_filter = ("reporting_year", "is_open", "month")
-    search_fields = ("=reporting_year",)
+    list_display = ("reporting_year", "district", "month", "close_date", "is_open", "updated_at")
+    list_filter = ("reporting_year", "district", "is_open", "month")
+    search_fields = ("=reporting_year", "district__name")
