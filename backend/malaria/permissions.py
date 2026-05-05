@@ -21,6 +21,15 @@ def get_dm_district_id(user):
     return getattr(profile, "micro_district_id", None) or None
 
 
+def get_user_district_id(user):
+    """District PK for any user (DM, SPO, SK, SHW, etc.), or None."""
+    profile = getattr(user, "profile", None) if user else None
+    if not profile:
+        return None
+    # Try to get district from profile's micro_district (DM, SPO, SK, SHW)
+    return getattr(profile, "micro_district_id", None) or None
+
+
 def get_malaria_role(user):
     """
     Canonical malaria-facing role for API/session: admin | dm | spo | None.

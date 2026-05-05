@@ -66,6 +66,7 @@ from .permissions import (
     IsMalariaPrivileged,
     get_dm_district_id,
     get_malaria_role,
+    get_user_district_id,
     has_malaria_access,
     has_malaria_privileged_access,
     is_malaria_dm,
@@ -3088,11 +3089,26 @@ class MonthAccessSettingViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet)
 
     def get_queryset(self):
         queryset = MonthAccessSetting.objects.all()
+        
         if is_malaria_dm(self.request.user):
+            # DM sees only their district's monthly access
             did = get_dm_district_id(self.request.user)
             queryset = queryset.filter(district_id=did) if did else queryset.none()
-        elif self.request.query_params.get("district_id") in (None, ""):
-            queryset = queryset.filter(district__isnull=True)
+        elif is_malaria_global_admin(self.request.user):
+            # Admin sees all monthly access
+            pass
+        else:
+            # SPO/SK/SHW users see global + their assigned district's monthly access
+            user_district_id = get_user_district_id(self.request.user)
+            
+            if user_district_id:
+                # User has a district assignment - see global + their district
+                from django.db.models import Q
+                queryset = queryset.filter(Q(district__isnull=True) | Q(district_id=user_district_id))
+            else:
+                # No district assignment - see only global
+                queryset = queryset.filter(district__isnull=True)
+        
         return _apply_filters(
             queryset,
             self.request,
