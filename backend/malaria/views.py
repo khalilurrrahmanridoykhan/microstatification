@@ -3146,6 +3146,61 @@ class MonthAccessSettingViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet)
             status=status.HTTP_200_OK if existing_instance else status.HTTP_201_CREATED,
         )
 
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        # DM can only update monthly access for their own district
+        if is_malaria_dm(request.user):
+            did = get_dm_district_id(request.user)
+            if not did:
+                return Response(
+                    {"detail": "Your account must have an assigned district to change month access."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if instance.district_id != did:
+                return Response(
+                    {"detail": "You can only update monthly access settings for your assigned district."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        
+        payload = request.data.copy()
+        
+        # Ensure DM cannot change the district
+        if is_malaria_dm(request.user):
+            payload["district"] = instance.district_id
+        
+        try:
+            reporting_year = int(payload.get("reporting_year", instance.reporting_year))
+            month_number = int(payload.get("month", instance.month))
+            payload["close_date"] = _normalize_month_access_close_date(
+                payload.get("close_date", instance.close_date),
+                reporting_year,
+                month_number,
+            ).isoformat()
+            payload["is_open"] = True
+        except (TypeError, ValueError):
+            pass
+        
+        serializer = self.get_serializer(instance, data=payload, partial=kwargs.get("partial", False))
+        serializer.is_valid(raise_exception=True)
+        updated_instance = serializer.save()
+        response_serializer = self.get_serializer(updated_instance)
+        return Response(response_serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        # DM can only delete monthly access for their own district
+        if is_malaria_dm(request.user):
+            did = get_dm_district_id(request.user)
+            if not did or instance.district_id != did:
+                return Response(
+                    {"detail": "You can only delete monthly access settings for your assigned district."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        
+        return super().destroy(request, *args, **kwargs)
+
 
 class MonthlyApprovalViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
     serializer_class = MonthlyApprovalSerializer
