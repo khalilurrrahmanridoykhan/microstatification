@@ -112,6 +112,16 @@ function buildMonthEntries(rawRows, reportingYear, todayDateString) {
   });
 }
 
+function filterRowsForSelectedDistrict(rawRows, selectedDistrictId) {
+  const rows = Array.isArray(rawRows) ? rawRows : [];
+  const districtId = Number(selectedDistrictId);
+  if (!Number.isFinite(districtId)) {
+    return [];
+  }
+
+  return rows.filter((row) => Number(row?.district_id ?? row?.district) === districtId);
+}
+
 function MonthCard({
   entry,
   reportingYear,
@@ -132,11 +142,10 @@ function MonthCard({
           </p>
         </div>
         <div
-          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
-            entry.is_currently_open
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${entry.is_currently_open
               ? "bg-emerald-50 text-emerald-700"
               : "bg-slate-100 text-slate-600"
-          }`}
+            }`}
         >
           {entry.is_currently_open ? (
             <FiUnlock className="h-4 w-4" />
@@ -177,10 +186,18 @@ function MicrostatificationMonthAccess() {
   const currentYear = getDhakaYear();
   const currentMonth = getDhakaMonth();
   const todayDateString = getDhakaDateString();
+  const userInfo = JSON.parse(sessionStorage.getItem("userInfo") || "{}");
+  const userRole = Number(userInfo?.role || 0);
+  const microRole = String(userInfo?.profile?.micro_role || "").toLowerCase();
+  const isDistrictManager =
+    userRole === 10 || microRole === "dm" || microRole === "district_manager";
   const [year, setYear] = useState(currentYear);
   const [entries, setEntries] = useState(() =>
     buildMonthEntries([], currentYear, todayDateString)
   );
+  const [districtOptions, setDistrictOptions] = useState([]);
+  const [selectedDistrictId, setSelectedDistrictId] = useState("");
+  const [districtLoading, setDistrictLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -200,18 +217,72 @@ function MicrostatificationMonthAccess() {
     [entries]
   );
 
-  const loadEntries = async (selectedYear = year) => {
+  const selectedDistrictLabel = useMemo(() => {
+    const found = districtOptions.find(
+      (option) => String(option.id) === String(selectedDistrictId)
+    );
+    return found?.name || "Select district";
+  }, [districtOptions, selectedDistrictId]);
+
+  const buildDistrictPayload = () => {
+    const parsed = Number(selectedDistrictId);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const loadDistrictOptions = async () => {
+    setDistrictLoading(true);
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/malaria/districts/`, {
+        headers: authHeaders,
+      });
+
+      const rows = Array.isArray(response.data) ? response.data : [];
+      setDistrictOptions(rows);
+
+      if (isDistrictManager) {
+        const firstDistrict = rows[0];
+        setSelectedDistrictId(firstDistrict?.id ? String(firstDistrict.id) : "");
+      } else {
+        setSelectedDistrictId((prev) => prev || (rows[0]?.id ? String(rows[0].id) : ""));
+      }
+    } catch (error) {
+      console.error("Failed to load districts", error);
+      toast.error("Failed to load districts");
+      setDistrictOptions([]);
+      if (isDistrictManager) {
+        setSelectedDistrictId("");
+      }
+    } finally {
+      setDistrictLoading(false);
+    }
+  };
+
+  const loadEntries = async (selectedYear = year, districtId = selectedDistrictId) => {
+    if (!districtId) {
+      setEntries(buildMonthEntries([], selectedYear, todayDateString));
+      setDirty(false);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
+      const params = { reporting_year: selectedYear, _order: "month" };
+      const parsedDistrictId = Number(districtId);
+      if (Number.isFinite(parsedDistrictId)) {
+        params.district_id = parsedDistrictId;
+      }
+
       const response = await axios.get(
         `${BACKEND_URL}/api/malaria/month-access-settings/`,
         {
-          params: { reporting_year: selectedYear, _order: "month" },
+          params,
           headers: authHeaders,
         }
       );
 
-      setEntries(buildMonthEntries(response.data || [], selectedYear, todayDateString));
+      const scopedRows = filterRowsForSelectedDistrict(response.data || [], districtId);
+      setEntries(buildMonthEntries(scopedRows, selectedYear, todayDateString));
       setDirty(false);
     } catch (error) {
       console.error("Failed to load month access settings", error);
@@ -223,8 +294,12 @@ function MicrostatificationMonthAccess() {
   };
 
   useEffect(() => {
-    loadEntries(year);
-  }, [year]);
+    loadDistrictOptions();
+  }, []);
+
+  useEffect(() => {
+    loadEntries(year, selectedDistrictId);
+  }, [year, selectedDistrictId]);
 
   const handleCloseDateChange = (month, closeDate) => {
     const nextCloseDate = closeDate || buildDefaultCloseDate(year, month);
@@ -251,22 +326,30 @@ function MicrostatificationMonthAccess() {
 
   const handleCloseDateBlur = (month, closeDate) => {
     const nextCloseDate = closeDate || buildDefaultCloseDate(year, month);
+    const districtPayload = buildDistrictPayload();
+    if (districtPayload === null) {
+      toast.error("Please select a district before saving month access.");
+      return;
+    }
+    const payload = {
+      reporting_year: year,
+      month,
+      is_open: true,
+      close_date: nextCloseDate,
+      district: districtPayload,
+    };
+
     setSaving(true);
     axios
       .post(
         `${BACKEND_URL}/api/malaria/month-access-settings/`,
-        {
-          reporting_year: year,
-          month,
-          is_open: true,
-          close_date: nextCloseDate,
-        },
+        payload,
         { headers: authHeaders }
       )
       .then(async () => {
         toast.success("Month access updated");
         setDirty(false);
-        await loadEntries(year);
+        await loadEntries(year, selectedDistrictId);
       })
       .catch((error) => {
         console.error("Failed to auto-save month access settings", error);
@@ -279,25 +362,32 @@ function MicrostatificationMonthAccess() {
   };
 
   const handleSave = async () => {
+    const districtPayload = buildDistrictPayload();
+    if (districtPayload === null) {
+      toast.error("Please select a district before saving month access.");
+      return;
+    }
     setSaving(true);
     try {
       await Promise.all(
-        entries.map((entry) =>
-          axios.post(
+        entries.map((entry) => {
+          const payload = {
+            reporting_year: year,
+            month: entry.month,
+            is_open: true,
+            close_date: entry.close_date,
+            district: districtPayload,
+          };
+          return axios.post(
             `${BACKEND_URL}/api/malaria/month-access-settings/`,
-            {
-              reporting_year: year,
-              month: entry.month,
-              is_open: true,
-              close_date: entry.close_date,
-            },
+            payload,
             { headers: authHeaders }
-          )
-        )
+          );
+        })
       );
 
       toast.success("Month access settings saved");
-      await loadEntries(year);
+      await loadEntries(year, selectedDistrictId);
     } catch (error) {
       console.error("Failed to save month access settings", error);
       toast.error("Failed to save month access settings");
@@ -321,12 +411,12 @@ function MicrostatificationMonthAccess() {
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                 Each month is open from its first day until its close date. By
                 default that is the last day of the month, and admin can extend
-                or shorten it for all SK and SHW users across both Local and
+                or shorten it district-wise for all SK and SHW users across both Local and
                 Non-Local malaria reporting tables.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Reporting Year
@@ -340,6 +430,26 @@ function MicrostatificationMonthAccess() {
                     {years.map((item) => (
                       <option key={item} value={item}>
                         {item}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  District Scope
+                </p>
+                <div className="mt-3">
+                  <select
+                    value={selectedDistrictId}
+                    onChange={(event) => setSelectedDistrictId(event.target.value)}
+                    disabled={districtLoading || isDistrictManager}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none ring-0 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {districtOptions.map((item) => (
+                      <option key={item.id} value={String(item.id)}>
+                        {item.name}
                       </option>
                     ))}
                   </select>
@@ -382,10 +492,10 @@ function MicrostatificationMonthAccess() {
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-900">
-                Global field-user month control
+                {selectedDistrictLabel} field-user month control
               </p>
               <p className="text-xs text-slate-500">
-                These closing dates apply to all SK and SHW users for the selected year. Changes save after you leave the date field.
+                These closing dates apply to SK and SHW users assigned under the selected district. Changes save after you leave the date field.
               </p>
             </div>
           </div>
@@ -393,8 +503,8 @@ function MicrostatificationMonthAccess() {
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => loadEntries(year)}
-              disabled={loading}
+              onClick={() => loadEntries(year, selectedDistrictId)}
+              disabled={loading || districtLoading || !selectedDistrictId}
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <FiRefreshCw className="h-4 w-4" />
@@ -403,7 +513,7 @@ function MicrostatificationMonthAccess() {
             <button
               type="button"
               onClick={() => handleSave()}
-              disabled={saving || !dirty}
+              disabled={saving || !dirty || districtLoading || !selectedDistrictId}
               className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <FiSave className="h-4 w-4" />
@@ -431,7 +541,7 @@ function MicrostatificationMonthAccess() {
                 isCurrentMonth={year === currentYear && entry.month === currentMonth}
                 onCloseDateChange={handleCloseDateChange}
                 onCloseDateBlur={handleCloseDateBlur}
-                disabled={saving}
+                disabled={saving || !selectedDistrictId}
               />
             ))}
           </div>

@@ -44,6 +44,7 @@ import {
   saveMalariaGridColumnLayout,
   upsertMonthlyApproval,
   updateNonLocalRecord,
+  type AuthProfile,
   type ApprovalRow,
   type MalariaMasterData,
   type NonLocalRecord,
@@ -66,6 +67,75 @@ function nonLocalMetaCellBg(row: NonLocalRow): string {
   if (row.metadata_approval_status === "PENDING") return "bg-amber-50/85";
   if (row.metadata_approval_status === "REJECTED") return "bg-fuchsia-50/75";
   return "bg-white";
+}
+
+function profileScopeId(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+function resolveProfileDistrictFilterName(
+  profile: AuthProfile | null | undefined,
+  masterData: MalariaMasterData,
+): string | null {
+  if (!profile) return null;
+
+  const did = profileScopeId(profile.micro_district);
+  if (did != null) {
+    const district = masterData.districts.find((item) => item.id === did);
+    return district?.name ?? null;
+  }
+
+  const upid = profileScopeId(profile.micro_upazila);
+  if (upid != null) {
+    const upazila = masterData.upazilas.find((item) => item.id === upid);
+    const district = upazila ? masterData.districts.find((item) => item.id === upazila.district_id) : undefined;
+    return district?.name ?? null;
+  }
+
+  const uid = profileScopeId(profile.micro_union);
+  if (uid != null) {
+    const union = masterData.unions.find((item) => item.id === uid);
+    const upazila = union ? masterData.upazilas.find((item) => item.id === union.upazila_id) : undefined;
+    const district = upazila ? masterData.districts.find((item) => item.id === upazila.district_id) : undefined;
+    return district?.name ?? null;
+  }
+
+  const vid = profileScopeId(profile.micro_village);
+  if (vid != null) {
+    const village = masterData.villages.find((item) => item.id === vid);
+    const union = village ? masterData.unions.find((item) => item.id === village.union_id) : undefined;
+    const upazila = union ? masterData.upazilas.find((item) => item.id === union.upazila_id) : undefined;
+    const district = upazila ? masterData.districts.find((item) => item.id === upazila.district_id) : undefined;
+    return district?.name ?? null;
+  }
+
+  const multiIds = (profile.micro_villages || [])
+    .map((id) => profileScopeId(id))
+    .filter((n): n is number => n != null);
+  if (multiIds.length > 0) {
+    const names = new Set<string>();
+    for (const id of multiIds) {
+      const village = masterData.villages.find((item) => item.id === id);
+      const union = village ? masterData.unions.find((item) => item.id === village.union_id) : undefined;
+      const upazila = union ? masterData.upazilas.find((item) => item.id === union.upazila_id) : undefined;
+      const district = upazila ? masterData.districts.find((item) => item.id === upazila.district_id) : undefined;
+      if (district?.name) names.add(district.name);
+    }
+    if (names.size === 1) return [...names][0];
+  }
+
+  return null;
+}
+
+function resolveProfileDistrictId(
+  profile: AuthProfile | null | undefined,
+  masterData: MalariaMasterData,
+): number | null {
+  const districtName = resolveProfileDistrictFilterName(profile, masterData);
+  if (!districtName) return null;
+  return masterData.districts.find((district) => district.name === districtName)?.id ?? null;
 }
 
 type CellStatus = "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "REJECTED";
@@ -151,11 +221,22 @@ function getMonthLastDayIso(year: number, month: number): string {
 
 function computeOpenMonthNumbers(
   year: number,
-  settings: Array<{ month: number; close_date: string | null }>,
+  settings: Array<{ month: number; close_date: string | null; district_id?: number | null }>,
 ): Set<number> {
   const today = getDhakaTodayIso();
   const closeDateByMonth = new Map<number, string>();
-  settings.forEach((item) => {
+
+  // Keep the latest district-scoped setting per month.
+  const districtFirst = [...settings].sort((a, b) => {
+    const aPriority = a.district_id ? 1 : 0;
+    const bPriority = b.district_id ? 1 : 0;
+    return bPriority - aPriority;
+  });
+
+  districtFirst.forEach((item) => {
+    if (closeDateByMonth.has(item.month)) {
+      return;
+    }
     const closeDate = item.close_date || getMonthLastDayIso(year, item.month);
     closeDateByMonth.set(item.month, closeDate);
   });
@@ -228,7 +309,7 @@ function buildPayload(row: NonLocalRow, isAdminUser: boolean, includeNonAdminMet
 }
 
 const NonLocalRecordsGrid = () => {
-  const { user, role } = useAuth();
+  const { user, role, profile } = useAuth();
   const { toast } = useToast();
   const isGlobalAdmin = role === "admin";
   const isPrivileged = role === "admin" || role === "dm";
@@ -319,8 +400,9 @@ const NonLocalRecordsGrid = () => {
   }, [approvalRows, rows]);
 
   const displayedRows = useMemo(() => {
-    if (!isPrivileged || recordView === "all") return rows;
-    return rows.filter((row) => pendingRecordIds.has(row.id));
+    if (!isPrivileged) return rows;  // SPO sees all their records
+    if (recordView === "all") return rows;  // DM/Admin can see all records
+    return rows.filter((row) => pendingRecordIds.has(row.id));  // Filter to pending approval
   }, [rows, isPrivileged, recordView, pendingRecordIds]);
 
   const handleApprovalAction = async (recordId: string, month: number, status: "APPROVED" | "REJECTED") => {
@@ -496,18 +578,22 @@ const NonLocalRecordsGrid = () => {
   }, []);
 
   useEffect(() => {
-    if (isAdmin) return;
+    if (!isSpo) return;
     let mounted = true;
     const loadMonthAccess = async () => {
       try {
         const settings = await fetchMonthAccessSettings(year);
-        const open = computeOpenMonthNumbers(year, settings);
+        const assignedDistrictId = resolveProfileDistrictId(profile, masterData);
+        const scopedSettings = assignedDistrictId
+          ? settings.filter((item) => Number(item.district_id) === assignedDistrictId)
+          : [];
+        const open = computeOpenMonthNumbers(year, scopedSettings);
         if (mounted) {
           setOpenMonthNumbers(open);
         }
       } catch (_error) {
         if (mounted) {
-          setOpenMonthNumbers(new Set([currentMonth]));
+          setOpenMonthNumbers(new Set());
         }
       }
     };
@@ -515,7 +601,7 @@ const NonLocalRecordsGrid = () => {
     return () => {
       mounted = false;
     };
-  }, [year, isAdmin, currentMonth]);
+  }, [year, isSpo, profile, masterData]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -1337,17 +1423,16 @@ const NonLocalRecordsGrid = () => {
                   return (
                     <td
                       key={col}
-                      className={`grid-td p-0 border ${getMonthBg(status)} ${
-                        isAdmin && isPendingCell ? "!overflow-visible whitespace-normal align-middle" : ""
-                      } ${editable ? "" : "opacity-80"}`}
+                      className={`grid-td p-0 border ${getMonthBg(status)} ${isAdmin && isPendingCell ? "!overflow-visible whitespace-normal align-middle" : ""
+                        } ${editable ? "" : "opacity-80"}`}
                       title={
                         status === "APPROVED"
                           ? "Approved"
                           : status === "PENDING"
-                          ? "Waiting for approval"
-                          : status === "REJECTED"
-                          ? "Rejected"
-                          : "Not submitted"
+                            ? "Waiting for approval"
+                            : status === "REJECTED"
+                              ? "Rejected"
+                              : "Not submitted"
                       }
                     >
                       {isAdmin && isPendingCell ? (

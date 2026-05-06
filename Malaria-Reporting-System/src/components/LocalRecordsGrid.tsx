@@ -295,6 +295,15 @@ function resolveProfileDistrictFilterName(
   return null;
 }
 
+function resolveProfileDistrictId(
+  profile: AuthProfile | null | undefined,
+  masterData: MalariaMasterData,
+): number | null {
+  const districtName = resolveProfileDistrictFilterName(profile, masterData);
+  if (!districtName) return null;
+  return masterData.districts.find((district) => district.name === districtName)?.id ?? null;
+}
+
 function getDhakaTodayIso(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Dhaka",
@@ -311,11 +320,22 @@ function getMonthLastDayIso(year: number, month: number): string {
 
 function computeOpenMonthNumbers(
   year: number,
-  settings: Array<{ month: number; close_date: string | null }>,
+  settings: Array<{ month: number; close_date: string | null; district_id?: number | null }>,
 ): Set<number> {
   const today = getDhakaTodayIso();
   const closeDateByMonth = new Map<number, string>();
-  settings.forEach((item) => {
+
+  // Keep the latest district-scoped setting per month.
+  const districtFirst = [...settings].sort((a, b) => {
+    const aPriority = a.district_id ? 1 : 0;
+    const bPriority = b.district_id ? 1 : 0;
+    return bPriority - aPriority;
+  });
+
+  districtFirst.forEach((item) => {
+    if (closeDateByMonth.has(item.month)) {
+      return;
+    }
     const closeDate = item.close_date || getMonthLastDayIso(year, item.month);
     closeDateByMonth.set(item.month, closeDate);
   });
@@ -785,18 +805,22 @@ const LocalRecordsGrid = () => {
   }, [isGlobalAdmin, isSpo, role, profile, masterData]);
 
   useEffect(() => {
-    if (isAdmin) return;
+    if (!isSpo) return;
     let mounted = true;
     const loadMonthAccess = async () => {
       try {
         const settings = await fetchMonthAccessSettings(year);
-        const open = computeOpenMonthNumbers(year, settings);
+        const assignedDistrictId = resolveProfileDistrictId(profile, masterData);
+        const scopedSettings = assignedDistrictId
+          ? settings.filter((item) => Number(item.district_id) === assignedDistrictId)
+          : [];
+        const open = computeOpenMonthNumbers(year, scopedSettings);
         if (mounted) {
           setOpenMonthNumbers(open);
         }
       } catch (_error) {
         if (mounted) {
-          setOpenMonthNumbers(new Set([currentMonth]));
+          setOpenMonthNumbers(new Set());
         }
       }
     };
@@ -804,7 +828,7 @@ const LocalRecordsGrid = () => {
     return () => {
       mounted = false;
     };
-  }, [year, isAdmin, currentMonth]);
+  }, [year, isSpo, profile, masterData]);
 
   const skGeoLock = useMemo(() => {
     if (!isSpo) return emptySkGeographyLock();
@@ -1646,9 +1670,9 @@ const LocalRecordsGrid = () => {
       } else {
         setSaveErrorAlert({
           variant: "generic",
-        title: "Save error",
+          title: "Save error",
           message: error instanceof Error ? error.message : "Failed to save records.",
-      });
+        });
       }
     } finally {
       setSaving(false);
@@ -2444,11 +2468,10 @@ const LocalRecordsGrid = () => {
                     <input
                       type="number"
                       min={0}
-                      className={`grid-input ${
-                        canEditOwnNewRow(row) || canSkEditRestrictedNumber(row, itnCol)
+                      className={`grid-input ${canEditOwnNewRow(row) || canSkEditRestrictedNumber(row, itnCol)
                           ? ""
                           : "bg-muted/30 text-muted-foreground"
-                      }`}
+                        }`}
                       value={row[itnCol] === 0 ? "" : row[itnCol]}
                       onChange={(e) => handleCellChange(row.id, itnCol, e.target.value)}
                       disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedNumber(row, itnCol)}
@@ -2466,29 +2489,28 @@ const LocalRecordsGrid = () => {
                   return (
                     <td
                       key={col}
-                      className={`grid-td p-0 border ${getMonthBg(status)} ${
-                        isAdmin && isPendingCell ? "!overflow-visible whitespace-normal align-middle" : ""
-                      } ${editable ? "" : "opacity-80"}`}
+                      className={`grid-td p-0 border ${getMonthBg(status)} ${isAdmin && isPendingCell ? "!overflow-visible whitespace-normal align-middle" : ""
+                        } ${editable ? "" : "opacity-80"}`}
                       title={
                         status === "APPROVED"
                           ? "Approved"
                           : status === "PENDING"
-                          ? "Waiting for approval"
-                          : status === "REJECTED"
-                          ? "Rejected"
-                          : "Not submitted"
+                            ? "Waiting for approval"
+                            : status === "REJECTED"
+                              ? "Rejected"
+                              : "Not submitted"
                       }
                     >
                       {isAdmin && isPendingCell ? (
                         <div className="flex min-w-0 items-center gap-0 px-0 py-0.5">
-                      <input
-                        type="number"
-                        min={0}
+                          <input
+                            type="number"
+                            min={0}
                             className={`grid-input bg-transparent min-w-0 flex-1 !w-auto !overflow-visible !text-clip ${editable ? "" : "text-muted-foreground"}`}
                             value={value === 0 ? "" : value}
-                        onChange={(e) => handleCellChange(row.id, col, e.target.value)}
-                        disabled={!editable}
-                      />
+                            onChange={(e) => handleCellChange(row.id, col, e.target.value)}
+                            disabled={!editable}
+                          />
                           <div className="flex shrink-0 items-center gap-0.5 pr-0.5">
                             <button
                               type="button"

@@ -97,6 +97,7 @@ const Login = ({ setAuthToken }) => {
           }
         );
 
+
         console.log("✅ Login response:", response.data);
         const token = response.data.token;
         const user = response.data.user;
@@ -111,10 +112,10 @@ const Login = ({ setAuthToken }) => {
             : isMalariaDistrictManager(user)
               ? "/dashboard"
               : isMalariaFieldUser(user)
-              ? "/malaria/"
-              : user?.username === BRAC_DOWNLOAD_USERNAME
-                ? "/projects/55/all-rows"
-                : "/dashboard";
+                ? "/malaria/"
+                : user?.username === BRAC_DOWNLOAD_USERNAME
+                  ? "/projects/55/all-rows"
+                  : "/dashboard";
 
         if (hasMalariaWorkspaceAccess(user)) {
           localStorage.setItem(MALARIA_TOKEN_KEY, token);

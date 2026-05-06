@@ -285,6 +285,7 @@ export interface VillageUpdatePayload {
 
 export interface MonthAccessSetting {
   id: string;
+  district_id?: number | null;
   reporting_year: number;
   month: number;
   is_open: boolean;
@@ -395,8 +396,8 @@ function getLegacySessionFromMainApp(): SessionData | null {
         micro_village: userInfo.profile?.micro_village ?? null,
         micro_villages: Array.isArray((userInfo.profile as { micro_villages?: unknown[] } | undefined)?.micro_villages)
           ? ((userInfo.profile as { micro_villages?: unknown[] }).micro_villages || []).map((item) =>
-              String(item),
-            )
+            String(item),
+          )
           : [],
         micro_ward_no: String(userInfo.profile?.micro_ward_no || ""),
       },
@@ -443,7 +444,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
     try {
       const errorPayload = (await response.json()) as
-        | { error?: string; detail?: string; [key: string]: unknown }
+        | { error?: string; detail?: string;[key: string]: unknown }
         | string
         | null;
       if (typeof errorPayload === "string" && errorPayload.trim()) {
@@ -547,8 +548,8 @@ export function fetchLocalRecords(year?: number | "latest"): Promise<LocalRecord
     year === "latest"
       ? "?reporting_year=latest"
       : Number.isFinite(year)
-      ? `?reporting_year=${year}`
-      : "";
+        ? `?reporting_year=${year}`
+        : "";
   return requestCached<LocalRecord[]>(`/malaria/local-records/${query}`);
 }
 
@@ -700,8 +701,8 @@ export function fetchNonLocalRecords(year?: number | "latest"): Promise<NonLocal
     year === "latest"
       ? "?reporting_year=latest"
       : Number.isFinite(year)
-      ? `?reporting_year=${year}`
-      : "";
+        ? `?reporting_year=${year}`
+        : "";
   return requestCached<NonLocalRecord[]>(`/malaria/non-local-records/${query}`);
 }
 

@@ -563,11 +563,9 @@ def _non_local_record_district_id(instance):
 def _get_month_access_lookup(reporting_year, district_id=None, district_name=None):
     today = _current_dhaka_date()
     resolved_district_id = _resolve_month_access_district_id(district_id=district_id, district_name=district_name)
-    setting_filter = Q(district__isnull=True)
-    if resolved_district_id:
-        setting_filter |= Q(district_id=resolved_district_id)
+    setting_filter = Q(district_id=resolved_district_id) if resolved_district_id else Q(pk__in=[])
     settings_by_month = {
-        (setting.month, setting.district_id): setting
+        setting.month: setting
         for setting in MonthAccessSetting.objects.filter(
             setting_filter,
             reporting_year=reporting_year,
@@ -581,11 +579,7 @@ def _get_month_access_lookup(reporting_year, district_id=None, district_name=Non
 
     for month_number in range(1, len(MONTH_COLUMNS) + 1):
         month_start = _month_start_date(reporting_year, month_number)
-        setting = (
-            settings_by_month.get((month_number, resolved_district_id))
-            if resolved_district_id
-            else None
-        ) or settings_by_month.get((month_number, None))
+        setting = settings_by_month.get(month_number)
         close_date = setting.close_date if setting and setting.close_date else _default_month_close_date(
             reporting_year,
             month_number,
@@ -3095,19 +3089,12 @@ class MonthAccessSettingViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet)
             did = get_dm_district_id(self.request.user)
             queryset = queryset.filter(district_id=did) if did else queryset.none()
         elif is_malaria_global_admin(self.request.user):
-            # Admin sees all monthly access
-            pass
+            # Global monthly access is retired; admins manage district-specific access only.
+            queryset = queryset.filter(district__isnull=False)
         else:
-            # SPO/SK/SHW users see global + their assigned district's monthly access
+            # SPO/SK/SHW users see their assigned district's monthly access only.
             user_district_id = get_user_district_id(self.request.user)
-            
-            if user_district_id:
-                # User has a district assignment - see global + their district
-                from django.db.models import Q
-                queryset = queryset.filter(Q(district__isnull=True) | Q(district_id=user_district_id))
-            else:
-                # No district assignment - see only global
-                queryset = queryset.filter(district__isnull=True)
+            queryset = queryset.filter(district_id=user_district_id) if user_district_id else queryset.none()
         
         return _apply_filters(
             queryset,
@@ -3131,7 +3118,10 @@ class MonthAccessSettingViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet)
         elif district_id not in (None, ""):
             payload["district"] = district_id
         else:
-            payload["district"] = None
+            return Response(
+                {"detail": "District is required. Global monthly access is no longer supported."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             reporting_year = int(payload.get("reporting_year"))
@@ -3229,26 +3219,45 @@ class MonthlyApprovalViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = MonthlyApproval.objects.all()
+        # Debug: record DM role/did and queryset counts when needed
+        try:
+            debug_user = getattr(self.request.user, 'username', 'unknown')
+        except Exception:
+            debug_user = 'unknown'
         if is_malaria_global_admin(self.request.user):
             pass
         elif is_malaria_dm(self.request.user):
             did = get_dm_district_id(self.request.user)
+            # write a lightweight debug entry so we can verify DM identity and did
+            try:
+                with open('/tmp/monthly_approvals_debug.log', 'a') as _f:
+                    _f.write(f"user={debug_user} is_dm=True did={did}\n")
+            except Exception:
+                pass
             if did:
+                # Also include fallback when non_local records have a district_or_state text value
                 try:
                     dname = District.objects.only("name").get(pk=did).name
                 except District.DoesNotExist:
                     dname = None
+                pre_count = queryset.count()
+                q = Q(local_record__village__union__upazila__district_id=did) | Q(
+                    non_local_record__sk_user__profile__micro_district_id=did
+                )
                 if dname:
-                    queryset = queryset.filter(
-                        Q(local_record__village__union__upazila__district_id=did)
-                        | Q(
-                            non_local_record__country__iexact="Bangladesh",
-                            non_local_record__district_or_state__iexact=dname,
-                        )
-                    )
-                else:
-                    queryset = queryset.none()
+                    q = q | (Q(non_local_record__country__iexact="Bangladesh") & Q(non_local_record__district_or_state__iexact=dname))
+                queryset = queryset.filter(q)
+                try:
+                    with open('/tmp/monthly_approvals_debug.log', 'a') as _f:
+                        _f.write(f"pre_count={pre_count} post_count={queryset.count()}\n")
+                except Exception:
+                    pass
             else:
+                try:
+                    with open('/tmp/monthly_approvals_debug.log', 'a') as _f:
+                        _f.write("did_missing_for_dm\n")
+                except Exception:
+                    pass
                 queryset = queryset.none()
         else:
             profile = getattr(self.request.user, "profile", None)
