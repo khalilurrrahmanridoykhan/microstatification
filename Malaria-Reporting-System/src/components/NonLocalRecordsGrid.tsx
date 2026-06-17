@@ -471,9 +471,9 @@ const NonLocalRecordsGrid = () => {
     }
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const requestPageSize = 100;
       const skUserId = isPrivileged ? undefined : user.id;
@@ -1001,13 +1001,24 @@ const NonLocalRecordsGrid = () => {
         const includeMeta =
           !isAdmin && (r._isNew || dirtyNonLocalMetadataRowIdsRef.current.has(r.id));
         if (r._isNew) {
-          await createNonLocalRecord(buildPayload(r, isAdmin, includeMeta));
+          const created = await createNonLocalRecord(buildPayload(r, isAdmin, includeMeta));
+          setRows((prev) => {
+            const idx = prev.findIndex((row) => row.id === r.id);
+            if (idx < 0) return [created, ...prev];
+            const next = [...prev];
+            next[idx] = created;
+            return next;
+          });
         } else {
-          await updateNonLocalRecord(r.id, buildPayload(r, isAdmin, includeMeta));
+          const updated = await updateNonLocalRecord(r.id, buildPayload(r, isAdmin, includeMeta));
+          setRows((prev) => prev.map((row) => (row.id === r.id ? updated : row)));
         }
       }
 
-      await fetchData();
+      const freshApprovals = await fetchMonthlyApprovals({ recordType: "non_local", reportingYear: year });
+      setApprovalRows(freshApprovals);
+      setDirtyIds(new Set());
+      setDeletedIds([]);
       dirtyNonLocalMetadataRowIdsRef.current.clear();
       toast({ title: "Saved successfully" });
     } catch (error) {

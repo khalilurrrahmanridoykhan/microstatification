@@ -25,6 +25,9 @@ LOCAL_METADATA_VILLAGE_KEYS = frozenset(
     }
 )
 
+# These village fields are saved directly (no admin approval needed).
+LOCAL_DIRECT_VILLAGE_KEYS = frozenset({"name_bn", "village_code", "latitude", "longitude"})
+
 LOCAL_METADATA_PROFILE_KEYS = frozenset(
     {
         "micro_sk_shw_name",
@@ -57,7 +60,7 @@ NONLOCAL_METADATA_DISPLAY_KEYS = frozenset(
 
 
 def _sanitize_village_value(key: str, value: Any) -> Any:
-    if key == "distance_from_upazila_office_km" and value not in (None, ""):
+    if key in ("distance_from_upazila_office_km", "latitude", "longitude") and value not in (None, ""):
         try:
             # JSONField / psycopg2 JSON cannot encode Decimal; store as float for pending payloads.
             return float(Decimal(str(value)))
@@ -79,13 +82,46 @@ def filter_local_metadata_submission(raw: dict | None) -> dict[str, dict[str, An
     if isinstance(v_in, dict):
         for k, val in v_in.items():
             if k in LOCAL_METADATA_VILLAGE_KEYS:
-                out["village"][k] = _sanitize_village_value(k, val)
+                sanitized = _sanitize_village_value(k, val)
+                if sanitized not in (None, ""):
+                    out["village"][k] = sanitized
     p_in = raw.get("profile")
     if isinstance(p_in, dict):
         for k, val in p_in.items():
             if k in LOCAL_METADATA_PROFILE_KEYS:
-                out["profile"][k] = str(val).strip() if val is not None else ""
+                cleaned = str(val).strip() if val is not None else ""
+                if cleaned:
+                    out["profile"][k] = cleaned
     return out
+
+
+def apply_direct_village_fields(raw_submission: dict | None, village) -> bool:
+    """Directly write name_bn, village_code, latitude, longitude to Village. Returns True if saved."""
+    if not raw_submission or not isinstance(raw_submission, dict):
+        return False
+    v_in = raw_submission.get("village")
+    if not isinstance(v_in, dict):
+        return False
+    updates = []
+    for k in LOCAL_DIRECT_VILLAGE_KEYS:
+        if k not in v_in:
+            continue
+        val = v_in[k]
+        if k in ("latitude", "longitude"):
+            if val in (None, ""):
+                setattr(village, k, None)
+            else:
+                try:
+                    setattr(village, k, Decimal(str(val)))
+                except (InvalidOperation, TypeError, ValueError):
+                    continue
+        else:
+            setattr(village, k, str(val).strip() if val is not None else "")
+        updates.append(k)
+    if updates:
+        village.save(update_fields=updates)
+        return True
+    return False
 
 
 def merge_local_metadata_pending(existing: dict | None, submission: dict[str, dict[str, Any]]) -> dict:

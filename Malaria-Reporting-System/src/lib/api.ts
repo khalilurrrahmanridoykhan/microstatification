@@ -11,6 +11,10 @@ export interface LocalRecordMetadataSubmission {
     distance_from_upazila_office_km?: number | null;
     bordering_country_name?: string;
     other_activities?: string;
+    name_bn?: string;
+    village_code?: string;
+    latitude?: number | null;
+    longitude?: number | null;
   };
   profile?: {
     micro_sk_shw_name?: string;

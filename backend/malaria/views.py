@@ -32,6 +32,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .metadata_approval import (
+    apply_direct_village_fields,
     apply_local_metadata_pending_to_db,
     apply_nonlocal_metadata_pending_to_db,
     filter_nonlocal_metadata_submission,
@@ -1816,25 +1817,6 @@ def _user_managed_in_dm_district(actor, target_user):
     return False
 
 
-def _assert_dm_nonlocal_sk_user(actor, sk_user):
-    """
-    District managers may only bind non-local rows to SPO users in their district.
-    """
-    if not is_malaria_dm(actor):
-        return
-    if not sk_user:
-        raise PermissionError(
-            "Specify sk_user: an SPO in your district must own this non-local record."
-        )
-    if not _user_managed_in_dm_district(actor, sk_user):
-        raise PermissionError(
-            "You can only assign non-local records to users in your district."
-        )
-    if get_malaria_role(sk_user) != "spo":
-        raise PermissionError(
-            "You can only assign non-local records to SPO users in your district."
-        )
-
 
 def _apply_privileged_new_user_profile(actor, user, malaria_role):
     """When a DM creates a malaria user, pin them to the DM's district for SPO."""
@@ -1911,9 +1893,6 @@ def _ensure_non_local_record_editable(user, instance, validated_data):
     if is_malaria_dm(user):
         if not _non_local_in_dm_district(user, instance):
             raise PermissionError("You can only edit non-local records in your district.")
-        new_sk = validated_data.get("sk_user")
-        if new_sk is not None and new_sk.pk != instance.sk_user_id:
-            _assert_dm_nonlocal_sk_user(user, new_sk)
         return
 
     if instance.sk_user_id != user.id:
@@ -2647,17 +2626,19 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                 record,
                 month_fields_for_approval,
             )
+            raw_sub = payload.get("metadata_submission")
+            apply_direct_village_fields(raw_sub if isinstance(raw_sub, dict) else {}, record.village)
             meta_sub = parse_local_metadata_from_request(payload)
-            record.metadata_approval_status = METADATA_APPROVAL_PENDING
             if local_metadata_submission_nonempty(meta_sub):
                 record.metadata_pending = merge_local_metadata_pending(record.metadata_pending, meta_sub)
-            record.save(
-                update_fields=[
-                    "metadata_approval_status",
-                    "metadata_pending",
-                    "updated_at",
-                ]
-            )
+                record.metadata_approval_status = METADATA_APPROVAL_PENDING
+                record.save(
+                    update_fields=[
+                        "metadata_approval_status",
+                        "metadata_pending",
+                        "updated_at",
+                    ]
+                )
         out = self.get_serializer(record)
         return Response(out.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
@@ -2695,6 +2676,8 @@ class LocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                     profile.micro_designation = designation
                     profile.save(update_fields=["micro_designation"])
         else:
+            raw_sub = request.data.get("metadata_submission")
+            apply_direct_village_fields(raw_sub if isinstance(raw_sub, dict) else {}, instance.village)
             meta_sub = parse_local_metadata_from_request(request.data)
             if local_metadata_submission_nonempty(meta_sub):
                 instance.metadata_pending = merge_local_metadata_pending(instance.metadata_pending, meta_sub)
@@ -2812,13 +2795,12 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                         dname = District.objects.only("name").get(pk=did).name
                     except District.DoesNotExist:
                         dname = None
+                    # Show records added by SPOs in this district (primary filter)
+                    # OR Bangladesh records whose origin district matches (secondary filter).
+                    q = Q(sk_user__profile__micro_district_id=did)
                     if dname:
-                        queryset = queryset.filter(
-                            country__iexact="Bangladesh",
-                            district_or_state__iexact=dname,
-                        )
-                    else:
-                        queryset = queryset.none()
+                        q |= Q(country__iexact="Bangladesh", district_or_state__iexact=dname)
+                    queryset = queryset.filter(q)
                 else:
                     queryset = queryset.none()
         else:
@@ -2877,29 +2859,11 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         # Ensure sk_user is always set to avoid DB NOT NULL failures.
         # Non-admin users are always bound to themselves.
         if not payload.get("sk_user"):
-            if has_malaria_privileged_access(request.user) and is_malaria_dm(request.user):
-                return Response(
-                    {
-                        "detail": (
-                            "Specify sk_user: an SPO in your district must own this non-local record."
-                        )
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
             payload["sk_user"] = request.user.id
         if not has_malaria_privileged_access(request.user):
             payload["sk_user"] = request.user.id
         serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
-
-        if is_malaria_dm(request.user):
-            try:
-                _assert_dm_nonlocal_sk_user(
-                    request.user,
-                    serializer.validated_data.get("sk_user"),
-                )
-            except PermissionError as exc:
-                return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
         self.perform_create(serializer)
         instance = serializer.instance
@@ -2908,6 +2872,15 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
             if isinstance(gm, dict):
                 instance.grid_metadata = {**(instance.grid_metadata or {}), **gm}
                 instance.save(update_fields=["grid_metadata", "updated_at"])
+            # Create PENDING approval entries for any months with data so the record
+            # appears in the DM approval queue.
+            dm_month_fields = [f for f in MONTH_COLUMNS if getattr(instance, f, 0)]
+            if dm_month_fields:
+                _sync_monthly_approvals_for_user_submission(
+                    MonthlyApproval.RECORD_TYPE_NON_LOCAL,
+                    instance,
+                    dm_month_fields,
+                )
         else:
             submitted_month_fields = [
                 field
@@ -2988,21 +2961,22 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
                         "updated_at",
                     ]
                 )
-        if not has_malaria_privileged_access(request.user) and (changed_month_fields or non_month_changes):
-            month_fields_for_approval = (
-                changed_month_fields
-                if changed_month_fields
-                else sorted(
+        if changed_month_fields:
+            _sync_monthly_approvals_for_user_submission(
+                MonthlyApproval.RECORD_TYPE_NON_LOCAL,
+                serializer.instance,
+                changed_month_fields,
+            )
+        elif not has_malaria_privileged_access(request.user) and non_month_changes:
+            _sync_monthly_approvals_for_user_submission(
+                MonthlyApproval.RECORD_TYPE_NON_LOCAL,
+                serializer.instance,
+                sorted(
                     _get_open_month_fields(
                         serializer.instance.reporting_year,
                         district_id=_non_local_record_district_id(serializer.instance),
                     )
-                )
-            )
-            _sync_monthly_approvals_for_user_submission(
-                MonthlyApproval.RECORD_TYPE_NON_LOCAL,
-                serializer.instance,
-                month_fields_for_approval,
+                ),
             )
         instance.refresh_from_db()
         return Response(self.get_serializer(instance).data)
@@ -3012,12 +2986,7 @@ class NonLocalRecordViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
         if is_malaria_global_admin(request.user):
             return super().destroy(request, *args, **kwargs)
         if is_malaria_dm(request.user):
-            if _non_local_in_dm_district(request.user, instance):
-                return super().destroy(request, *args, **kwargs)
-            return Response(
-                {"detail": "You can only delete non-local records in your district."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+            return super().destroy(request, *args, **kwargs)
         if instance.sk_user_id == request.user.id:
             return super().destroy(request, *args, **kwargs)
         return Response(
@@ -3219,45 +3188,22 @@ class MonthlyApprovalViewSet(RequestedFieldsViewMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = MonthlyApproval.objects.all()
-        # Debug: record DM role/did and queryset counts when needed
-        try:
-            debug_user = getattr(self.request.user, 'username', 'unknown')
-        except Exception:
-            debug_user = 'unknown'
         if is_malaria_global_admin(self.request.user):
             pass
         elif is_malaria_dm(self.request.user):
             did = get_dm_district_id(self.request.user)
-            # write a lightweight debug entry so we can verify DM identity and did
-            try:
-                with open('/tmp/monthly_approvals_debug.log', 'a') as _f:
-                    _f.write(f"user={debug_user} is_dm=True did={did}\n")
-            except Exception:
-                pass
             if did:
-                # Also include fallback when non_local records have a district_or_state text value
                 try:
                     dname = District.objects.only("name").get(pk=did).name
                 except District.DoesNotExist:
                     dname = None
-                pre_count = queryset.count()
                 q = Q(local_record__village__union__upazila__district_id=did) | Q(
                     non_local_record__sk_user__profile__micro_district_id=did
                 )
                 if dname:
                     q = q | (Q(non_local_record__country__iexact="Bangladesh") & Q(non_local_record__district_or_state__iexact=dname))
                 queryset = queryset.filter(q)
-                try:
-                    with open('/tmp/monthly_approvals_debug.log', 'a') as _f:
-                        _f.write(f"pre_count={pre_count} post_count={queryset.count()}\n")
-                except Exception:
-                    pass
             else:
-                try:
-                    with open('/tmp/monthly_approvals_debug.log', 'a') as _f:
-                        _f.write("did_missing_for_dm\n")
-                except Exception:
-                    pass
                 queryset = queryset.none()
         else:
             profile = getattr(self.request.user, "profile", None)

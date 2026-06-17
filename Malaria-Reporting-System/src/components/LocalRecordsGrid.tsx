@@ -136,6 +136,24 @@ function skBaselineNumberIsEmpty(value: number | null | undefined): boolean {
   return value === null || value === undefined || Number(value) === 0;
 }
 
+function NumericCellInput({
+  value,
+  onChange,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { value: number | null | undefined }) {
+  const [raw, setRaw] = useState<string | null>(null);
+  const display = raw !== null ? raw : (value == null || value === 0 ? "" : String(value));
+  return (
+    <input
+      {...props}
+      value={display}
+      onFocus={() => setRaw(value == null || value === 0 ? "" : String(value))}
+      onChange={(e) => { setRaw(e.target.value); onChange?.(e); }}
+      onBlur={() => setRaw(null)}
+    />
+  );
+}
+
 const OTHER_OPTION = "__other__";
 const LOCAL_HEADER_LABELS = [
   "SL",
@@ -213,6 +231,10 @@ const LOCAL_METADATA_DIRTY_FIELDS = new Set<keyof LocalRecord>([
   "village_distance_from_upazila_office_km",
   "village_bordering_country_name",
   "village_other_activities",
+  "village_name_bn",
+  "village_code",
+  "village_latitude",
+  "village_longitude",
 ]);
 
 /** API may return numeric `id`; JS Set uses strict equality — normalize for dirtyIds / lookups. */
@@ -360,6 +382,10 @@ function buildLocalMetadataSubmission(row: LocalRecord): LocalRecordMetadataSubm
       distance_from_upazila_office_km: row.village_distance_from_upazila_office_km,
       bordering_country_name: row.village_bordering_country_name || "",
       other_activities: row.village_other_activities || "",
+      name_bn: row.village_name_bn || "",
+      village_code: row.village_code || "",
+      latitude: row.village_latitude != null ? Number(row.village_latitude) : null,
+      longitude: row.village_longitude != null ? Number(row.village_longitude) : null,
     },
     profile: {
       micro_sk_shw_name: row.village_sk_shw_name || "",
@@ -660,11 +686,11 @@ const LocalRecordsGrid = () => {
     }
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     if (!user) return;
     fetchGenerationRef.current += 1;
     const fetchGen = fetchGenerationRef.current;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const requestPageSize = Math.max(100, pageSize || 100);
       let firstPage = await fetchLocalRecordsPage({
@@ -1643,9 +1669,14 @@ const LocalRecordsGrid = () => {
           await updateUpazila(r.upazila_id, { name: r.upazila_name });
           await updateUnion(r.union_id, { name: r.union_name });
         }
-        await updateLocalRecord(
+        const updated = await updateLocalRecord(
           rowIdKey(r.id),
           buildUpdatePayload(r, !isAdmin && dirtyLocalMetadataRowIdsRef.current.has(rowIdKey(r.id))),
+        );
+        setRows((prev) =>
+          prev.map((row) =>
+            rowIdKey(row.id) === rowIdKey(r.id) ? ({ ...updated } as LocalGridRow) : row,
+          ),
         );
         if (isAdmin) {
           await updateVillage(r.village_id, buildVillageUpdatePayload(r));
@@ -1654,7 +1685,8 @@ const LocalRecordsGrid = () => {
 
       const refreshedMaster = await fetchMalariaMasterData({ includeVillages: false });
       setMasterData(refreshedMaster);
-      await fetchData();
+      const freshApprovals = await fetchMonthlyApprovals({ recordType: "local", reportingYear: year });
+      setApprovalRows(freshApprovals);
       setDirtyIds(new Set());
       dirtyLocalMetadataRowIdsRef.current.clear();
       toast({ title: "Saved successfully" });
@@ -2453,11 +2485,11 @@ const LocalRecordsGrid = () => {
                 </td>
 
                 <td className="grid-td p-0">
-                  <input
+                  <NumericCellInput
                     type="number"
                     min={0}
                     className="grid-input"
-                    value={row.hh === 0 ? "" : row.hh}
+                    value={row.hh}
                     onChange={(e) => handleCellChange(row.id, "hh", e.target.value)}
                     disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedNumber(row, "hh")}
                   />
@@ -2465,14 +2497,14 @@ const LocalRecordsGrid = () => {
 
                 {itnColumns.map((itnCol) => (
                   <td key={itnCol} className="grid-td p-0">
-                    <input
+                    <NumericCellInput
                       type="number"
                       min={0}
                       className={`grid-input ${canEditOwnNewRow(row) || canSkEditRestrictedNumber(row, itnCol)
                           ? ""
                           : "bg-muted/30 text-muted-foreground"
                         }`}
-                      value={row[itnCol] === 0 ? "" : row[itnCol]}
+                      value={row[itnCol] as number | null}
                       onChange={(e) => handleCellChange(row.id, itnCol, e.target.value)}
                       disabled={!canEditOwnNewRow(row) && !canSkEditRestrictedNumber(row, itnCol)}
                     />
@@ -2554,9 +2586,9 @@ const LocalRecordsGrid = () => {
                   />
                 </td>
                 <td className="grid-td p-0">
-                  <input
+                  <NumericCellInput
                     className="grid-input"
-                    value={row.village_distance_from_upazila_office_km ?? ""}
+                    value={row.village_distance_from_upazila_office_km}
                     onChange={(e) =>
                       handleDecimalCellChange(row.id, "village_distance_from_upazila_office_km", e.target.value)
                     }
