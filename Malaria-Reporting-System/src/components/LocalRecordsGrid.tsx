@@ -1668,6 +1668,7 @@ const LocalRecordsGrid = () => {
           await updateDistrict(r.district_id, { name: r.district_name });
           await updateUpazila(r.upazila_id, { name: r.upazila_name });
           await updateUnion(r.union_id, { name: r.union_name });
+          await updateVillage(r.village_id, buildVillageUpdatePayload(r));
         }
         const updated = await updateLocalRecord(
           rowIdKey(r.id),
@@ -1678,9 +1679,6 @@ const LocalRecordsGrid = () => {
             rowIdKey(row.id) === rowIdKey(r.id) ? ({ ...updated } as LocalGridRow) : row,
           ),
         );
-        if (isAdmin) {
-          await updateVillage(r.village_id, buildVillageUpdatePayload(r));
-        }
       }
 
       const refreshedMaster = await fetchMalariaMasterData({ includeVillages: false });

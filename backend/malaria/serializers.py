@@ -328,18 +328,12 @@ class LocalRecordSerializer(RequestedFieldsMixin, serializers.ModelSerializer):
         return get_cached_local_record_assigned_user_details(obj)["ss_name"]
 
     def get_village_sk_shw_name(self, obj):
-        name = self.get_sk_user_display_name(obj)
-        if name:
-            return name
         pv = self._pending_village(obj)
         if "sk_shw_name" in pv:
             return _clean_assignment_text(pv.get("sk_shw_name"))
         return _clean_assignment_text(getattr(obj.village, "sk_shw_name", ""))
 
     def get_village_ss_name(self, obj):
-        ss = self.get_sk_user_ss_name(obj)
-        if ss:
-            return ss
         pv = self._pending_village(obj)
         if "ss_name" in pv:
             return _clean_assignment_text(pv.get("ss_name"))
