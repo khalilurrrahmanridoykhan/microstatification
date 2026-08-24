@@ -472,3 +472,51 @@ ModuleNotFoundError: No module named 'backend.wsgi'
 [2026-04-12 09:23:37 +0000] [3480299] [INFO] Using worker: sync
 [2026-04-12 09:23:37 +0000] [3480304] [INFO] Booting worker with pid: 3480304
 [2026-04-12 09:23:38 +0000] [3477664] [INFO] Shutting down: Master
+[2026-05-14 05:29:23 +0000] [448169] [INFO] Starting gunicorn 23.0.0
+[2026-05-14 05:29:23 +0000] [448169] [INFO] Listening at: http://127.0.0.1:9202 (448169)
+[2026-05-14 05:29:23 +0000] [448169] [INFO] Using worker: sync
+[2026-05-14 05:29:23 +0000] [448172] [INFO] Booting worker with pid: 448172
+[2026-05-14 05:32:22 +0000] [448169] [INFO] Handling signal: term
+[2026-05-14 00:32:22 -0500] [448172] [INFO] Worker exiting (pid: 448172)
+[2026-05-14 05:32:22 +0000] [448169] [INFO] Shutting down: Master
+[2026-05-14 05:32:38 +0000] [449925] [INFO] Starting gunicorn 23.0.0
+[2026-05-14 05:32:38 +0000] [449925] [INFO] Listening at: http://127.0.0.1:9202 (449925)
+[2026-05-14 05:32:38 +0000] [449925] [INFO] Using worker: sync
+[2026-05-14 05:32:38 +0000] [449926] [INFO] Booting worker with pid: 449926
+[2026-05-17 18:02:54 +0000] [449925] [ERROR] Worker (pid:449926) was sent SIGKILL! Perhaps out of memory?
+[2026-05-17 18:02:54 +0000] [2657711] [INFO] Booting worker with pid: 2657711
+[2026-05-20 09:32:52 +0000] [449925] [ERROR] Worker (pid:2657711) was sent SIGKILL! Perhaps out of memory?
+[2026-05-20 09:32:52 +0000] [196063] [INFO] Booting worker with pid: 196063
+[2026-05-31 22:16:44 -0500] [196063] [INFO] Worker exiting (pid: 196063)
+[2026-06-01 03:16:44 +0000] [449925] [INFO] Handling signal: term
+[2026-06-01 03:16:44 +0000] [449925] [ERROR] Worker (pid:196063) was sent SIGTERM!
+[2026-06-01 03:16:44 +0000] [449925] [INFO] Shutting down: Master
+[2026-06-01 03:16:46 +0000] [471012] [INFO] Starting gunicorn 23.0.0
+[2026-06-01 03:16:46 +0000] [471012] [INFO] Listening at: http://127.0.0.1:9202 (471012)
+[2026-06-01 03:16:46 +0000] [471012] [INFO] Using worker: sync
+[2026-06-01 03:16:46 +0000] [471013] [INFO] Booting worker with pid: 471013
+[2026-06-16 22:27:34 -0500] [471013] [INFO] Worker exiting (pid: 471013)
+[2026-06-17 03:27:34 +0000] [471012] [INFO] Handling signal: term
+[2026-06-17 03:27:34 +0000] [471012] [ERROR] Worker (pid:471013) was sent SIGTERM!
+[2026-06-17 03:27:34 +0000] [471012] [INFO] Shutting down: Master
+[2026-06-17 03:27:46 +0000] [1811708] [INFO] Starting gunicorn 23.0.0
+[2026-06-17 03:27:46 +0000] [1811708] [INFO] Listening at: http://127.0.0.1:9202 (1811708)
+[2026-06-17 03:27:46 +0000] [1811708] [INFO] Using worker: sync
+[2026-06-17 03:27:46 +0000] [1811709] [INFO] Booting worker with pid: 1811709
+[2026-06-17 03:31:45 +0000] [1811708] [INFO] Handling signal: term
+[2026-06-16 22:31:45 -0500] [1811709] [INFO] Worker exiting (pid: 1811709)
+[2026-06-17 03:31:45 +0000] [1811708] [INFO] Shutting down: Master
+[2026-06-17 03:31:54 +0000] [1814837] [INFO] Starting gunicorn 23.0.0
+[2026-06-17 03:31:54 +0000] [1814837] [INFO] Listening at: http://127.0.0.1:9202 (1814837)
+[2026-06-17 03:31:54 +0000] [1814837] [INFO] Using worker: sync
+[2026-06-17 03:31:54 +0000] [1814839] [INFO] Booting worker with pid: 1814839
+[2026-06-17 03:54:08 +0000] [1830694] [INFO] Starting gunicorn 23.0.0
+[2026-06-17 03:54:08 +0000] [1830694] [INFO] Listening at: http://127.0.0.1:9202 (1830694)
+[2026-06-17 03:54:08 +0000] [1830694] [INFO] Using worker: sync
+[2026-06-17 03:54:08 +0000] [1830695] [INFO] Booting worker with pid: 1830695
+[2026-07-07 11:05:12 +0000] [1830694] [INFO] Handling signal: hup
+[2026-07-07 11:05:12 +0000] [1830694] [INFO] Hang up: Master
+[2026-07-07 11:05:12 +0000] [1830694] [ERROR] Worker (pid:1830695) was sent SIGHUP!
+[2026-07-07 11:05:13 +0000] [1830694] [INFO] Handling signal: term
+[2026-07-07 11:05:13 +0000] [1948356] [INFO] Booting worker with pid: 1948356
+[2026-07-07 11:05:43 +0000] [1830694] [INFO] Shutting down: Master

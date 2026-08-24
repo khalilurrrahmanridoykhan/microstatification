@@ -17,6 +17,7 @@ from xml.etree import ElementTree as ET
 
 from django.contrib.auth.models import User
 from django.core import signing
+from django.core.cache import cache
 from django.core.paginator import EmptyPage, Paginator
 from django.core.signing import BadSignature, SignatureExpired
 from django.http import FileResponse, HttpResponse
@@ -1629,6 +1630,179 @@ def _build_microstatification_dashboard_payload(request_user, district_id=None):
         "upload_trend": upload_trend,
         "recent_uploads": recent_uploads,
     }
+
+
+MICROSTATIFICATION_PUBLIC_DASHBOARD_CACHE_KEY = "microstat_public_dashboard_v1"
+MICROSTATIFICATION_PUBLIC_DASHBOARD_CACHE_SECONDS = 300
+MICROSTATIFICATION_CURRENT_REPORTING_YEAR = 2026
+MICROSTATIFICATION_MONTH_FIELDS = [
+    "jan_cases", "feb_cases", "mar_cases", "apr_cases", "may_cases", "jun_cases",
+    "jul_cases", "aug_cases", "sep_cases", "oct_cases", "nov_cases", "dec_cases",
+]
+MICROSTATIFICATION_MONTH_LABELS = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+]
+# Not stored in the DB today; all districts currently onboarded sit in Chattogram Hill Tracts.
+MICROSTATIFICATION_DISTRICT_DIVISIONS = {
+    "Bandarban": "Chattogram",
+    "Chattogram": "Chattogram",
+    "Cox's Bazar": "Chattogram",
+    "Khagrachhari": "Chattogram",
+    "Rangamati": "Chattogram",
+}
+
+
+def _build_microstatification_public_dashboard_payload():
+    """Live-database equivalent of the dashboard's offline XLSX-generated JSON bundle.
+
+    Shape matches microstatification-dashboard's Village / MicrostatificationGeneratedSummary
+    types exactly so the frontend needs no schema changes, only a new fetch path.
+    """
+    local_records_by_village = {
+        row["village_id"]: row
+        for row in LocalRecord.objects.filter(
+            reporting_year=MICROSTATIFICATION_CURRENT_REPORTING_YEAR
+        ).values("village_id", "hh", "itn_2024", "itn_2025", "itn_2026", *MICROSTATIFICATION_MONTH_FIELDS)
+    }
+
+    villages_qs = Village.objects.select_related("union__upazila__district").order_by("id")
+
+    villages_payload = []
+    district_counts = defaultdict(int)
+    upazila_counts = defaultdict(int)
+    village_code_counts = defaultdict(int)
+    monthly_totals = [0] * 12
+    total_population = 0
+    total_households = 0
+    total_llin_2026 = 0
+    total_llin_2025 = 0
+    total_llin_2024 = 0
+    missing_coordinates = 0
+    missing_population = 0
+    district_ids = set()
+    upazila_ids = set()
+    union_ids = set()
+    ward_keys = set()
+
+    for village in villages_qs:
+        union = village.union
+        upazila = union.upazila
+        district = upazila.district
+        record = local_records_by_village.get(village.id)
+
+        cases_monthly = (
+            [int(record[field] or 0) for field in MICROSTATIFICATION_MONTH_FIELDS]
+            if record else [0] * 12
+        )
+        hh_number = int(record["hh"]) if record and record["hh"] is not None else 0
+        llin_2026 = int(record["itn_2026"]) if record and record["itn_2026"] is not None else 0
+        llin_2025 = int(record["itn_2025"]) if record and record["itn_2025"] is not None else 0
+        llin_2024 = int(record["itn_2024"]) if record and record["itn_2024"] is not None else 0
+
+        population = village.population or 0
+        has_coords = village.latitude is not None and village.longitude is not None
+
+        district_counts[district.name] += 1
+        upazila_counts[upazila.name] += 1
+        district_ids.add(district.id)
+        upazila_ids.add(upazila.id)
+        union_ids.add(union.id)
+        if village.ward_no:
+            ward_keys.add((union.id, village.ward_no))
+        if village.village_code:
+            village_code_counts[village.village_code] += 1
+        if not has_coords:
+            missing_coordinates += 1
+        if not population:
+            missing_population += 1
+
+        total_population += population
+        total_households += hh_number
+        total_llin_2026 += llin_2026
+        total_llin_2025 += llin_2025
+        total_llin_2024 += llin_2024
+        for i, value in enumerate(cases_monthly):
+            monthly_totals[i] += value
+
+        villages_payload.append({
+            "country": "Bangladesh",
+            "division": MICROSTATIFICATION_DISTRICT_DIVISIONS.get(district.name, "Chattogram"),
+            "district": district.name,
+            "upazila": upazila.name,
+            "union": union.name,
+            "ward_no": village.ward_no or "",
+            "sk_shw_name": village.sk_shw_name or "",
+            "designation": "Unknown",
+            "ss_name": village.ss_name or "",
+            "village_name_en": village.name,
+            "village_name_bn": village.name_bn or "",
+            "village_code": village.village_code or "",
+            "latitude": float(village.latitude) if village.latitude is not None else None,
+            "longitude": float(village.longitude) if village.longitude is not None else None,
+            "population": population,
+            "hh_number": hh_number,
+            "active_llin_2026": llin_2026,
+            "active_llin_2025": llin_2025,
+            "active_llin_2024": llin_2024,
+            "service_point": village.mmw_hp_chwc_name or "",
+            "distance_km": float(village.distance_from_upazila_office_km) if village.distance_from_upazila_office_km is not None else 0,
+            "border_country": village.bordering_country_name or "",
+            "other_activities": village.other_activities or "",
+            "cases_monthly_2026": cases_monthly,
+            "cases_2025_total": 0,
+            "cases_2024_total": 0,
+        })
+
+    duplicate_village_codes = sum(1 for count in village_code_counts.values() if count > 1)
+
+    summary = {
+        "generated_at": timezone.now().isoformat(),
+        "source": "Live database",
+        "totals": {
+            "villages": len(villages_payload),
+            "districts": len(district_ids),
+            "upazilas": len(upazila_ids),
+            "unions": len(union_ids),
+            "wards": len(ward_keys),
+            "population": total_population,
+            "households": total_households,
+            "active_llin_2026": total_llin_2026,
+            "active_llin_2025": total_llin_2025,
+            "active_llin_2024": total_llin_2024,
+            "missing_coordinates": missing_coordinates,
+            "missing_population": missing_population,
+            "duplicate_village_codes": duplicate_village_codes,
+        },
+        "district_counts": dict(district_counts),
+        "upazila_counts": dict(upazila_counts),
+        "monthly_totals_2026": [
+            {"month": label, "value": value}
+            for label, value in zip(MICROSTATIFICATION_MONTH_LABELS, monthly_totals)
+        ],
+        "limitations": [
+            "Health-worker fields (Name of SK/SHW, Name of SS) are not yet populated in the live system for almost all villages; they will show blank until field teams enter them.",
+            "Household counts and active-LLIN figures are not yet consistently entered against most villages and currently show as 0 rather than 'unknown'.",
+            "Only reporting year 2026 exists in the live system today; 2024 and 2025 case totals are not available and show as 0.",
+            f"{missing_coordinates} of {len(villages_payload)} villages have no latitude/longitude yet and cannot be placed on the map.",
+        ],
+    }
+
+    return {"villages": villages_payload, "summary": summary}
+
+
+class MicrostatificationPublicDashboardDataView(APIView):
+    """Public, read-only, cached feed for the standalone microstatification dashboard SPA."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        payload = cache.get_or_set(
+            MICROSTATIFICATION_PUBLIC_DASHBOARD_CACHE_KEY,
+            _build_microstatification_public_dashboard_payload,
+            MICROSTATIFICATION_PUBLIC_DASHBOARD_CACHE_SECONDS,
+        )
+        return Response(payload)
 
 
 def _profile_local_scope_q(profile):
